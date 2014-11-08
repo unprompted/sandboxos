@@ -2,6 +2,7 @@
 #include <v8-platform.h>
 #include <libplatform/libplatform.h>
 #include <unistd.h>
+#include <uv.h>
 
 #include "Task.h"
 
@@ -13,11 +14,12 @@ int main(int argc, char* argv[]) {
 	v8::V8::InitializePlatform(gPlatform);
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
+	uv_loop_t* loop = uv_default_loop();
 
-	int result = 0;
 	gPlatform->CallOnBackgroundThread(new Task("test.js"), v8::Platform::kLongRunningTask);
+	int result = uv_run(loop, UV_RUN_DEFAULT);
 
-	while (Task::getCount()) {
+	while (true) {
 		usleep(10000);
 	}
 

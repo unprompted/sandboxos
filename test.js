@@ -26,6 +26,7 @@ function onMessage(message) {
 
 var a = startScript("test2.js");
 print("startScript => " + a);
+sleep(0.2);
 a.invoke(['test', 1, 2, 3.0]).then(function(x) { print("response => " + x); });
 print("~test.js");
 print("parent = " + parent);

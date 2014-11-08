@@ -12,14 +12,19 @@
 
 class Task;
 
+struct uv_async_s; typedef struct uv_async_s uv_async_t;
+struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
+struct uv_work_s; typedef struct uv_work_s uv_work_t;
+
 typedef int taskid_t;
 
 class Message {
 public:
-	bool _response;
+	bool _isResponse;
 	taskid_t _sender;
 	taskid_t _recipient;
-	std::string _message;
+	std::string _data;
+	std::string _result;
 	int _promise;
 };
 
@@ -44,12 +49,9 @@ private:
 
 	std::list<Message> _messages;
 	Mutex _messageMutex;
-	Signal _messageSignal;
+	uv_async_t* _asyncMessage;
 	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
-
-	void enqueueMessage(const Message& message);
-	bool dequeueMessage(Message& message);
-	void handleMessage(const Message& message);
+	uv_loop_t* _loop;
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -60,6 +62,11 @@ private:
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	static void asyncMessage(uv_async_t* handle, int status);
+
+	static void startInvoke(Message& message);
+	static void finishInvoke(Message& message);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 };
