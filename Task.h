@@ -40,6 +40,7 @@ private:
 	Signal _messageSignal;
 
 	void enqueueMessage(const Message& message);
+	bool dequeueMessage(Message& message);
 	void handleMessage(const Message& message);
 
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -58,19 +58,8 @@ void Task::Run() {
 		while (true) {
 			if (_messageSignal.wait()) {
 				Message message;
-				bool haveMessage = false;
-				{
-					Lock lock(_mutex);
-					if (_messages.size()) {
-						message = _messages.front();
-						_messages.pop_front();
-						haveMessage = true;
-					}
-				}
-				if (haveMessage) {
+				if (dequeueMessage(message)) {
 					handleMessage(message);
-				} else {
-					break;
 				}
 			}
 		}
@@ -95,11 +84,13 @@ void Task::handleMessage(const Message& message) {
 		object = function;
 	}
 
-	v8::Handle<v8::Value> arg = v8::String::NewFromUtf8(_isolate, message._message.c_str(), v8::String::kNormalString, message._message.size());
-	v8::Handle<v8::Value> result = function->Call(object, 1, &arg);
-
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(_isolate, "JSON"))->ToObject();
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(_isolate, "stringify")));
+	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(_isolate, "parse")));
+
+	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(_isolate, message._message.c_str(), v8::String::kNormalString, message._message.size());
+	v8::Handle<v8::Value> arg = parse->Call(json, 1, &argAsString);
+	v8::Handle<v8::Value> result = function->Call(object, 1, &arg);
 
 	if (!message._response) {
 		Message response;
@@ -167,6 +158,17 @@ void Task::enqueueMessage(const Message& message) {
 	Lock lock(_mutex);
 	_messages.push_back(message);
 	_messageSignal.signal();
+}
+
+bool Task::dequeueMessage(Message& message) {
+	bool haveMessage = false;
+	Lock lock(_mutex);
+	if (_messages.size()) {
+		message = _messages.front();
+		_messages.pop_front();
+		haveMessage = true;
+	}
+	return haveMessage;
 }
 
 void Task::send(const v8::FunctionCallbackInfo<v8::Value>& args) {

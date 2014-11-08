@@ -1,5 +1,5 @@
 print("test2.js");
-send({text: "this is a message", array: [1, 2, 3]}, function bleh(result) {
-	print("response to message => " + JSON.stringify(result));
+send({command: "sum", args: [1, 2, 3]}, function(result) {
+	print("response to message => " + result);
 });
 'test2.js';
