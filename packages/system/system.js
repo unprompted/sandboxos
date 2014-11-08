@@ -80,7 +80,18 @@ function onMessage(from, message) {
 		if (message.to == "system") {
 			var fromName = getTaskName(from);
 
-			if (tasks[fromName] && tasks[fromName].manifest.trusted
+			if (message.action == "getData") {
+				var fileName = packageFilePath(fromName, "data/" + message.fileName);
+				if (fileName) {
+					return readFile(fileName);
+				}
+			} else if (message.action == "putData") {
+				makeDirectory(packageFilePath(fromName, "data"));
+				var fileName = packageFilePath(fromName, "data/" + message.fileName);
+				if (fileName) {
+					print("writeFile(" + fileName + ") => " + writeFile(fileName, message.contents));
+				}
+			} else if (tasks[fromName] && tasks[fromName].manifest.trusted
 				|| (!message.taskName && message.action == "get")) {
 				if (message.action == "stopTask") {
 					print("killing " + message.taskName);
@@ -91,13 +102,7 @@ function onMessage(from, message) {
 					print("killing " + message.taskName);
 					print(tasks[message.taskName]);
 					tasks[message.taskName].task.kill();
-					var fileName = tasks[message.taskName].fileName;
-					if (fileName) {
-						print(fileName);
-						var trusted = tasks[message.taskName].trusted;
-						tasks[message.taskName] = startScript(fileName, trusted);
-						tasks[message.taskName].fileName = fileName;
-					}
+					startTask(message.taskName);
 				} else if (message.action == "put") {
 					var fileName = packageFilePath(message.taskName, message.fileName);
 					print("fileName = " + fileName);
@@ -118,6 +123,8 @@ function onMessage(from, message) {
 				} else if (message.action == "getPackageList") {
 					print(getPackageList());
 					return getPackageList();
+				} else if (message.action == "getTasks") {
+					return tasks;
 				} else if (message.action == "getManifest") {
 					return tasks[message.taskName].manifest;
 				} else if (message.action == "list") {

@@ -1,0 +1,5 @@
+{
+	"name": "wiki",
+	"start": "backend.js",
+	"httpd": {"root": "/wiki"}
+}

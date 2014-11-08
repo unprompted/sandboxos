@@ -1,6 +1,13 @@
 var gHandlers = [];
 
 function updatePackage(packageName) {
+	var newHandlers = [];
+	for (var i in gHandlers) {
+		if (gHandlers[i].taskName != packageName) {
+			newHandlers.push(gHandlers[i]);
+		}
+	}
+	gHandlers = newHandlers;
 	parent.invoke({to: "system", action: "getManifest", taskName: packageName}).then(function(manifest) {
 		if (manifest && manifest.httpd && manifest.httpd.root) {
 			gHandlers.push({

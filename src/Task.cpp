@@ -419,7 +419,7 @@ void Task::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::String::Utf8Value utf8FileName(fileName);
 	std::ifstream file(*utf8FileName, std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
 	std::streampos fileSize = file.tellg();
-	if (fileSize >= 0) {
+	if (fileSize >= 0 && fileSize < 4 * 1024 * 1024) {
 		file.seekg(0, std::ios_base::beg);
 		char* buffer = new char[fileSize];
 		file.read(buffer, fileSize);

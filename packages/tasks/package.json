@@ -1,0 +1,6 @@
+{
+	"name": "tasks",
+	"start": "backend.js",
+	"trusted": true,
+	"httpd": {"root": "/tasks"}
+}
