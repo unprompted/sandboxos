@@ -5,17 +5,19 @@
 #include "Signal.h"
 
 #include <list>
-#include <memory>
 #include <string>
 #include <v8.h>
 #include <v8-platform.h>
 
 class Task;
 
+typedef int taskid_t;
+
 class Message {
 public:
 	bool _response;
-	std::weak_ptr<Task> _sender;
+	taskid_t _sender;
+	taskid_t _recipient;
 	std::string _message;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _callback;
 };
@@ -26,17 +28,21 @@ public:
 	~Task();
 	void Run();
 
+	int getId() const { return _id; }
 	static int getCount() { return _count; }
+	void kill();
 private:
 	static int _count;
 	static Mutex _mutex;
 
-	std::shared_ptr<Task> _self;
+	bool _killed;
+	taskid_t _id;
+	taskid_t _parent;
 	std::string _scriptName;
 	v8::Isolate* _isolate;
-	std::weak_ptr<Task> _parent;
-	std::list<std::weak_ptr<Task> > _children;
+
 	std::list<Message> _messages;
+	Mutex _messageMutex;
 	Signal _messageSignal;
 
 	void enqueueMessage(const Message& message);
@@ -49,6 +55,10 @@ private:
 	static void send(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void receive(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void noDelete(Task* task) {}
+
+	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	static void disposeTask(const v8::WeakCallbackData<v8::Object, void>& data);
 };
 
 #endif

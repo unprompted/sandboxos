@@ -1,4 +1,5 @@
 print("test.js");
+
 function onMessage(message) {
 	if (message.command == 'sum') {
 		var total = 0;
@@ -9,7 +10,13 @@ function onMessage(message) {
 	}
 }
 
-startScript("test2.js");
+var a = startScript("test2.js");
+print("startScript => " + a);
+sleep(0.5);
+print("killing script");
+a.kill();
+print("waiting");
+sleep(0.5);
 print("~test.js");
 
 'test.js';

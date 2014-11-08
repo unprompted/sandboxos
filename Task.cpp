@@ -1,13 +1,16 @@
 #include "Task.h"
 
-#include <v8.h>
-#include <v8-platform.h>
-#include <libplatform/libplatform.h>
 #include <fstream>
 #include <iostream>
+#include <libplatform/libplatform.h>
+#include <map>
 #include <unistd.h>
+#include <v8.h>
+#include <v8-platform.h>
 
 extern v8::Platform* gPlatform;
+std::map<taskid_t, Task*> gTasks;
+int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
 void execute(v8::Handle<v8::String> source);
@@ -22,8 +25,17 @@ public:
 };
 
 Task::Task(const char* scriptName)
-:	_self(this, NoDeleter()),
+:	_killed(false),
 	_isolate(0) {
+
+	{
+		Lock lock(_mutex);
+		do {
+			_id = gNextTaskId++;
+		} while (gTasks.find(_id) != gTasks.end());
+		gTasks[_id] = this;
+	}
+
 	++_count;
 	if (scriptName) {
 		_scriptName = scriptName;
@@ -32,7 +44,11 @@ Task::Task(const char* scriptName)
 
 Task::~Task() {
 	std::cout << "Task " << this << " destroyed.\n";
-	--_count;
+	{
+		Lock lock(_mutex);
+		gTasks.erase(gTasks.find(_id));
+		--_count;
+	}
 }
 
 void Task::Run() {
@@ -57,9 +73,14 @@ void Task::Run() {
 
 		while (true) {
 			if (_messageSignal.wait()) {
-				Message message;
-				if (dequeueMessage(message)) {
-					handleMessage(message);
+				if (_killed) {
+					break;
+				} else {
+					std::cout << this << " got signal?\n";
+					Message message;
+					if (dequeueMessage(message)) {
+						handleMessage(message);
+					}
 				}
 			}
 		}
@@ -94,12 +115,16 @@ void Task::handleMessage(const Message& message) {
 
 	if (!message._response) {
 		Message response;
-		response._sender = _self;
+		response._sender = _id;
 		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
 		response._message = toString(responseValue);
 		response._response = true;
 		response._callback = v8::Persistent<v8::Function>(_isolate, message._callback);
-		message._sender.lock()->enqueueMessage(response);
+
+		Lock lock(_mutex);
+		if (Task* task = gTasks[message._sender]) {
+			task->enqueueMessage(response);
+		}
 	}
 }
 
@@ -135,18 +160,43 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::HandleScope scope(args.GetIsolate());
+	v8::EscapableHandleScope scope(args.GetIsolate());
 	Task* task = new Task();
 	{
 		Lock lock(_mutex);
 		Task* parent = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 		if (parent) {
-			task->_parent = parent->_self;
-			parent->_children.push_back(task->_self);
+			task->_parent = parent->_id;
 		}
 	}
 	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
 	gPlatform->CallOnBackgroundThread(task, v8::Platform::kLongRunningTask);
+
+	v8::Handle<v8::ObjectTemplate> taskTemplate =  v8::ObjectTemplate::New(args.GetIsolate());
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), Task::kill));
+	taskTemplate->SetInternalFieldCount(1);
+	v8::Handle<v8::Object> taskObject = taskTemplate->NewInstance();
+	taskObject->SetInternalField(0, v8::Integer::New(args.GetIsolate(), task->_id));
+	args.GetReturnValue().Set(taskObject);
+}
+
+void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	int taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
+	std::cout << "kill?  KILL KILL!?!?! " << taskId << "\n";
+
+	Lock lock(_mutex);
+	if (Task* task = gTasks[taskId]) {
+		task->kill();
+	} else {
+		std::cout << "Could not find task!\n";
+	}
+}
+
+void Task::kill() {
+	v8::V8::TerminateExecution(_isolate);
+	_killed = true;
+	std::cout << "signalling " << this << "\n";
+	_messageSignal.signal();
 }
 
 void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -155,19 +205,29 @@ void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::enqueueMessage(const Message& message) {
-	Lock lock(_mutex);
+	Lock lock(_messageMutex);
 	_messages.push_back(message);
 	_messageSignal.signal();
 }
 
 bool Task::dequeueMessage(Message& message) {
 	bool haveMessage = false;
-	Lock lock(_mutex);
-	if (_messages.size()) {
+	Lock lock(_messageMutex);
+
+	while (_messages.size() && !_messages.front()._sender) {
+		_messages.pop_front();
+	}
+
+	while (_messages.size()) {
 		message = _messages.front();
 		_messages.pop_front();
-		haveMessage = true;
+
+		if (gTasks[message._sender]) {
+			haveMessage = true;
+			break;
+		}
 	}
+
 	return haveMessage;
 }
 
@@ -181,17 +241,22 @@ void Task::send(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	if (task) {
-		std::shared_ptr<Task> parent(task->_parent.lock());
-		if (parent) {
-			Message message;
-			message._message = *value;
-			message._sender = task->_self;
-			message._response = false;
-			v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), args[1].As<v8::Function>());
-			message._callback = function;
-			parent->enqueueMessage(message);
-			args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), true));
+		bool enqueued = false;
+		Message message;
+		message._message = *value;
+		message._sender = task->_id;
+		message._response = false;
+		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), args[1].As<v8::Function>());
+		message._callback = function;
+
+		{
+			Lock lock(_mutex);
+			if (Task* parent = gTasks[task->_parent]) {
+				parent->enqueueMessage(message);
+				enqueued = true;
+			}
 		}
+		args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), enqueued));
 	}
 }
 
@@ -214,4 +279,8 @@ void execute(v8::Handle<v8::String> source) {
 
 const char* toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
+}
+
+void Task::disposeTask(const v8::WeakCallbackData<v8::Object, void>& data) {
+	std::cout << "disposeTask\n";
 }
