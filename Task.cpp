@@ -339,8 +339,12 @@ void Task::startInvoke(Message& message) {
 	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
 	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
 
-	v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
-	message._result = toString(responseValue);
+	if (result->IsUndefined() || result->IsNull()) {
+		message._result = "";
+	} else {
+		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
+		message._result = toString(responseValue);
+	}
 
 	message._isResponse = true;
 
@@ -374,8 +378,14 @@ void Task::finishInvoke(Message& message) {
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "JSON"))->ToObject();
 	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "parse")));
 
-	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._result.c_str(), v8::String::kNormalString, message._result.size());
-	v8::Handle<v8::Value> arg = parse->Call(json, 1, &argAsString);
+	v8::Handle<v8::Value> arg;
+
+	if (message._result.size()) {
+		v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._result.c_str(), v8::String::kNormalString, message._result.size());
+		arg = parse->Call(json, 1, &argAsString);
+	} else {
+		arg = v8::Undefined(task->_isolate);
+	}
 
 	v8::TryCatch tryCatch;
 	v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(task->_isolate, task->_promises[message._promise]);
