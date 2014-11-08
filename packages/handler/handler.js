@@ -31,8 +31,8 @@ function onMessage(from, message) {
 			  messageId: message.messageId,
 		  });
 	} else if (message.request.uri == "/handler/receive") {
-	  	var haveIndex = message.request.body;
-	  	if (haveIndex < index) {
+	  	var haveIndex = parseInt(message.request.body);
+	  	if (haveIndex + 1 < index) {
 		  parent.invoke({
 			  to: "httpd",
 			  response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({index: haveIndex + 1, message: messages[haveIndex + 1]}),

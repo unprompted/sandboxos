@@ -13,10 +13,11 @@
 				$.ajax({
 					url: "/handler/receive",
 					method: "POST",
-					data: haveIndex,
+					data: haveIndex.toString(),
 					dataType: "json",
 				}).then(function(data) {
 				  print(data.message);
+				  haveIndex = data.index;
 				  receive();
 				}).fail(function(xhr, message, error) {
 				  print("RECEIVE FAILED");
