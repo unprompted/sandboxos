@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
 	{
-		Task task("system.js");
+		Task task("packages/system/system.js");
 		task.setTrusted(true);
 		task.run();
 	}

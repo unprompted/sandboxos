@@ -1,0 +1,5 @@
+{
+	"name": "httpd",
+	"start": "httpd.js",
+	"trusted": true
+}

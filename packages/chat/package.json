@@ -1,0 +1,5 @@
+{
+	"name": "chat",
+	"start": "backend.js",
+	"httpd": {"root": "/chat"}
+}

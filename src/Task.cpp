@@ -155,7 +155,6 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
 	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
-	std::cout << "CALL " << task->_scriptName << task->_id << "\n";
 	uv_thread_create(&task->_thread, run, task);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));

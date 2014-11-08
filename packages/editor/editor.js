@@ -50,50 +50,57 @@ var kStaticFiles = [
 
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
-	if (message.request.uri == "/editor/get") {
-		var form = decodeForm(message.request.query);
-		parent.invoke({to: "system", action: "get", taskName: form.taskName, fileName: form.fileName}).then(function(result) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
-		});
-	} else if (message.request.uri == "/editor/getPackageList") {
-		parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-		});
-	} else if (message.request.uri == "/editor/list") {
-		var form = decodeForm(message.request.query);
-		parent.invoke({to: "system", action: "list", taskName: form.taskName}).then(function(result) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-		});
-	} else if (message.request.uri == "/editor/put") {
-		var form = decodeForm(message.request.body);
-		print(form.fileName);
-		print(form.fileName);
-		print(form.fileName);
-		parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
-		parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
-			parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
-		});
-	} else if (message.request.uri == "/editor/newPackage") {
-		var form = decodeForm(message.request.query);
-		parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-		}).catch(function(error) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
-		});
-	} else {
-		var match;
-		for (var i in kStaticFiles) {
-			var file = kStaticFiles[i];
-			if (message.request.uri == file.uri) {
-				match = file;
-			}
-		}
-		if (match) {
-			parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
+	if (message.request) {
+		if (message.request.uri == "/editor/get") {
+			var form = decodeForm(message.request.query);
+			parent.invoke({to: "system", action: "get", taskName: form.taskName, fileName: form.fileName}).then(function(result) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
+			});
+		} else if (message.request.uri == "/editor/getPackageList") {
+			parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+			});
+		} else if (message.request.uri == "/editor/list") {
+			var form = decodeForm(message.request.query);
+			parent.invoke({to: "system", action: "list", taskName: form.taskName}).then(function(result) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+			});
+		} else if (message.request.uri == "/editor/put") {
+			var form = decodeForm(message.request.body);
+			print(undefined);
+			print(undefined);
+			print(JSON.parse(form.contents));
+			print(undefined);
+			print(undefined);
+			/*print(form.fileName);
+			print(form.fileName);
+			print(form.fileName);
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
+			parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: form.contents}).then(function(result) {
+				parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
+			});*/
+		} else if (message.request.uri == "/editor/newPackage") {
+			var form = decodeForm(message.request.query);
+			parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+			}).catch(function(error) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
 			});
 		} else {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
+			var match;
+			for (var i in kStaticFiles) {
+				var file = kStaticFiles[i];
+				if (message.request.uri == file.uri) {
+					match = file;
+				}
+			}
+			if (match) {
+				parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
+					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
+				});
+			} else {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
+			}
 		}
 	}
 }

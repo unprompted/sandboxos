@@ -1,13 +1,23 @@
-var gHandlers = [
-	{
-		path: '/handler',
-		taskName: 'handler',
-	},
-	{
-		path: '/editor',
-		taskName: 'editor',
-	},
-];
+var gHandlers = [];
+
+function updatePackage(packageName) {
+	parent.invoke({to: "system", action: "getManifest", taskName: packageName}).then(function(manifest) {
+		if (manifest && manifest.httpd && manifest.httpd.root) {
+			gHandlers.push({
+				path: manifest.httpd.root,
+				taskName: packageName,
+			});
+			print(gHandlers);
+		}
+	});
+}
+
+parent.invoke({to: "system", action: "getPackageList"}).then(function(packages) {
+	print(packages);
+	for (var i in packages) {
+		updatePackage(packages[i]);
+	}
+});
 
 function Request(method, uri, version, headers, body, client) {
 	this.method = method;
@@ -30,15 +40,20 @@ var gMessageId = 0;
 var gMessages = {};
 
 function onMessage(from, message) {
-	print("httpd onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
-	var promise = gMessages[message.messageId];
-	print(promise);
-	if (promise) {
-		print("resolving promise?");
-		promise[0](message);
-		delete gMessages[message.messageId];
+	if (message.action == "taskStarted") {
+		print(from);
+		print(message);
+		updatePackage(message.taskName);
+	} else {
+		print("httpd onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
+		var promise = gMessages[message.messageId];
+		print(promise);
+		if (promise) {
+			print("resolving promise?");
+			promise[0](message);
+			delete gMessages[message.messageId];
+		}
 	}
-	return true;
 }
 
 function invoke(message) {
