@@ -13,8 +13,6 @@ public:
 
 private:
 	uv_mutex_t _mutex;
-
-	friend class Signal;
 };
 
 class Lock {

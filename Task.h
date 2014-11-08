@@ -2,7 +2,6 @@
 #define INCLUDED_Task
 
 #include "Mutex.h"
-#include "Signal.h"
 
 #include <iostream>
 #include <list>
