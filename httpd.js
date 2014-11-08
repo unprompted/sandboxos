@@ -1,6 +1,6 @@
 var gHandlers = [
 	{
-		path: '/test',
+		path: '/handler',
 		taskName: 'handler',
 	},
 	{
@@ -9,12 +9,13 @@ var gHandlers = [
 	},
 ];
 
-function Request(method, uri, version, headers, client) {
+function Request(method, uri, version, headers, body, client) {
 	this.method = method;
 	this.uri = uri;
 	this.version = version;
 	this.headers = headers;
 	this.client = client;
+	this.body = body;
 	return this;
 }
 
@@ -44,6 +45,7 @@ function invoke(message) {
 
 function handleRequest(request) {
 	var matchedHandler = null;
+	print(request);
 
 	for (var name in gHandlers) {
 		var handler = gHandlers[name];
@@ -61,7 +63,7 @@ function handleRequest(request) {
 			request.client.close();
 		});
 	} else {
-		request.client.write("HTTP/1.0 OK\n");
+		request.client.write("HTTP/1.0 200 OK\n");
 		request.client.write("Content-Type: text/plain; encoding=utf-8\n");
 		request.client.write("Connection: close\n\n");
 		request.client.write("No handler for request: " + request.uri);
@@ -74,20 +76,43 @@ function handleConnection(client) {
 	var inputBuffer = "";
 	var request;
 	var headers = {};
+	var lineByLine = true;
+	var bodyToRead = -1;
+	var body = undefined;
 
-	function handleLine(line) {
-		if (!request) {
-			request = line.split(' ');
-			return true;
-		} else if (line) {
-			var colon = line.indexOf(':');
-			var key = line.slice(0, colon).trim();
-			var value = line.slice(colon + 1).trim();
-			headers[key] = value;
-			return true;
+	function finish() {
+		handleRequest(new Request(request[0], request[1], request[2], headers, body, client));
+	}
+
+	function handleLine(line, length) {
+		if (bodyToRead == -1) {
+			if (!request) {
+				request = line.split(' ');
+				return true;
+			} else if (line) {
+				var colon = line.indexOf(':');
+				var key = line.slice(0, colon).trim();
+				var value = line.slice(colon + 1).trim();
+				headers[key] = value;
+				return true;
+			} else {
+				if (headers["Content-Length"] > 0) {
+					bodyToRead = headers["Content-Length"];
+					print("bodyToRead => " + bodyToRead);
+					lineByLine = false;
+					body = "";
+					return true;
+				} else {
+					handleRequest(new Request(request[0], request[1], request[2], headers, body, client));
+					return false;
+				}
+			}
 		} else {
-			handleRequest(new Request(request[0], request[1], request[2], headers, client));
-			return false;
+			body += line + "\n";
+			bodyToRead -= length;
+			if (bodyToRead <= 0) {
+				finish();
+			}
 		}
 	}
 
@@ -99,16 +124,21 @@ function handleConnection(client) {
 			inputBuffer += data;
 			var more = true;
 			while (more) {
-				more = false;
-				var end = inputBuffer.indexOf('\n');
-				var realEnd = end;
-				while  (end > 0 && inputBuffer[end - 1] == '\r') {
-					--end;
-				}
-				if (end != -1) {
-					var line = inputBuffer.slice(0, end);
-					inputBuffer = inputBuffer.slice(realEnd + 1);
-					more = handleLine(line);
+				if (lineByLine) {
+					more = false;
+					var end = inputBuffer.indexOf('\n');
+					var realEnd = end;
+					while  (end > 0 && inputBuffer[end - 1] == '\r') {
+						--end;
+					}
+					if (end != -1) {
+						var line = inputBuffer.slice(0, end);
+						inputBuffer = inputBuffer.slice(realEnd + 1);
+						more = handleLine(line, realEnd + 1);
+					}
+				} else {
+					more = handleLine(inputBuffer, inputBuffer.length);
+					inputBuffer = "";
 				}
 			}
 		}

@@ -143,7 +143,6 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	std::cout << "CALL " << task->_scriptName << "\n";
 
 	uv_thread_create(&task->_thread, run, task);
-	//gPlatform->CallOnBackgroundThread(task, v8::Platform::kLongRunningTask);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
 }
@@ -175,7 +174,7 @@ void Task::kill() {
 		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
 		uv_async_send(_asyncMessage);
-		uv_thread_join(&_thread);
+		//uv_thread_join(&_thread);
 	}
 }
 
@@ -350,7 +349,7 @@ void Task::startInvoke(Message& message) {
 	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
 	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
 
-	if (result->IsUndefined() || result->IsNull()) {
+	if (result.IsEmpty() || result->IsUndefined() || result->IsNull()) {
 		message._result = "";
 	} else {
 		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
