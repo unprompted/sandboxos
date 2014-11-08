@@ -26,4 +26,7 @@ print("parent = " + parent);
 sleep(2.0).then(function() { a.kill() });
 'test.js';
 
+writeFile("writtenFile.txt", "Hello, world!");
+print(readFile("writtenFile.txt"));
+
 sleep(3.0).then(exit);

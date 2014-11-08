@@ -75,6 +75,8 @@ void Task::Run() {
 		global->Set(v8::String::NewFromUtf8(_isolate, "sleep"), v8::FunctionTemplate::New(_isolate, sleep));
 		global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
 		global->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, invoke));
+		global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
+		global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
 		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
@@ -111,10 +113,10 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(args.GetIsolate(), "JSON"))->ToObject();
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	std::cout << *task << '>';
 	for (int i = 0; i < args.Length(); i++) {
-		if (i != 0) {
-			std::cout << ' ';
-		}
+		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
 		v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
 		std::cout << toString(value);
@@ -403,6 +405,37 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 		taskObject->SetInternalField(0, v8::Integer::New(_isolate, id));
 	}
 	return taskObject;
+}
+
+void Task::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	v8::Handle<v8::String> fileName = args[0]->ToString();
+
+	v8::String::Utf8Value utf8FileName(fileName);
+	std::ifstream file(*utf8FileName, std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
+	std::streampos fileSize = file.tellg();
+	if (fileSize >= 0) {
+		file.seekg(0, std::ios_base::beg);
+		char* buffer = new char[fileSize];
+		file.read(buffer, fileSize);
+		std::string contents(buffer, buffer + fileSize);
+		args.GetReturnValue().Set(v8::String::NewFromOneByte(args.GetIsolate(), reinterpret_cast<const uint8_t*>(buffer), v8::String::String::kNormalString, fileSize));
+		delete[] buffer;
+	}
+}
+
+void Task::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	v8::Handle<v8::String> fileName = args[0]->ToString();
+	v8::Handle<v8::String> contents = args[1]->ToString();
+
+	v8::String::Utf8Value utf8FileName(fileName);
+	std::ofstream file(*utf8FileName, std::ios_base::out | std::ios_base::binary);
+
+	v8::String::Utf8Value utf8Contents(contents);
+	if (!file.write(*utf8Contents, utf8Contents.length())) {
+		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
+	}
 }
 
 const char* toString(const v8::String::Utf8Value& value) {

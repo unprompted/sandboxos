@@ -53,6 +53,9 @@ private:
 	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	uv_loop_t* _loop;
 
+	static void readFile(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void writeFile(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
