@@ -35,7 +35,21 @@ function onMessage(from, message) {
 			if (message.taskName == "handler") {
 				return readFile("handler.js");
 			} else {
-				return undefined;
+				var fromName;
+				for (var taskName in tasks) {
+					if (tasks[taskName].id == from.id) {
+						fromName = taskName;
+					}
+				}
+				print("GET GET GET");
+				print(fromName);
+				print(message.file);
+				if (message.file.indexOf('..') == -1) {
+					print('/packages/' + fromName + '/' + message.file);
+					return readFile('packages/' + fromName + '/' + message.file);
+				} else {
+					return 'bad path';
+				}
 			}
 		}
 	} else if (message.to) {

@@ -45,8 +45,12 @@ function onMessage(from, message) {
 			contents += "<head>\n";
 			contents += "\t<title>Editor</title>\n";
 			contents += "\t<script src=\"http://code.jquery.com/jquery-1.11.0.min.js\"></script>\n";
+			contents += "\t<script src=\"/editor/codemirror-compressed.js\"></script>\n";
+			contents += "\t<link rel=\"stylesheet\" href=\"/editor/codemirror.css\"></link>\n";
 			contents += "\t<script language=\"javascript\">\n";
+			contents += "\t\tvar cm;\n";
 			contents += "\t\tfunction submit() {\n";
+			contents += "\t\t\tcm.save()\n";
 			contents += "\t\t\t$.ajax({\n";
 			contents += "\t\t\t\ttype: \"POST\",\n";
 			contents += "\t\t\t\turl: \"/editor/update\",\n";
@@ -56,15 +60,21 @@ function onMessage(from, message) {
 			contents += "\t\t\t\t$(\"#iframe\")[0].src = \"/handler\";\n";
 			contents += "\t\t\t});\n";
 			contents += "\t\t}\n";
+			contents += "\t\t$(document).ready(function() {\n";
+			contents += "\t\t\tvar editor = document.getElementById(\"edit\");\n";
+			contents += "\t\t\tcm = CodeMirror.fromTextArea(editor);\n";
+			contents += "\t\t});\n";
 			contents += "\t</script>\n";
 			contents += "</head>\n";
 			contents += "<body>\n";
 			contents += "<h1>Editor</h1>\n";
-			contents += "<textarea id=\"edit\" style=\"width: 640px; height: 480px\">";
+			contents += "<input type=\"button\" value=\"Update =>\" onclick=\"submit()\" style=\"clear: both\"></input>\n";
+			contents += "<div>\n";
+			contents += "<textarea id=\"edit\" style=\"width: 100%; height: 10em\">";
 			contents += escapeHtml(result);
 			contents += "</textarea>\n";
-			contents += "<input type=\"button\" value=\"Update =>\" onclick=\"submit()\"></input>\n";
-			contents += "<iframe id=\"iframe\" style=\"width: 640px; height: 480px\" src=\"/handler\"></iframe>\n";
+			contents += "<iframe id=\"iframe\" style=\"width: 100%; height: 10em\" src=\"/handler\"></iframe>\n";
+			contents += "</div>\n";
 			contents += "</body>\n";
 			contents += "</html>\n";
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\n" + contents, messageId: message.messageId});
@@ -73,6 +83,14 @@ function onMessage(from, message) {
 		var form = decodeForm(message.request.body);
 		parent.invoke({to: "system", action: "update", taskName: "handler", script: JSON.parse(form.script)}).then(function(result) {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
+		});
+	} else if (message.request.uri == '/editor/codemirror-compressed.js') {
+		parent.invoke({to: "system", action: "get", file: "codemirror-compressed.js"}).then(function(contents) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/javascript\nConnection: close\n\n" + contents, messageId: message.messageId});
+		});
+	} else if (message.request.uri == '/editor/codemirror.css') {
+		parent.invoke({to: "system", action: "get", file: "codemirror.css"}).then(function(contents) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/css\nConnection: close\n\n" + contents, messageId: message.messageId});
 		});
 	} else {
 		var contents = "huh?";
