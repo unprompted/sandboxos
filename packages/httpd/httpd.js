@@ -126,8 +126,8 @@ function handleConnection(client) {
 			} else {
 				if (headers["Content-Length"] > 0) {
 					bodyToRead = headers["Content-Length"];
-					print("bodyToRead => " + bodyToRead);
 					lineByLine = false;
+					print("bodyToRead => " + bodyToRead);
 					body = "";
 					return true;
 				} else {
@@ -136,9 +136,6 @@ function handleConnection(client) {
 				}
 			}
 		} else {
-			if (body) {
-				body += "\n";
-			}
 			body += line;
 			bodyToRead -= length;
 			if (bodyToRead <= 0) {
