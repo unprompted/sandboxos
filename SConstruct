@@ -1,5 +1,5 @@
 env = Environment()
 env.Append(CPPPATH=['/home/cory/src/sys/v8/include', '/home/cory/src/sys/v8'])
-env.Append(LIBS=['v8', 'libicuuc', 'libicui18n', 'v8_libplatform'])
-env.Append(LIBPATH=['/home/cory/src/sys/v8/out/native/lib.target', '/home/cory/src/sys/v8/out/native/obj.target/tools/gyp'])
-env.Program('sandboxos', ['main.cpp'])
+env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread'])
+env.Append(LIBPATH=['/home/cory/src/sys/v8/out/native/obj.target/third_party/icu', '/home/cory/src/sys/v8/out/native/obj.target/tools/gyp'])
+env.Program('sandboxos', Glob('*.cpp'))
