@@ -26,14 +26,16 @@ function decode(encoded) {
 function decodeForm(encoded) {
 	var result = {};
 	// HACK
-	encoded = encoded.trim();
-	var items = encoded.split('&');
-	for (var i = 0; i < items.length; i++) {
-		var item = items[i];
-		var equals = item.indexOf('=');
-		var key = decode(item.slice(0, equals));
-		var value = decode(item.slice(equals + 1));
-		result[key] = value;
+	if (encoded) {
+		encoded = encoded.trim();
+		var items = encoded.split('&');
+		for (var i = 0; i < items.length; i++) {
+			var item = items[i];
+			var equals = item.indexOf('=');
+			var key = decode(item.slice(0, equals));
+			var value = decode(item.slice(equals + 1));
+			result[key] = value;
+		}
 	}
 	return result;
 }
@@ -70,6 +72,13 @@ function onMessage(from, message) {
 		parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
 		parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
 			parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
+		});
+	} else if (message.request.uri == "/editor/newPackage") {
+		var form = decodeForm(message.request.query);
+		parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+		}).catch(function(error) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
 		});
 	} else {
 		var match;

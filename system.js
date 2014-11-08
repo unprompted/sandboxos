@@ -74,6 +74,12 @@ function onMessage(from, message) {
 				if (fileName) {
 					return readFile(fileName);
 				}
+			} else if (message.action == "newPackage") {
+				var path = packageFilePath(message.taskName, "");
+				if (path) {
+					makeDirectory(path);
+				}
+				return path;
 			} else if (message.action == "getPackageList") {
 				var list = readDirectory("packages/");
 				list.sort();

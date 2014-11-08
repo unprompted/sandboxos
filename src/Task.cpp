@@ -86,6 +86,7 @@ void Task::run() {
 			global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
 			global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "readDirectory"), v8::FunctionTemplate::New(_isolate, readDirectory));
+			global->Set(v8::String::NewFromUtf8(_isolate, "makeDirectory"), v8::FunctionTemplate::New(_isolate, makeDirectory));
 			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
 		}
@@ -458,6 +459,13 @@ void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 
 	args.GetReturnValue().Set(array);
+}
+
+void Task::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	v8::Handle<v8::String> directory = args[0]->ToString();
+
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), mkdir(*v8::String::Utf8Value(directory), 0777)));
 }
 
 void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {

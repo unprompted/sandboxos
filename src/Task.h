@@ -82,6 +82,7 @@ private:
 	static void readFile(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void writeFile(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);

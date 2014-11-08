@@ -26,12 +26,39 @@ function setText(text) {
 	}
 }
 
+function newPackage() {
+	var package = prompt("Name of new package:");
+	if (package) {
+		$.ajax({
+			url: "/editor/newPackage",
+			data: {taskName: package},
+		}).then(function(data) {
+			alert("Package '" + package + "' created successfully.");
+		}).fail(function(xhr, status, error) {
+			alert("Error: " + error);
+		});
+	}
+}
+
+function newFile() {
+	var fileName = prompt("Name of new file:");
+	if (fileName) {
+		$.ajax({
+			type: "POST",
+			url: "/editor/put",
+			data: {fileName: fileName, contents: JSON.stringify(""), taskName: currentPackage},
+			dataType: "text",
+		});
+	}
+}
+
 function changePackage() {
 	currentPackage = $(this).text();
 	currentFileName = null;
 	$("#title").text("Editor - " + currentPackage);
 	$("#packageSpecific").show();
 	$("#fileSpecific").hide();
+	$("#iframe")[0].src = "";
 	$("#packages").children().each(function (i) {
 		if ($(this).text() == currentPackage) {
 			$(this).addClass("current");
@@ -87,5 +114,5 @@ $(document).ready(function() {
 		}
 	});
 	var editor = document.getElementById("edit");
-	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false});
+	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false, lineNumbers: true});
 });
