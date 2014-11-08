@@ -4,6 +4,7 @@
 		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
 		<script src="/editor/codemirror-compressed.js"></script>
 		<link rel="stylesheet" href="/editor/codemirror.css"></link>
+		<link rel="stylesheet" href="/editor/lesser-dark.css"></link>
 		<style>
 			li.current {
 				font-weight: bold;
@@ -66,7 +67,7 @@
 					}
 				});
 				var editor = document.getElementById("edit");
-				cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, indentUnit: 4, smartIndent: false});
+				cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false});
 			});
 		</script>
 	</head>

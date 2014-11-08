@@ -64,7 +64,7 @@ function onMessage(from, message) {
 					}
 				}
 				return finalList;
-			} else if (message.action == "startTask" && message.taskName == "handler") {
+			} else if (message.action == "startTask" && tasks[message.taskName]) {
 				var fileName = tasks[message.taskName].fileName;
 				if (fileName) {
 					print(fileName);

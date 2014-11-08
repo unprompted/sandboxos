@@ -42,6 +42,7 @@ var kStaticFiles = [
 	{uri: '/editor', path: 'index.html', type: 'text/html'},
 	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
 	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
+	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
 ];
 
 function onMessage(from, message) {

@@ -20,8 +20,7 @@
 				  haveIndex = data.index;
 				  receive();
 				}).fail(function(xhr, message, error) {
-				  print("RECEIVE FAILED");
-				  receive();
+				  print("RECEIVE FAILED.  Reload to resume.");
 				});
 			}
 			function print(line) {
