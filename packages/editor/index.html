@@ -3,6 +3,7 @@
 		<title>Editor</title>
 		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
 		<script src="/editor/codemirror-compressed.js"></script>
+		<script src="/editor/script.js"></script>
 		<link rel="stylesheet" href="/editor/codemirror.css"></link>
 		<link rel="stylesheet" href="/editor/lesser-dark.css"></link>
 		<style>
@@ -10,74 +11,22 @@
 				font-weight: bold;
 			}
 		</style>
-		<script language="javascript">
-			var cm;
-			var currentFileName;
-			function saveFile() {
-				cm.save()
-				if (currentFileName) {
-					$.ajax({
-						type: "POST",
-						url: "/editor/put",
-						data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
-						dataType: "text",
-					}).done(function(data) {
-						$("#iframe")[0].src = "/handler";
-					});
-				}
-			}
-			function setText(text) {
-				if (cm) {
-					cm.setValue(text);
-				} else {
-					$("#edit").val(text);
-				}
-			}
-			function changeFile() {
-				currentFileName = $(this).text();
-				$("#save").val("Save " + currentFileName);
-				$("#files").children().each(function (i) {
-					if ($(this).text() == currentFileName) {
-						$(this).addClass("current");
-					} else {
-						$(this).removeClass("current");
-					}
-				});
-				$.ajax({
-					url: "/editor/get",
-					data: {taskName: "handler", fileName: currentFileName},
-					dataType: "text",
-				}).done(setText);
-			}
-			$(document).ready(function() {
-				$.ajax({
-					url: "/editor/list",
-					data: {taskName: "handler"},
-					dataType: "JSON",
-				}).then(function(data) {
-					$("#files").empty();
-					for (var i in data) {
-						var li = document.createElement("li");
-						$(li).text(data[i]);
-						$(li).click(changeFile);
-						$("#files").append(li);
-						if (!currentFileName) {
-							changeFile.apply(li);
-						}
-					}
-				});
-				var editor = document.getElementById("edit");
-				cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false});
-			});
-		</script>
 	</head>
 	<body>
-		<h1>Editor</h1>
-		<ul id="files"></ul>
-		<input id="save" type="button" value="Save" onclick="saveFile()" style="clear: both"></input>
-		<div>
-			<textarea id="edit" style="width: 100%; height: 10em"></textarea>
-			<iframe id="iframe" style="width: 100%; height: 20em" src="/handler"></iframe>
+		<h1 id="title">Editor</h1>
+		<h2>Packages</h2>
+		<ul id="packages"></ul>
+		<div id="packageSpecific" style="display: none">
+			<h2>Files</h2>
+			<ul id="files"></ul>
+			<div id="fileSpecific" style="display: none">
+				<input id="save" type="button" value="Save" onclick="saveFile()" style="clear: both"></input>
+				<div>
+					<textarea id="edit" style="width: 100%; height: 10em"></textarea>
+					<input id="reload" type="button" value="Reload" onclick="reload()" style="clear: both"></input>
+					<iframe id="iframe" style="width: 100%; height: 20em"></iframe>
+				</div>
+			</div>
 		</div>
 	</body>
 </html>

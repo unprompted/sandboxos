@@ -43,17 +43,23 @@ var kStaticFiles = [
 	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
 	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
 	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
+	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
 ];
 
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 	if (message.request.uri == "/editor/get") {
 		var form = decodeForm(message.request.query);
-		parent.invoke({to: "system", action: "get", taskName: "handler", fileName: form.fileName}).then(function(result) {
+		parent.invoke({to: "system", action: "get", taskName: form.taskName, fileName: form.fileName}).then(function(result) {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
 		});
+	} else if (message.request.uri == "/editor/getPackageList") {
+		parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+		});
 	} else if (message.request.uri == "/editor/list") {
-		parent.invoke({to: "system", action: "list", taskName: "handler"}).then(function(result) {
+		var form = decodeForm(message.request.query);
+		parent.invoke({to: "system", action: "list", taskName: form.taskName}).then(function(result) {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
 		});
 	} else if (message.request.uri == "/editor/put") {
@@ -61,12 +67,9 @@ function onMessage(from, message) {
 		print(form.fileName);
 		print(form.fileName);
 		print(form.fileName);
-		parent.invoke({to: "system", action: "stopTask", taskName: "handler"}).then(function(result) {
-			parent.invoke({to: "system", action: "put", taskName: "handler", fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
-				parent.invoke({to: "system", action: "startTask", taskName: "handler"}).then(function(result) {
-					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
-				});
-			});
+		parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
+		parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
+			parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
 		});
 	} else {
 		var match;

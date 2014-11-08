@@ -42,7 +42,27 @@ function onMessage(from, message) {
 			|| (!message.taskName && message.action == "get")) {
 			if (message.action == "stopTask") {
 				print("killing " + message.taskName);
+				print(tasks[message.taskName]);
 				tasks[message.taskName].kill();
+			} else if (message.action == "startTask" && tasks[message.taskName]) {
+				var fileName = tasks[message.taskName].fileName;
+				if (fileName) {
+					print(fileName);
+					var trusted = tasks[message.taskName].trusted;
+					tasks[message.taskName] = startScript(fileName, trusted);
+					tasks[message.taskName].fileName = fileName;
+				}
+			} else if (message.action == "restartTask" && tasks[message.taskName]) {
+				print("killing " + message.taskName);
+				print(tasks[message.taskName]);
+				tasks[message.taskName].kill();
+				var fileName = tasks[message.taskName].fileName;
+				if (fileName) {
+					print(fileName);
+					var trusted = tasks[message.taskName].trusted;
+					tasks[message.taskName] = startScript(fileName, trusted);
+					tasks[message.taskName].fileName = fileName;
+				}
 			} else if (message.action == "put") {
 				var fileName = packageFilePath(message.taskName, message.fileName);
 				print("fileName = " + fileName);
@@ -54,24 +74,26 @@ function onMessage(from, message) {
 				if (fileName) {
 					return readFile(fileName);
 				}
+			} else if (message.action == "getPackageList") {
+				var list = readDirectory("packages/");
+				list.sort();
+				var finalList = [];
+				for (var i in list) {
+					if (list[i][0] != ".") {
+						finalList.push(list[i]);
+					}
+				}
+				return finalList;
 			} else if (message.action == "list") {
 				var list = readDirectory(packageFilePath(message.taskName, ""));
 				list.sort();
 				var finalList = [];
 				for (var i in list) {
-					if (list[i] != "." && list[i] != "..") {
+					if (list[i][0] != ".") {
 						finalList.push(list[i]);
 					}
 				}
 				return finalList;
-			} else if (message.action == "startTask" && tasks[message.taskName]) {
-				var fileName = tasks[message.taskName].fileName;
-				if (fileName) {
-					print(fileName);
-					var trusted = tasks[message.taskName].trusted;
-					tasks[message.taskName] = startScript(fileName, trusted);
-					tasks[message.taskName].fileName = fileName;
-				}
 			}
 		} else if (message.action == "getPackageContents") {
 		}
