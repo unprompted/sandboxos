@@ -1,4 +1,8 @@
+#ifndef INCLUDED_Task
+#define INCLUDED_Task
+
 #include "Mutex.h"
+#include "Signal.h"
 
 #include <list>
 #include <memory>
@@ -10,8 +14,10 @@ class Task;
 
 class Message {
 public:
+	bool _response;
 	std::weak_ptr<Task> _sender;
 	std::string _message;
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _callback;
 };
 
 class Task : public v8::Task {
@@ -30,7 +36,11 @@ private:
 	v8::Isolate* _isolate;
 	std::weak_ptr<Task> _parent;
 	std::list<std::weak_ptr<Task> > _children;
-	std::list<std::string> _messages;
+	std::list<Message> _messages;
+	Signal _messageSignal;
+
+	void enqueueMessage(const Message& message);
+	void handleMessage(const Message& message);
 
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -39,3 +49,5 @@ private:
 	static void receive(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void noDelete(Task* task) {}
 };
+
+#endif
