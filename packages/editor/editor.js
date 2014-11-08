@@ -67,18 +67,10 @@ function onMessage(from, message) {
 			});
 		} else if (message.request.uri == "/editor/put") {
 			var form = decodeForm(message.request.body);
-			print(undefined);
-			print(undefined);
-			print(JSON.parse(form.contents));
-			print(undefined);
-			print(undefined);
-			/*print(form.fileName);
-			print(form.fileName);
-			print(form.fileName);
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
-			parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: form.contents}).then(function(result) {
+			parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
 				parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
-			});*/
+			});
 		} else if (message.request.uri == "/editor/newPackage") {
 			var form = decodeForm(message.request.query);
 			parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
