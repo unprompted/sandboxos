@@ -71,6 +71,8 @@ private:
 	int64_t _memoryAllocated;
 	int64_t _memoryLimit;
 
+	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
+
 	static void readLine(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void readFile(const v8::FunctionCallbackInfo<v8::Value>& args);

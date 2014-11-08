@@ -16,7 +16,6 @@ std::map<taskid_t, Task*> gTasks;
 int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
-void execute(v8::Isolate* isolate, v8::Handle<v8::String> source, v8::Handle<v8::String> name);
 const char* toString(const v8::String::Utf8Value& value);
 
 int Task::_count;
@@ -86,7 +85,7 @@ void Task::Run() {
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
 		std::cout << "Running script " << _scriptName << "\n";
 		if (!script.IsEmpty()) {
-			execute(_isolate, script, v8::String::NewFromUtf8(_isolate, _scriptName.c_str()));
+			execute(script, v8::String::NewFromUtf8(_isolate, _scriptName.c_str()));
 		}
 
 		uv_run(_loop, UV_RUN_DEFAULT);
@@ -219,10 +218,8 @@ void Task::sleepCallback(uv_timer_t* timer) {
 	delete data;
 }
 
-void execute(v8::Isolate* isolate, v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
-	v8::TryCatch tryCatch;
-	tryCatch.SetVerbose(true);
-	tryCatch.SetCaptureMessage(true);
+void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
+	TaskTryCatch tryCatch(this);
 	v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
 	if (!script.IsEmpty()) {
 		v8::Handle<v8::Value> result = script->Run();
@@ -230,12 +227,6 @@ void execute(v8::Isolate* isolate, v8::Handle<v8::String> source, v8::Handle<v8:
 		std::cout << "Script returned: " << toString(stringResult) << '\n';
 	} else {
 		std::cerr << "Failed to compile script.\n";
-	}
-	if (tryCatch.HasCaught()) {
-		v8::Local<v8::Value> exception = tryCatch.Exception();
-		v8::String::Utf8Value exceptionText(exception->ToString());
-		tryCatch.Message()->PrintCurrentStackTrace(isolate, stderr);
-		std::cerr << __LINE__ << " - Exception: " << toString(exceptionText) << "\n";
 	}
 }
 

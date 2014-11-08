@@ -43,21 +43,26 @@ function invoke(message) {
 	});
 }
 
-function handleRequest(request) {
+function findHandler(uri) {
 	var matchedHandler = null;
-	print(request);
-
 	for (var name in gHandlers) {
 		var handler = gHandlers[name];
-		if (handler.path == request.uri.slice(0, handler.path.length)) {
+		if (uri == handler.path ||
+			uri.slice(0, handler.path.length + 1) == handler.path + '/') {
 			matchedHandler = handler;
 			break;
 		}
 	}
+	return matchedHandler;
+}
 
-	if (matchedHandler) {
-		print(matchedHandler.taskName);
-		invoke({to: matchedHandler.taskName, action: "handleRequest", request: request}).then(function(data) {
+function handleRequest(request) {
+	var  handler = findHandler(request.uri);
+	print(request);
+
+	if (handler) {
+		print(handler.taskName);
+		invoke({to: handler.taskName, action: "handleRequest", request: request}).then(function(data) {
 			print("INVOKE -> " + JSON.stringify(data));
 			request.client.write(data.response);
 			request.client.close();
@@ -66,7 +71,7 @@ function handleRequest(request) {
 		request.client.write("HTTP/1.0 200 OK\n");
 		request.client.write("Content-Type: text/plain; encoding=utf-8\n");
 		request.client.write("Connection: close\n\n");
-		request.client.write("No handler for request: " + request.uri);
+		request.client.write("No handler found for request: " + request.uri);
 		request.client.close();
 	}
 }
@@ -149,10 +154,16 @@ var kBacklog = 8;
 
 function runServer(ip, port) {
 	var socket = new Socket();
-	socket.bind(ip, port);
-	socket.listen(kBacklog, function() {
+	var bindResult = socket.bind(ip, port);
+	if (bindResult != 0) {
+		throw "bind failed: " + bindResult;
+	}
+	var listenResult = socket.listen(kBacklog, function() {
 		handleConnection(socket.accept());
 	});
+	if (listenResult != 0) {
+		throw "listen failed: " + listenResult;
+	}
 }
 
 runServer("0.0.0.0", 12345);

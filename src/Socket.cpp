@@ -30,7 +30,7 @@ void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		int backlog = args[0]->ToInteger()->Value();
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
 		socket->_onConnect = callback;
-		uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection);
+		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection)));
 	}
 }
 
