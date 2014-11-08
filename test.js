@@ -9,7 +9,7 @@ function Request(method, uri, version, headers, client) {
 
 function handleRequest(request) {
 	request.client.write("HTTP/1.0 OK\n");
-	request.client.write("Content-Type: text/plain\n");
+	request.client.write("Content-Type: text/plain; encoding=utf-8\n");
 	request.client.write("Connection: close\n\n");
 	request.client.write("Hello, world!");
 	request.client.close();
