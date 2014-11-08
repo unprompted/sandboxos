@@ -45,11 +45,12 @@ Task::Task(const char* scriptName)
 }
 
 Task::~Task() {
+	Lock lock(_mutex);
+	Lock messageLock(_messageMutex);
 	std::cout << *this << " loop b gone\n";
 	uv_loop_delete(_loop);
 	std::cout << *this << " destroyed.\n";
 	{
-		Lock lock(_mutex);
 		gTasks.erase(gTasks.find(_id));
 		--_count;
 	}

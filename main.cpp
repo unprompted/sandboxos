@@ -14,16 +14,9 @@ int main(int argc, char* argv[]) {
 	v8::V8::InitializePlatform(gPlatform);
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
-	uv_loop_t* loop = uv_default_loop();
 
 	Task task("test.js");
 	task.Run();
-	/*gPlatform->CallOnBackgroundThread(new Task("test.js"), v8::Platform::kLongRunningTask);
-	int result = uv_run(loop, UV_RUN_DEFAULT);
-
-	while (true) {
-		usleep(10000);
-	}*/
 
 	v8::V8::Dispose();
 

@@ -1,19 +1,7 @@
 print("test.js");
 
-print("test promise");
-var p = new Promise(function(resolve, reject) {
-	print("yo");
-	print(resolve);
-	print(reject);
-	print(resolve("resolved"));
-})
-.then(function(result) { print("then: " + result); })
-.catch(function(e) { print("catch: " + e); });
-print(p);
-print("end test promise");
-
 function onMessage(message) {
-	print("onMessage => " + JSON.stringify(message));
+	print("test.js onMessage => " + JSON.stringify(message));
 	if (message.command == 'sum') {
 		var total = 0;
 		for (var i = 0; i < message.args.length; i++) {
