@@ -16,7 +16,7 @@ std::map<taskid_t, Task*> gTasks;
 int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
-void execute(v8::Isolate* isolate, v8::Handle<v8::String> source);
+void execute(v8::Isolate* isolate, v8::Handle<v8::String> source, v8::Handle<v8::String> name);
 const char* toString(const v8::String::Utf8Value& value);
 
 int Task::_count;
@@ -82,7 +82,7 @@ void Task::Run() {
 		v8::Context::Scope contextScope(context);
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
 		if (!script.IsEmpty()) {
-			execute(_isolate, script);
+			execute(_isolate, script, v8::String::NewFromUtf8(_isolate, _scriptName.c_str()));
 		}
 
 		uv_run(_loop, UV_RUN_DEFAULT);
@@ -205,11 +205,11 @@ void Task::sleepCallback(uv_timer_t* timer, int status) {
 	delete data;
 }
 
-void execute(v8::Isolate* isolate, v8::Handle<v8::String> source) {
+void execute(v8::Isolate* isolate, v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
 	v8::TryCatch tryCatch;
 	tryCatch.SetVerbose(true);
 	tryCatch.SetCaptureMessage(true);
-	v8::Handle<v8::Script> script = v8::Script::Compile(source, source);
+	v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
 	if (!script.IsEmpty()) {
 		v8::Handle<v8::Value> result = script->Run();
 		v8::String::Utf8Value stringResult(result);
@@ -226,6 +226,7 @@ void execute(v8::Isolate* isolate, v8::Handle<v8::String> source) {
 }
 
 void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::TryCatch tryCatch;
 	v8::EscapableHandleScope scope(args.GetIsolate());
 	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(args.GetIsolate(), "JSON"))->ToObject();
@@ -259,6 +260,12 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 				uv_async_send(recipient->_asyncMessage);
 			}
 		}
+	}
+	if (tryCatch.HasCaught()) {
+		v8::Local<v8::Value> exception = tryCatch.Exception();
+		v8::String::Utf8Value exceptionText(exception->ToString());
+		tryCatch.Message()->PrintCurrentStackTrace(args.GetIsolate(), stderr);
+		std::cerr << __LINE__ << " - Exception: " << toString(exceptionText) << "\n";
 	}
 }
 
@@ -314,11 +321,13 @@ void Task::startInvoke(Message& message) {
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "stringify")));
 
 	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._data.c_str(), v8::String::kNormalString, message._data.size());
-	v8::Handle<v8::Value> arg;
+	v8::Handle<v8::Value> args[2];
+
+	args[0] = task->makeTaskObject(message._sender);
 
 	{
 		v8::TryCatch tryCatch;
-		arg = parse->Call(json, 1, &argAsString);
+		args[1] = parse->Call(json, 1, &argAsString);
 
 		if (tryCatch.HasCaught()) {
 			v8::Local<v8::Value> exception = tryCatch.Exception();
@@ -328,7 +337,7 @@ void Task::startInvoke(Message& message) {
 	}
 
 	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
-	v8::Handle<v8::Value> result = function->Call(context->Global(), 1, &arg);
+	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
 
 	v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
 	message._result = toString(responseValue);
@@ -393,6 +402,7 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 		taskTemplate->SetInternalFieldCount(1);
 		taskObject = taskTemplate->NewInstance();
 		taskObject->SetInternalField(0, v8::Integer::New(_isolate, id));
+		taskObject->Set(v8::String::NewFromUtf8(_isolate, "id"), v8::Integer::New(_isolate, id));
 	}
 	return taskObject;
 }

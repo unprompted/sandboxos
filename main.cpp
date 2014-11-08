@@ -15,8 +15,7 @@ int main(int argc, char* argv[]) {
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
-	Task task("test.js");
-	task.Run();
+	Task("system.js").Run();
 
 	v8::V8::Dispose();
 
