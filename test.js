@@ -23,10 +23,10 @@ a.invoke(['test', 1, 2, 3.0]).then(function(x) { print("response => " + x); });
 
 print("~test.js");
 print("parent = " + parent);
-sleep(2.0).then(function() { a.kill() });
+//sleep(2.0).then(function() { a.kill() });
 'test.js';
 
 writeFile("writtenFile.txt", "Hello, world!");
 print(readFile("writtenFile.txt"));
 
-sleep(3.0).then(exit);
+//sleep(3.0).then(exit);

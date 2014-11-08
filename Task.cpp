@@ -14,7 +14,7 @@ std::map<taskid_t, Task*> gTasks;
 int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
-void execute(v8::Handle<v8::String> source);
+void execute(v8::Isolate* isolate, v8::Handle<v8::String> source);
 const char* toString(const v8::String::Utf8Value& value);
 
 int Task::_count;
@@ -41,7 +41,6 @@ Task::Task(const char* scriptName)
 	_asyncMessage = new uv_async_t();
 	_asyncMessage->data = this;
 	uv_async_init(_loop, _asyncMessage, asyncMessage);
-	std::cout << *this << " has loop " << _loop << "\n";
 
 	++_count;
 	if (scriptName) {
@@ -52,9 +51,7 @@ Task::Task(const char* scriptName)
 Task::~Task() {
 	Lock lock(_mutex);
 	Lock messageLock(_messageMutex);
-	std::cout << *this << " loop b gone\n";
 	uv_loop_delete(_loop);
-	std::cout << *this << " destroyed.\n";
 	{
 		gTasks.erase(gTasks.find(_id));
 		--_count;
@@ -62,7 +59,6 @@ Task::~Task() {
 }
 
 void Task::Run() {
-	std::cout << *this << " running.\n";
 	_isolate = v8::Isolate::New();
 	_isolate->SetData(0, this);
 	{
@@ -77,12 +73,13 @@ void Task::Run() {
 		global->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, invoke));
 		global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
 		global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
+		global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
 		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
 		if (!script.IsEmpty()) {
-			execute(script);
+			execute(_isolate, script);
 		}
 
 		uv_run(_loop, UV_RUN_DEFAULT);
@@ -90,7 +87,6 @@ void Task::Run() {
 	_promises.clear();
 	_isolate->Dispose();
 	_isolate = 0;
-	std::cout << *this << " is done.\n";
 }
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
@@ -152,9 +148,7 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Lock lock(_mutex);
 	if (Task* task = gTasks[taskId]) {
 		if (task->_parent == self->_id) {
-			std::cout << "Killing task " << *task << "\n";
 			task->kill();
-			std::cout << "Killed " << *task << "?\n";
 		} else {
 			std::cerr << *task << " is not a child of " << *self << "\n";
 		}
@@ -164,9 +158,11 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::kill() {
-	v8::V8::TerminateExecution(_isolate);
-	_killed = true;
-	uv_async_send(_asyncMessage);
+	if (!_killed) {
+		v8::V8::TerminateExecution(_isolate);
+		_killed = true;
+		uv_async_send(_asyncMessage);
+	}
 }
 
 void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -196,8 +192,6 @@ void Task::sleepCallback(uv_timer_t* timer, int status) {
 		task = gTasks[data->_task];
 	}
 
-	std::cout << "sleepCallback " << *task << "\n";
-
 	if (task) {
 		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(task->_isolate, task->_promises[data->_promise]);
 		resolver->Resolve(v8::Undefined(task->_isolate));
@@ -208,8 +202,10 @@ void Task::sleepCallback(uv_timer_t* timer, int status) {
 	delete data;
 }
 
-void execute(v8::Handle<v8::String> source) {
+void execute(v8::Isolate* isolate, v8::Handle<v8::String> source) {
 	v8::TryCatch tryCatch;
+	tryCatch.SetVerbose(true);
+	tryCatch.SetCaptureMessage(true);
 	v8::Handle<v8::Script> script = v8::Script::Compile(source, source);
 	if (!script.IsEmpty()) {
 		v8::Handle<v8::Value> result = script->Run();
@@ -220,7 +216,8 @@ void execute(v8::Handle<v8::String> source) {
 	}
 	if (tryCatch.HasCaught()) {
 		v8::Local<v8::Value> exception = tryCatch.Exception();
-		v8::String::Utf8Value exceptionText(exception);
+		v8::String::Utf8Value exceptionText(exception->ToString());
+		tryCatch.Message()->PrintCurrentStackTrace(isolate, stderr);
 		std::cerr << __LINE__ << " - Exception: " << toString(exceptionText) << "\n";
 	}
 }
@@ -251,14 +248,12 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		{
 			Lock lock(_mutex);
 			if (Task* recipient = gTasks[recipientId]) {
-				std::cout << "queuing work on " << *recipient << "\n";
 				{
 					Lock messageLock(recipient->_messageMutex);
 					recipient->_messages.push_back(message);
 				}
 
 				uv_async_send(recipient->_asyncMessage);
-				std::cout << "done queuing work on " << *recipient << "\n";
 			}
 		}
 	}
@@ -268,9 +263,7 @@ void Task::asyncMessage(uv_async_t* work, int status) {
 	bool moreMessages = true;
 	Task* task = (Task*)work->data;
 	if (task) {
-		std::cout << "asyncMessage " << *task << "\n";
 		if (task->_killed) {
-			std::cout << *task << ", I am slain\n";
 			uv_close(reinterpret_cast<uv_handle_t*>(task->_asyncMessage), 0);
 		} else {
 			while (moreMessages) {
@@ -310,8 +303,6 @@ void Task::startInvoke(Message& message) {
 		return;
 	}
 
-	std::cout << "startInvoke on " << *task << "\n";
-
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
 
@@ -346,8 +337,6 @@ void Task::startInvoke(Message& message) {
 		Lock lock(_mutex);
 		sender = gTasks[message._sender];
 		if (sender) {
-			std::cout << "returning to " << *sender << "\n";
-
 			Lock messageLock(sender->_messageMutex);
 			sender->_messages.push_back(message);
 			uv_async_send(sender->_asyncMessage);
@@ -366,8 +355,6 @@ void Task::finishInvoke(Message& message) {
 		std::cerr << "invokeComplete with invalid sender\n";
 		return;
 	}
-
-	std::cout << "finishInvoke sender = " << *task << "\n";
 
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
@@ -435,6 +422,13 @@ void Task::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::String::Utf8Value utf8Contents(contents);
 	if (!file.write(*utf8Contents, utf8Contents.length())) {
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
+	}
+}
+
+void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	std::string line;
+	if (std::getline(std::cin, line)) {
+		args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), line.c_str()));
 	}
 }
 
