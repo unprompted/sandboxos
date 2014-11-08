@@ -71,8 +71,9 @@ function handleRequest(request) {
 		print(handler.taskName);
 		invoke({to: handler.taskName, action: "handleRequest", request: request}).then(function(data) {
 			print("INVOKE -> " + JSON.stringify(data));
-			request.client.write(data.response);
-			request.client.close();
+			request.client.write(data.response).then(function() {
+				request.client.close();
+			});
 		});
 	} else {
 		request.client.write("HTTP/1.0 200 OK\n");

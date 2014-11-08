@@ -72,7 +72,7 @@ function onMessage(from, message) {
 		}
 		if (match) {
 			parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\n\n" + contents, messageId: message.messageId});
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
 			});
 		} else {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
