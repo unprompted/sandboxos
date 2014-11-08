@@ -1,8 +1,6 @@
 #include <v8.h>
 #include <v8-platform.h>
 #include <libplatform/libplatform.h>
-#include <unistd.h>
-#include <uv.h>
 
 #include "Task.h"
 

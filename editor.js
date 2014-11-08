@@ -26,16 +26,12 @@ function decode(encoded) {
 function decodeForm(encoded) {
 	var result = {};
 	var items = encoded.split('&');
-	print("DECODING");
-	print("DECODING");
-	print("DECODING");
 	for (var i = 0; i < items.length; i++) {
 		var item = items[i];
 		var equals = item.indexOf('=');
 		var key = decode(item.slice(0, equals));
 		var value = decode(item.slice(equals + 1));
 		result[key] = value;
-		print([key, value]);
 	}
 	return result;
 }
@@ -64,7 +60,7 @@ function onMessage(from, message) {
 		contents += "</head>\n";
 		contents += "<body>\n";
 		contents += "<h1>Editor</h1>\n";
-		contents += "<textarea id=\"edit\" rows=\"8\" cols=\"80\">";
+		contents += "<textarea id=\"edit\" rows=\"20\" cols=\"80\">";
 		contents += escapeHtml(readFile("handler.js"));
 		contents += "</textarea>\n";
 		contents += "<input type=\"button\" value=\"Update\" onclick=\"submit()\"></input>\n";

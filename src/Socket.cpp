@@ -36,6 +36,7 @@ void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void Socket::onNewConnection(uv_stream_t* server, int status) {
 	if (Socket* socket = reinterpret_cast<Socket*>(server->data)) {
+		TaskTryCatch tryCatch(socket->_task);
 		v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onConnect);
 		callback->Call(callback, 0, 0);
 	}
@@ -70,6 +71,7 @@ void Socket::allocateBuffer(uv_handle_t* handle, size_t suggestedSize, uv_buf_t*
 
 void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffer) {
 	if (Socket* socket = reinterpret_cast<Socket*>(stream->data)) {
+		TaskTryCatch tryCatch(socket->_task);
 		v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 		v8::Handle<v8::Value> data;
 		if (readSize >= 0) {

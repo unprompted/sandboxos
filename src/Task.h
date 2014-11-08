@@ -97,6 +97,16 @@ private:
 
 };
 
+class TaskTryCatch {
+public:
+	TaskTryCatch(Task* task);
+	~TaskTryCatch();
+
+private:
+	v8::TryCatch _tryCatch;
+	Task* _task;
+};
+
 std::ostream& operator<<(std::ostream& stream, const Task& task);
 
 #endif
