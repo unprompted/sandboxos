@@ -121,7 +121,10 @@ function handleConnection(client) {
 				}
 			}
 		} else {
-			body += line + "\n";
+			if (body) {
+				body += "\n";
+			}
+			body += line;
 			bodyToRead -= length;
 			if (bodyToRead <= 0) {
 				finish();

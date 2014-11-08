@@ -25,6 +25,8 @@ function decode(encoded) {
 
 function decodeForm(encoded) {
 	var result = {};
+	// HACK
+	encoded = encoded.trim();
 	var items = encoded.split('&');
 	for (var i = 0; i < items.length; i++) {
 		var item = items[i];
@@ -55,6 +57,9 @@ function onMessage(from, message) {
 		});
 	} else if (message.request.uri == "/editor/put") {
 		var form = decodeForm(message.request.body);
+		print(form.fileName);
+		print(form.fileName);
+		print(form.fileName);
 		parent.invoke({to: "system", action: "stopTask", taskName: "handler"}).then(function(result) {
 			parent.invoke({to: "system", action: "put", taskName: "handler", fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
 				parent.invoke({to: "system", action: "startTask", taskName: "handler"}).then(function(result) {

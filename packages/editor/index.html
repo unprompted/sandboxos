@@ -14,14 +14,16 @@
 			var currentFileName;
 			function saveFile() {
 				cm.save()
-				$.ajax({
-					type: "POST",
-					url: "/editor/put",
-					data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
-					dataType: "text",
-				}).done(function(data) {
-					$("#iframe")[0].src = "/handler";
-				});
+				if (currentFileName) {
+					$.ajax({
+						type: "POST",
+						url: "/editor/put",
+						data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
+						dataType: "text",
+					}).done(function(data) {
+						$("#iframe")[0].src = "/handler";
+					});
+				}
 			}
 			function setText(text) {
 				if (cm) {
