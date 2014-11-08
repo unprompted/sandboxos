@@ -20,7 +20,6 @@ public:
 	taskid_t _sender;
 	taskid_t _recipient;
 	std::string _message;
-	int _callback;
 	int _promise;
 };
 
@@ -46,7 +45,6 @@ private:
 	std::list<Message> _messages;
 	Mutex _messageMutex;
 	Signal _messageSignal;
-	std::vector<v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _callbacks;
 	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 
 	void enqueueMessage(const Message& message);
@@ -57,11 +55,13 @@ private:
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void send(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void syscall(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void noDelete(Task* task) {}
+	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 };
 
 #endif

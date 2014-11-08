@@ -26,12 +26,7 @@ function onMessage(message) {
 
 var a = startScript("test2.js");
 print("startScript => " + a);
-sleep(0.5);
-//print("killing script");
-//a.kill();
-print("waiting");
-sleep(0.5);
-sleep(0.5);
-sleep(0.5);
+a.invoke(['test', 1, 2, 3.0]).then(function(x) { print("response => " + x); });
 print("~test.js");
+print("parent = " + parent);
 'test.js';
