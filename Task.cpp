@@ -36,7 +36,7 @@ Task::Task(const char* scriptName)
 	_asyncMessage = new uv_async_t();
 	_asyncMessage->data = this;
 	uv_async_init(_loop, _asyncMessage, asyncMessage);
-	std::cout << "Task " << _id << " has loop " << _loop << "\n";
+	std::cout << *this << " has loop " << _loop << "\n";
 
 	++_count;
 	if (scriptName) {
@@ -45,9 +45,9 @@ Task::Task(const char* scriptName)
 }
 
 Task::~Task() {
-	std::cout << "loop b gone\n";
+	std::cout << *this << " loop b gone\n";
 	uv_loop_delete(_loop);
-	std::cout << "Task " << _id << " destroyed.\n";
+	std::cout << *this << " destroyed.\n";
 	{
 		Lock lock(_mutex);
 		gTasks.erase(gTasks.find(_id));
@@ -56,10 +56,9 @@ Task::~Task() {
 }
 
 void Task::Run() {
-	std::cout << "Task " << _id << " running.\n";
+	std::cout << *this << " running.\n";
 	_isolate = v8::Isolate::New();
 	_isolate->SetData(0, this);
-	std::cout << "Task " << _id << " _isolate = " << _isolate << "\n";
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
@@ -78,33 +77,12 @@ void Task::Run() {
 			execute(script);
 		}
 
-	std::cout << "Task " << _id << " _isolate = " << _isolate << " (running loop)\n";
 		uv_run(_loop, UV_RUN_DEFAULT);
-	std::cout << "Task " << _id << " _isolate = " << _isolate << " (done running loop)\n";
-
-/*
-		while (true) {
-			std::cout << _id << " waiting for signal\n";
-			if (_messageSignal.wait()) {
-				if (_killed) {
-					std::cout << "task killed, break\n";
-					break;
-				} else {
-					std::cout << this << " got signal?\n";
-					Message message;
-					if (dequeueMessage(message)) {
-						handleMessage(message);
-					}
-				}
-			}
-		}
-*/
 	}
-	std::cout << "Task " << _id << " _isolate = " << _isolate << "\n";
 	_promises.clear();
 	_isolate->Dispose();
 	_isolate = 0;
-	std::cout << "Task " << this << " is done.\n";
+	std::cout << *this << " is done.\n";
 }
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
@@ -167,9 +145,11 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Lock lock(_mutex);
 	if (Task* task = gTasks[taskId]) {
 		if (task->_parent == self->_id) {
+			std::cout << "Killing task " << *task << "\n";
 			task->kill();
+			std::cout << "Killed " << *task << "?\n";
 		} else {
-			std::cerr << "Task " << taskId << " is not a child of task " << self->_id << "\n";
+			std::cerr << *task << " is not a child of " << *self << "\n";
 		}
 	} else {
 		std::cout << "Could not find task!\n";
@@ -230,14 +210,14 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		{
 			Lock lock(_mutex);
 			if (Task* recipient = gTasks[recipientId]) {
-				std::cout << "queuing work on loop " << recipient->_loop << "\n";
+				std::cout << "queuing work on " << *recipient << "\n";
 				{
 					Lock messageLock(recipient->_messageMutex);
 					recipient->_messages.push_back(message);
 				}
 
 				uv_async_send(recipient->_asyncMessage);
-				std::cout << "done queuing work on loop " << recipient->_loop << "\n";
+				std::cout << "done queuing work on " << *recipient << "\n";
 			}
 		}
 	}
@@ -246,32 +226,38 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Task::asyncMessage(uv_async_t* work, int status) {
 	bool moreMessages = true;
 	Task* task = (Task*)work->data;
-	std::cout << "asyncMessage " << task << "\n";
-	while (moreMessages) {
-		moreMessages = false;
-		Message nextMessage;
+	if (task) {
+		std::cout << "asyncMessage " << *task << "\n";
+		if (task->_killed) {
+			std::cout << *task << ", I am slain\n";
+			uv_close(reinterpret_cast<uv_handle_t*>(task->_asyncMessage), 0);
+		} else {
+			while (moreMessages) {
+				moreMessages = false;
+				Message nextMessage;
 
-		{
-			Lock lock(task->_messageMutex);
-			if (task->_messages.size()) {
-				moreMessages = true;
-				nextMessage = task->_messages.front();
-				task->_messages.pop_front();
-			}
-		}
+				{
+					Lock lock(task->_messageMutex);
+					if (task->_messages.size()) {
+						moreMessages = true;
+						nextMessage = task->_messages.front();
+						task->_messages.pop_front();
+					}
+				}
 
-		if (moreMessages) {
-			if (nextMessage._isResponse) {
-				finishInvoke(nextMessage);
-			} else {
-				startInvoke(nextMessage);
+				if (moreMessages) {
+					if (nextMessage._isResponse) {
+						finishInvoke(nextMessage);
+					} else {
+						startInvoke(nextMessage);
+					}
+				}
 			}
 		}
 	}
 }
 
 void Task::startInvoke(Message& message) {
-	std::cout << "startInvoke on " << message._recipient << "\n";
 	Task* task = 0;
 	{
 		Lock lock(_mutex);
@@ -283,18 +269,14 @@ void Task::startInvoke(Message& message) {
 		return;
 	}
 
-	std::cout << "_isolate = " << task->_isolate << "\n";
+	std::cout << "startInvoke on " << *task << "\n";
 
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
 
-	std::cout << __LINE__ << "\n";
-
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "JSON"))->ToObject();
 	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "parse")));
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "stringify")));
-
-	std::cout << __LINE__ << "\n";
 
 	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._data.c_str(), v8::String::kNormalString, message._data.size());
 	v8::Handle<v8::Value> arg;
@@ -310,14 +292,8 @@ void Task::startInvoke(Message& message) {
 		}
 	}
 
-	std::cout << message._data << "\n";
-	std::cout << __LINE__ << ", " << argAsString.IsEmpty() << arg.IsEmpty() << parse.IsEmpty() << "\n";
-
 	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
-	std::cout << function.IsEmpty() << "\n";
 	v8::Handle<v8::Value> result = function->Call(context->Global(), 1, &arg);
-
-	std::cout << __LINE__ << "\n";
 
 	v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
 	message._result = toString(responseValue);
@@ -328,16 +304,17 @@ void Task::startInvoke(Message& message) {
 	{
 		Lock lock(_mutex);
 		sender = gTasks[message._sender];
-		std::cout << "returning to " << sender->_id << "\n";
+		if (sender) {
+			std::cout << "returning to " << *sender << "\n";
 
-		Lock messageLock(sender->_messageMutex);
-		sender->_messages.push_back(message);
-		uv_async_send(sender->_asyncMessage);
+			Lock messageLock(sender->_messageMutex);
+			sender->_messages.push_back(message);
+			uv_async_send(sender->_asyncMessage);
+		}
 	}
 }
 
 void Task::finishInvoke(Message& message) {
-	std::cout << "finishInvoke\n";
 	Task* task = 0;
 	{
 		Lock lock(_mutex);
@@ -349,7 +326,7 @@ void Task::finishInvoke(Message& message) {
 		return;
 	}
 
-	std::cout << "sender = " << message._sender << "\n";
+	std::cout << "finishInvoke sender = " << *task << "\n";
 
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
@@ -391,4 +368,12 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 
 const char* toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
+}
+
+std::ostream& operator<<(std::ostream& stream, const Task& task) {
+	if (&task) {
+		return stream << "Task[" << task.getId() << ']';
+	} else {
+		return stream << "Task[Null]";
+	}
 }

@@ -4,6 +4,7 @@
 #include "Mutex.h"
 #include "Signal.h"
 
+#include <iostream>
 #include <list>
 #include <string>
 #include <v8.h>
@@ -69,6 +70,9 @@ private:
 	static void finishInvoke(Message& message);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
+
 };
+
+std::ostream& operator<<(std::ostream& stream, const Task& task);
 
 #endif

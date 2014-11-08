@@ -1,7 +1,7 @@
 #ifndef INCLUDED_Mutex
 #define INCLUDED_Mutex
 
-#include <pthread.h>
+#include <uv.h>
 
 class Mutex {
 public:
@@ -12,7 +12,7 @@ public:
 	void unlock();
 
 private:
-	pthread_mutex_t _mutex;
+	uv_mutex_t _mutex;
 
 	friend class Signal;
 };
