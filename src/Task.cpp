@@ -29,7 +29,9 @@ struct SleepData {
 
 Task::Task(const char* scriptName)
 :	_killed(false),
-	_isolate(0) {
+	_isolate(0),
+	_memoryAllocated(0),
+	_memoryLimit(64 * 1024 * 1024) {
 
 	{
 		Lock lock(_mutex);
@@ -63,6 +65,7 @@ Task::~Task() {
 void Task::Run() {
 	_isolate = v8::Isolate::New();
 	_isolate->SetData(0, this);
+	_isolate->AddMemoryAllocationCallback(memoryAllocationCallback, v8::kObjectSpaceAll, v8::kAllocationActionAll);
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
@@ -553,6 +556,22 @@ TaskTryCatch::~TaskTryCatch() {
 		v8::String::Utf8Value stackTrace(_tryCatch.StackTrace());
 		if (stackTrace.length() > 0) {
 			std::cerr << *stackTrace << '\n';
+		}
+	}
+}
+
+void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size) {
+	if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
+		if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
+			if (action == v8::kAllocationActionAllocate) {
+				task->_memoryAllocated += size;
+				if (task->_memoryAllocated > task->_memoryLimit) {
+					std::cout << *task << " OOM " << task->_memoryAllocated << " allocated " << task->_memoryLimit << " limit.\n";
+					task->kill();
+				}
+			} else if (action == v8::kAllocationActionFree) {
+				task->_memoryAllocated -= size;
+			}
 		}
 	}
 }

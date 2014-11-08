@@ -68,6 +68,9 @@ private:
 	std::vector<Socket*> _sockets;
 	uv_thread_t _thread;
 
+	int64_t _memoryAllocated;
+	int64_t _memoryLimit;
+
 	static void readLine(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void readFile(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -93,8 +96,9 @@ private:
 
 	static void sleepCallback(uv_timer_t* timer);
 
-	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
+	static void memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size);
 
+	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 };
 
 class TaskTryCatch {
