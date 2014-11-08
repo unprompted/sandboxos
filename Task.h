@@ -8,6 +8,7 @@
 #include <string>
 #include <v8.h>
 #include <v8-platform.h>
+#include <vector>
 
 class Task;
 
@@ -19,7 +20,7 @@ public:
 	taskid_t _sender;
 	taskid_t _recipient;
 	std::string _message;
-	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _callback;
+	int _callback;
 };
 
 class Task : public v8::Task {
@@ -44,6 +45,7 @@ private:
 	std::list<Message> _messages;
 	Mutex _messageMutex;
 	Signal _messageSignal;
+	std::vector<v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _callbacks;
 
 	void enqueueMessage(const Message& message);
 	bool dequeueMessage(Message& message);
@@ -57,8 +59,6 @@ private:
 	static void noDelete(Task* task) {}
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-	static void disposeTask(const v8::WeakCallbackData<v8::Object, void>& data);
 };
 
 #endif

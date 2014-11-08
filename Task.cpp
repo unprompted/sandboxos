@@ -85,6 +85,7 @@ void Task::Run() {
 			}
 		}
 	}
+	_callbacks.clear();
 	_isolate->Dispose();
 	_isolate = 0;
 	std::cout << "Task " << this << " is done.\n";
@@ -94,7 +95,7 @@ void Task::handleMessage(const Message& message) {
 	v8::HandleScope scope(_isolate);
 	v8::Local<v8::Context> context = _isolate->GetCurrentContext();
 
-	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(_isolate, message._callback);
+	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(_isolate, _callbacks[message._callback]);
 
 	v8::Handle<v8::Object> object;
 	if (!message._response) {
@@ -119,7 +120,7 @@ void Task::handleMessage(const Message& message) {
 		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
 		response._message = toString(responseValue);
 		response._response = true;
-		response._callback = v8::Persistent<v8::Function>(_isolate, message._callback);
+		response._callback = message._callback;
 
 		Lock lock(_mutex);
 		if (Task* task = gTasks[message._sender]) {
@@ -247,7 +248,8 @@ void Task::send(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		message._sender = task->_id;
 		message._response = false;
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), args[1].As<v8::Function>());
-		message._callback = function;
+		task->_callbacks.push_back(function);
+		message._callback = task->_callbacks.size() - 1;
 
 		{
 			Lock lock(_mutex);
@@ -279,8 +281,4 @@ void execute(v8::Handle<v8::String> source) {
 
 const char* toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
-}
-
-void Task::disposeTask(const v8::WeakCallbackData<v8::Object, void>& data) {
-	std::cout << "disposeTask\n";
 }
