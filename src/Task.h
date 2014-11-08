@@ -38,6 +38,7 @@ public:
 	void run();
 
 	int getId() const { return _id; }
+	const std::string& getName() const { return _scriptName; }
 	v8::Isolate* getIsolate() { return _isolate; }
 	uv_loop_t* getLoop() { return _loop; }
 	void kill();

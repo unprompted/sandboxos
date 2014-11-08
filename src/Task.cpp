@@ -151,7 +151,7 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
 	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
-	std::cout << "CALL " << task->_scriptName << "\n";
+	std::cout << "CALL " << task->_scriptName << task->_id << "\n";
 	uv_thread_create(&task->_thread, run, task);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
@@ -458,7 +458,7 @@ const char* toString(const v8::String::Utf8Value& value) {
 
 std::ostream& operator<<(std::ostream& stream, const Task& task) {
 	if (&task) {
-		return stream << "Task[" << task.getId() << ']';
+		return stream << "Task[" << task.getId() << ':' + task.getName() << ']';
 	} else {
 		return stream << "Task[Null]";
 	}
@@ -522,6 +522,11 @@ TaskTryCatch::TaskTryCatch(Task* task)
 
 TaskTryCatch::~TaskTryCatch() {
 	if (_tryCatch.HasCaught()) {
+		if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
+			if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
+				std::cerr << *task << ' ';
+			}
+		}
 		std::cerr << "Exception:\n";
 
 		v8::Handle<v8::Message> message(_tryCatch.Message());

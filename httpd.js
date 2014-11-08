@@ -11,7 +11,14 @@ var gHandlers = [
 
 function Request(method, uri, version, headers, body, client) {
 	this.method = method;
-	this.uri = uri;
+	var index = uri.indexOf("?");
+	if (index != -1) {
+		this.uri = uri.slice(0, index);
+		this.query = uri.slice(index + 1);
+	} else {
+		this.uri = uri;
+		this.query = undefined;
+	}
 	this.version = version;
 	this.headers = headers;
 	this.client = client;

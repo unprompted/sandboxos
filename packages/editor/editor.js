@@ -36,65 +36,41 @@ function decodeForm(encoded) {
 	return result;
 }
 
+var kStaticFiles = [
+	{uri: '/editor', path: 'index.html', type: 'text/html'},
+	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/html'},
+	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
+];
+
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
-	if (message.request.uri == "/editor") {
-		parent.invoke({to: "system", action: "get", taskName: "handler"}).then(function(result) {
-			var contents = "";
-			contents += "<html>\n";
-			contents += "<head>\n";
-			contents += "\t<title>Editor</title>\n";
-			contents += "\t<script src=\"http://code.jquery.com/jquery-1.11.0.min.js\"></script>\n";
-			contents += "\t<script src=\"/editor/codemirror-compressed.js\"></script>\n";
-			contents += "\t<link rel=\"stylesheet\" href=\"/editor/codemirror.css\"></link>\n";
-			contents += "\t<script language=\"javascript\">\n";
-			contents += "\t\tvar cm;\n";
-			contents += "\t\tfunction submit() {\n";
-			contents += "\t\t\tcm.save()\n";
-			contents += "\t\t\t$.ajax({\n";
-			contents += "\t\t\t\ttype: \"POST\",\n";
-			contents += "\t\t\t\turl: \"/editor/update\",\n";
-			contents += "\t\t\t\tdata: {script: JSON.stringify($(\"#edit\").val())},\n";
-			contents += "\t\t\t\tdataType: \"JSON\",\n";
-			contents += "\t\t\t}).done(function(data) {\n";
-			contents += "\t\t\t\t$(\"#iframe\")[0].src = \"/handler\";\n";
-			contents += "\t\t\t});\n";
-			contents += "\t\t}\n";
-			contents += "\t\t$(document).ready(function() {\n";
-			contents += "\t\t\tvar editor = document.getElementById(\"edit\");\n";
-			contents += "\t\t\tcm = CodeMirror.fromTextArea(editor);\n";
-			contents += "\t\t});\n";
-			contents += "\t</script>\n";
-			contents += "</head>\n";
-			contents += "<body>\n";
-			contents += "<h1>Editor</h1>\n";
-			contents += "<input type=\"button\" value=\"Update =>\" onclick=\"submit()\" style=\"clear: both\"></input>\n";
-			contents += "<div>\n";
-			contents += "<textarea id=\"edit\" style=\"width: 100%; height: 10em\">";
-			contents += escapeHtml(result);
-			contents += "</textarea>\n";
-			contents += "<iframe id=\"iframe\" style=\"width: 100%; height: 10em\" src=\"/handler\"></iframe>\n";
-			contents += "</div>\n";
-			contents += "</body>\n";
-			contents += "</html>\n";
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\n" + contents, messageId: message.messageId});
-		});
-	} else if (message.request.uri == "/editor/update") {
-		var form = decodeForm(message.request.body);
-		parent.invoke({to: "system", action: "update", taskName: "handler", script: JSON.parse(form.script)}).then(function(result) {
+	if (message.request.uri == "/editor/get") {
+		parent.invoke({to: "system", action: "get", taskName: "handler", fileName: "handler.js"}).then(function(result) {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
 		});
-	} else if (message.request.uri == '/editor/codemirror-compressed.js') {
-		parent.invoke({to: "system", action: "get", file: "codemirror-compressed.js"}).then(function(contents) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/javascript\nConnection: close\n\n" + contents, messageId: message.messageId});
-		});
-	} else if (message.request.uri == '/editor/codemirror.css') {
-		parent.invoke({to: "system", action: "get", file: "codemirror.css"}).then(function(contents) {
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/css\nConnection: close\n\n" + contents, messageId: message.messageId});
+	} else if (message.request.uri == "/editor/put") {
+		var form = decodeForm(message.request.body);
+		parent.invoke({to: "system", action: "stopTask", taskName: "handler"}).then(function(result) {
+			parent.invoke({to: "system", action: "put", taskName: "handler", fileName: "handler.js", contents: JSON.parse(form.contents)}).then(function(result) {
+				parent.invoke({to: "system", action: "startTask", taskName: "handler"}).then(function(result) {
+					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
+				});
+			});
 		});
 	} else {
-		var contents = "huh?";
-		parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + contents, messageId: message.messageId});
+		var match;
+		for (var i in kStaticFiles) {
+			var file = kStaticFiles[i];
+			if (message.request.uri == file.uri) {
+				match = file;
+			}
+		}
+		if (match) {
+			parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\n\n" + contents, messageId: message.messageId});
+			});
+		} else {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
+		}
 	}
-	return true;
 }
