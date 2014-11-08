@@ -26,7 +26,17 @@ function refresh() {
 			var tr = document.createElement("tr");
 
 			var td = document.createElement("td");
-			$(td).text(package);
+			if (data.tasks[package]
+				&& data.tasks[package].manifest
+				&& data.tasks[package].manifest.httpd
+				&& data.tasks[package].manifest.httpd.root) {
+				var a = document.createElement("a");
+				$(a).attr("href", data.tasks[package].manifest.httpd.root);
+				$(a).text(package);
+				$(td).append(a);
+			} else {
+				$(td).text(package);
+			}
 			$(tr).append(td);
 
 			var td = document.createElement("td");

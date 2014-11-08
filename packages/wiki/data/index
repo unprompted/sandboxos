@@ -1,1 +1,8 @@
-This is a wiki thing.
+<h2>Welcome to CoryWeb?</h2>
+
+<div>This is a wiki.  I made a wiki with it.  It's really bad, but you can make it better.</div>
+
+<div>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find potentially more interesting apps.</div>
+
+<h2>Overview</h2>
+<div>There is a sort of design to this thing.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.  A lot needs to be done to improve the API for sending messages.  And a lot needs to be done to improve the error handling and reporting.<div>
