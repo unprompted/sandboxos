@@ -2,10 +2,12 @@
 
 #include "Socket.h"
 
+#include <dirent.h>
 #include <fstream>
 #include <iostream>
 #include <libplatform/libplatform.h>
 #include <map>
+#include <sys/types.h>
 #include <unistd.h>
 #include <uv.h>
 #include <v8.h>
@@ -83,6 +85,7 @@ void Task::run() {
 			global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 			global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
 			global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
+			global->Set(v8::String::NewFromUtf8(_isolate, "readDirectory"), v8::FunctionTemplate::New(_isolate, readDirectory));
 			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
 		}
@@ -438,6 +441,23 @@ void Task::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (!file.write(*utf8Contents, utf8Contents.length())) {
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
 	}
+}
+
+void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	v8::Handle<v8::String> directory = args[0]->ToString();
+
+	v8::Handle<v8::Array> array = v8::Array::New(args.GetIsolate(), 0);
+
+	if (DIR* dir = opendir(*v8::String::Utf8Value(directory))) {
+		int index = 0;
+		while (struct dirent* entry = readdir(dir)) {
+			array->Set(v8::Integer::New(args.GetIsolate(), index++), v8::String::NewFromUtf8(args.GetIsolate(), entry->d_name));
+		}
+		closedir(dir);
+	}
+
+	args.GetReturnValue().Set(array);
 }
 
 void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {

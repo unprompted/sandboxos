@@ -38,20 +38,25 @@ function decodeForm(encoded) {
 
 var kStaticFiles = [
 	{uri: '/editor', path: 'index.html', type: 'text/html'},
-	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/html'},
+	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
 	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
 ];
 
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 	if (message.request.uri == "/editor/get") {
-		parent.invoke({to: "system", action: "get", taskName: "handler", fileName: "handler.js"}).then(function(result) {
+		var form = decodeForm(message.request.query);
+		parent.invoke({to: "system", action: "get", taskName: "handler", fileName: form.fileName}).then(function(result) {
 			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
+		});
+	} else if (message.request.uri == "/editor/list") {
+		parent.invoke({to: "system", action: "list", taskName: "handler"}).then(function(result) {
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
 		});
 	} else if (message.request.uri == "/editor/put") {
 		var form = decodeForm(message.request.body);
 		parent.invoke({to: "system", action: "stopTask", taskName: "handler"}).then(function(result) {
-			parent.invoke({to: "system", action: "put", taskName: "handler", fileName: "handler.js", contents: JSON.parse(form.contents)}).then(function(result) {
+			parent.invoke({to: "system", action: "put", taskName: "handler", fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
 				parent.invoke({to: "system", action: "startTask", taskName: "handler"}).then(function(result) {
 					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
 				});

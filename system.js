@@ -38,7 +38,8 @@ function onMessage(from, message) {
 		print(fromName);
 
 		// Let the editor get/update anything.
-		if (fromName == "editor") {
+		if (fromName == "editor"
+			|| (!message.taskName && message.action == "get")) {
 			if (message.action == "stopTask") {
 				print("killing " + message.taskName);
 				tasks[message.taskName].kill();
@@ -49,10 +50,20 @@ function onMessage(from, message) {
 					print("write => " + writeFile(fileName, message.contents));
 				}
 			} else if (message.action == "get") {
-				var fileName = packageFilePath(message.taskName, message.fileName);
+				var fileName = packageFilePath(message.taskName || fromName, message.fileName);
 				if (fileName) {
 					return readFile(fileName);
 				}
+			} else if (message.action == "list") {
+				var list = readDirectory(packageFilePath(message.taskName, ""));
+				list.sort();
+				var finalList = [];
+				for (var i in list) {
+					if (list[i] != "." && list[i] != "..") {
+						finalList.push(list[i]);
+					}
+				}
+				return finalList;
 			} else if (message.action == "startTask" && message.taskName == "handler") {
 				var fileName = tasks[message.taskName].fileName;
 				if (fileName) {
