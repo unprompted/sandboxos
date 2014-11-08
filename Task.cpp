@@ -81,6 +81,7 @@ void Task::Run() {
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
+		std::cout << "Running script " << _scriptName << "\n";
 		if (!script.IsEmpty()) {
 			execute(_isolate, script, v8::String::NewFromUtf8(_isolate, _scriptName.c_str()));
 		}
@@ -139,9 +140,18 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		task->_parent = parent->_id;
 	}
 	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
-	gPlatform->CallOnBackgroundThread(task, v8::Platform::kLongRunningTask);
+	std::cout << "CALL " << task->_scriptName << "\n";
+
+	uv_thread_create(&task->_thread, run, task);
+	//gPlatform->CallOnBackgroundThread(task, v8::Platform::kLongRunningTask);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
+}
+
+void Task::run(void* data) {
+	Task* task = reinterpret_cast<Task*>(data);
+	task->Run();
+	delete task;
 }
 
 void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -165,6 +175,7 @@ void Task::kill() {
 		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
 		uv_async_send(_asyncMessage);
+		uv_thread_join(&_thread);
 	}
 }
 

@@ -3,6 +3,10 @@ var gHandlers = [
 		path: '/test',
 		taskName: 'handler',
 	},
+	{
+		path: '/editor',
+		taskName: 'editor',
+	},
 ];
 
 function Request(method, uri, version, headers, client) {
@@ -50,16 +54,12 @@ function handleRequest(request) {
 	}
 
 	if (matchedHandler) {
+		print(matchedHandler.taskName);
 		invoke({to: matchedHandler.taskName, action: "handleRequest", request: request}).then(function(data) {
 			print("INVOKE -> " + JSON.stringify(data));
 			request.client.write(data.response);
 			request.client.close();
 		});
-		/*parent.invoke({to: matchedHandler.taskName, action: "handleRequest", request: request}).then(function(data) {
-			print("INVOKE -> " + JSON.stringify(data));
-			request.client.write(data);
-			request.client.close();
-		});*/
 	} else {
 		request.client.write("HTTP/1.0 OK\n");
 		request.client.write("Content-Type: text/plain; encoding=utf-8\n");

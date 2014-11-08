@@ -66,6 +66,7 @@ private:
 	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	uv_loop_t* _loop;
 	std::vector<Socket*> _sockets;
+	uv_thread_t _thread;
 
 	static void readLine(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -78,6 +79,8 @@ private:
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void createSocket(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	static void run(void* data);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
