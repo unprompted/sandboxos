@@ -30,7 +30,8 @@ Task::Task(const char* scriptName)
 :	_killed(false),
 	_isolate(0),
 	_memoryAllocated(0),
-	_memoryLimit(64 * 1024 * 1024) {
+	_memoryLimit(64 * 1024 * 1024),
+	_trusted(false) {
 
 	{
 		Lock lock(_mutex);
@@ -61,8 +62,10 @@ Task::~Task() {
 	}
 }
 
-void Task::Run() {
-	_isolate = v8::Isolate::New();
+void Task::run() {
+	v8::Isolate::CreateParams params;
+	//params.constraints.set_max_old_space_size(_memoryLimit);
+	_isolate = v8::Isolate::New(params);
 	_isolate->SetData(0, this);
 	_isolate->AddMemoryAllocationCallback(memoryAllocationCallback, v8::kObjectSpaceAll, v8::kAllocationActionAll);
 	{
@@ -70,16 +73,20 @@ void Task::Run() {
 		v8::HandleScope handleScope(_isolate);
 
 		v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
-		global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 		global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
 		global->Set(v8::String::NewFromUtf8(_isolate, "sleep"), v8::FunctionTemplate::New(_isolate, sleep));
-		global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
 		global->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, invoke));
-		global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
-		global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
-		global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
-		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
 		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
+
+		if (_trusted) {
+			global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
+			global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
+			global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
+			global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
+			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
+			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
+		}
+
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
@@ -136,15 +143,15 @@ void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* parent = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::EscapableHandleScope scope(args.GetIsolate());
+	v8::HandleScope scope(args.GetIsolate());
 	Task* task = new Task();
 	{
 		Lock lock(_mutex);
 		task->_parent = parent->_id;
 	}
 	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
+	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
 	std::cout << "CALL " << task->_scriptName << "\n";
-
 	uv_thread_create(&task->_thread, run, task);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
@@ -152,7 +159,7 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void Task::run(void* data) {
 	Task* task = reinterpret_cast<Task*>(data);
-	task->Run();
+	task->run();
 	delete task;
 }
 

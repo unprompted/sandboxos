@@ -31,11 +31,11 @@ public:
 	int _promise;
 };
 
-class Task : public v8::Task {
+class Task {
 public:
 	Task(const char* scriptName = 0);
 	~Task();
-	void Run();
+	void run();
 
 	int getId() const { return _id; }
 	v8::Isolate* getIsolate() { return _isolate; }
@@ -47,13 +47,16 @@ public:
 	void rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value);
 	socketid_t allocateSocket();
 	Socket* getSocket(socketid_t id);
+	void setTrusted(bool trusted) { _trusted = trusted; }
 
 	static int getCount() { return _count; }
 	static Task* get(taskid_t id);
+
 private:
 	static int _count;
 	static Mutex _mutex;
 
+	bool _trusted;
 	bool _killed;
 	taskid_t _id;
 	taskid_t _parent;

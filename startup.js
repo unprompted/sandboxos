@@ -1,5 +1,5 @@
-{
-	"httpd": "httpd.js",
-	"editor": "editor.js",
-	"handler": "handler.js"
-}
+[
+	{"name": "httpd", "fileName": "httpd.js", "trusted": true},
+	{"name": "editor", "fileName": "editor.js"},
+	{"name": "handler", "fileName": "handler.js"}
+]

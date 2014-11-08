@@ -4,7 +4,7 @@ function escapeHtml(value) {
 		"<": "&lt;",
 		">": "&gt;",
 	};
-	return value.replace(/&<>/g, function(v) { return kMap[v]; });
+	return value.replace(/[&<>]/g, function(v) { return kMap[v]; });
 }
 
 function decode(encoded) {
@@ -39,35 +39,36 @@ function decodeForm(encoded) {
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 	if (message.request.uri == "/editor") {
-		var contents = "";
-		contents += "<html>\n";
-		contents += "<head>\n";
-		contents += "\t<title>Editor</title>\n";
-		contents += "\t<script src=\"http://code.jquery.com/jquery-1.11.0.min.js\"></script>\n";
-		contents += "\t<script language=\"javascript\">\n";
-		contents += "\t\tfunction submit() {\n";
-		contents += "\t\t\t$.ajax({\n";
-		contents += "\t\t\t\ttype: \"POST\",\n";
-		contents += "\t\t\t\turl: \"/editor/update\",\n";
-		contents += "\t\t\t\tdata: {script: JSON.stringify($(\"#edit\").val())},\n";
-		contents += "\t\t\t\tdataType: \"JSON\",\n";
-		contents += "\t\t\t}).done(function(data) {\n";
-		contents += "\t\t\t\t$(\"#iframe\")[0].src = \"/handler\";\n";
-		contents += "\t\t\t\tconsole.debug(data);\n";
-		contents += "\t\t\t});\n";
-		contents += "\t\t}\n";
-		contents += "\t</script>\n";
-		contents += "</head>\n";
-		contents += "<body>\n";
-		contents += "<h1>Editor</h1>\n";
-		contents += "<textarea id=\"edit\" rows=\"20\" cols=\"80\">";
-		contents += escapeHtml(readFile("handler.js"));
-		contents += "</textarea>\n";
-		contents += "<input type=\"button\" value=\"Update\" onclick=\"submit()\"></input>\n";
-		contents += "<iframe id=\"iframe\"></iframe>\n";
-		contents += "</body>\n";
-		contents += "</html>\n";
-		parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\n" + contents, messageId: message.messageId});
+		parent.invoke({to: "system", action: "get", taskName: "handler"}).then(function(result) {
+			var contents = "";
+			contents += "<html>\n";
+			contents += "<head>\n";
+			contents += "\t<title>Editor</title>\n";
+			contents += "\t<script src=\"http://code.jquery.com/jquery-1.11.0.min.js\"></script>\n";
+			contents += "\t<script language=\"javascript\">\n";
+			contents += "\t\tfunction submit() {\n";
+			contents += "\t\t\t$.ajax({\n";
+			contents += "\t\t\t\ttype: \"POST\",\n";
+			contents += "\t\t\t\turl: \"/editor/update\",\n";
+			contents += "\t\t\t\tdata: {script: JSON.stringify($(\"#edit\").val())},\n";
+			contents += "\t\t\t\tdataType: \"JSON\",\n";
+			contents += "\t\t\t}).done(function(data) {\n";
+			contents += "\t\t\t\t$(\"#iframe\")[0].src = \"/handler\";\n";
+			contents += "\t\t\t});\n";
+			contents += "\t\t}\n";
+			contents += "\t</script>\n";
+			contents += "</head>\n";
+			contents += "<body>\n";
+			contents += "<h1>Editor</h1>\n";
+			contents += "<textarea id=\"edit\" style=\"width: 640px; height: 480px\">";
+			contents += escapeHtml(result);
+			contents += "</textarea>\n";
+			contents += "<input type=\"button\" value=\"Update =>\" onclick=\"submit()\"></input>\n";
+			contents += "<iframe id=\"iframe\" style=\"width: 640px; height: 480px\" src=\"/handler\"></iframe>\n";
+			contents += "</body>\n";
+			contents += "</html>\n";
+			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\n" + contents, messageId: message.messageId});
+		});
 	} else if (message.request.uri == "/editor/update") {
 		var form = decodeForm(message.request.body);
 		parent.invoke({to: "system", action: "update", taskName: "handler", script: JSON.parse(form.script)}).then(function(result) {
