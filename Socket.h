@@ -35,8 +35,8 @@ private:
 	static void keepPromise(uv_handle_t* handle, int status);
 	static void onNewConnection(uv_stream_t* server, int status);
 
-	static uv_buf_t allocateBuffer(uv_handle_t* handle, size_t suggestedSize);
-	static void onRead(uv_stream_t* stream, ssize_t readSize, uv_buf_t buffer);
+	static void allocateBuffer(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer);
+	static void onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffer);
 	static void onWrite(uv_write_t* request, int status);
 };
 

@@ -186,7 +186,7 @@ void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(promise);
 }
 
-void Task::sleepCallback(uv_timer_t* timer, int status) {
+void Task::sleepCallback(uv_timer_t* timer) {
 	SleepData* data = reinterpret_cast<SleepData*>(timer->data);
 
 	Task* task = 0;
@@ -269,7 +269,7 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-void Task::asyncMessage(uv_async_t* work, int status) {
+void Task::asyncMessage(uv_async_t* work) {
 	bool moreMessages = true;
 	Task* task = (Task*)work->data;
 	if (task) {

@@ -83,12 +83,12 @@ private:
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-	static void asyncMessage(uv_async_t* handle, int status);
+	static void asyncMessage(uv_async_t* handle);
 
 	static void startInvoke(Message& message);
 	static void finishInvoke(Message& message);
 
-	static void sleepCallback(uv_timer_t* timer, int status);
+	static void sleepCallback(uv_timer_t* timer);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 

@@ -19,8 +19,9 @@ void Socket::bind4(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::String::Utf8Value ip(args[0]->ToString());
 		int port = args[1]->ToInteger()->Value();
-		struct sockaddr_in address = uv_ip4_addr(*ip, port);
-		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_tcp_bind(&socket->_socket, address)));
+		struct sockaddr_in address;
+		uv_ip4_addr(*ip, port, &address);
+		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_tcp_bind(&socket->_socket, reinterpret_cast<struct sockaddr*>(&address), 0)));
 	}
 }
 
@@ -63,23 +64,22 @@ void Socket::read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-uv_buf_t Socket::allocateBuffer(uv_handle_t* handle, size_t suggestedSize) {
-	return uv_buf_init(new char[suggestedSize], suggestedSize);
+void Socket::allocateBuffer(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buf) {
+	*buf = uv_buf_init(new char[suggestedSize], suggestedSize);
 }
 
-void Socket::onRead(uv_stream_t* stream, ssize_t readSize, uv_buf_t buffer) {
+void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffer) {
 	if (Socket* socket = reinterpret_cast<Socket*>(stream->data)) {
 		v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 		v8::Handle<v8::Value> data;
 		if (readSize >= 0) {
-			data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer.base), v8::String::kNormalString, readSize);
+			data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer->base), v8::String::kNormalString, readSize);
 		} else {
 			data = v8::Undefined(socket->_task->getIsolate());
 		}
 		callback->Call(callback, 1, &data);
 	}
-	delete[] buffer.base;
-	buffer.base = 0;
+	delete[] buffer->base;
 }
 
 void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -140,7 +140,7 @@ void Socket::keepPromise(uv_handle_t* handle, int status) {
 		if (socket->_promise != -1) {
 			promiseid_t promise = socket->_promise;
 			socket->_promise = -1;
-			if (status == UV_OK) {
+			if (status == 0) {
 				socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
 			} else {
 				socket->_task->rejectPromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
