@@ -20,6 +20,11 @@ const char* toString(const v8::String::Utf8Value& value);
 int Task::_count;
 Mutex Task::_mutex;
 
+struct SleepData {
+	taskid_t _task;
+	int _promise;
+};
+
 Task::Task(const char* scriptName)
 :	_killed(false),
 	_isolate(0) {
@@ -120,8 +125,7 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	if (task) {
-		v8::V8::TerminateExecution(task->_isolate);
-		task->_killed = true;
+		task->kill();
 	}
 }
 
@@ -164,8 +168,42 @@ void Task::kill() {
 }
 
 void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	v8::HandleScope scope(args.GetIsolate());
-	usleep(static_cast<useconds_t>(1000000 * args[0].As<v8::Number>()->Value()));
+
+	SleepData* data = new SleepData;
+	data->_task = task->_id;
+	data->_promise = task->_promises.size();
+
+	uv_timer_t* timer = new uv_timer_t();
+	uv_timer_init(task->_loop, timer);
+	timer->data = data;
+	uv_timer_start(timer, sleepCallback, static_cast<uint64_t>(args[0].As<v8::Number>()->Value() * 1000), 0);
+
+	v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(args.GetIsolate(), v8::Promise::Resolver::New(args.GetIsolate()));
+	task->_promises.push_back(promise);
+	args.GetReturnValue().Set(promise);
+}
+
+void Task::sleepCallback(uv_timer_t* timer, int status) {
+	SleepData* data = reinterpret_cast<SleepData*>(timer->data);
+
+	Task* task = 0;
+	{
+		Lock lock(_mutex);
+		task = gTasks[data->_task];
+	}
+
+	std::cout << "sleepCallback " << *task << "\n";
+
+	if (task) {
+		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(task->_isolate, task->_promises[data->_promise]);
+		resolver->Resolve(v8::Undefined(task->_isolate));
+		task->_isolate->RunMicrotasks();
+		task->_promises[data->_promise].Reset();
+	}
+
+	delete data;
 }
 
 void execute(v8::Handle<v8::String> source) {

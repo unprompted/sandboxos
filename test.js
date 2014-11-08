@@ -14,10 +14,16 @@ function onMessage(message) {
 
 var a = startScript("test2.js");
 print("startScript => " + a);
-sleep(0.2);
+
+print("SLEEP starting");
+sleep(0.5).then(function() { print("SLEEP finished!"); });
+print("SLEEP started");
+
 a.invoke(['test', 1, 2, 3.0]).then(function(x) { print("response => " + x); });
+
 print("~test.js");
 print("parent = " + parent);
-sleep(0.5);
-a.kill();
+sleep(2.0).then(function() { a.kill() });
 'test.js';
+
+sleep(3.0).then(exit);

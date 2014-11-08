@@ -68,6 +68,8 @@ private:
 	static void startInvoke(Message& message);
 	static void finishInvoke(Message& message);
 
+	static void sleepCallback(uv_timer_t* timer, int status);
+
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 
 };
