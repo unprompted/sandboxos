@@ -21,17 +21,11 @@ function onMessage(message) {
 
 while (true) {
 	var r = readLine();
-	print("1");
 	JSON.stringify(undefined);
-	print("2");
 	print(JSON.stringify(undefined));
-	print("3");
 	print("read " + JSON.stringify(r));
-	print("4");
 	if (r == 'exit' || r == undefined) {
-		print("exit1");
 		exit();
-		print("exit2");
 	}
 }
 

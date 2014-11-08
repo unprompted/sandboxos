@@ -1,5 +1,7 @@
 #include "Task.h"
 
+#include "Socket.h"
+
 #include <fstream>
 #include <iostream>
 #include <libplatform/libplatform.h>
@@ -74,6 +76,7 @@ void Task::Run() {
 		global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
 		global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
 		global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
+		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
 		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
@@ -432,6 +435,11 @@ void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
+void Task::createSocket(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	args.GetReturnValue().Set(Socket::create(task));
+}
+
 const char* toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
 }
@@ -441,5 +449,55 @@ std::ostream& operator<<(std::ostream& stream, const Task& task) {
 		return stream << "Task[" << task.getId() << ']';
 	} else {
 		return stream << "Task[Null]";
+	}
+}
+
+socketid_t Task::allocateSocket() {
+	socketid_t id = _sockets.size();
+	_sockets.push_back(new Socket(this));
+	return id;
+}
+
+Task* Task::get(taskid_t id) {
+	Lock lock(_mutex);
+	return gTasks[id];
+}
+
+Socket* Task::getSocket(socketid_t id) {
+	return _sockets[id];
+}
+
+promiseid_t Task::allocatePromise() {
+	promiseid_t promiseId = _promises.size();
+	v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(_isolate, v8::Promise::Resolver::New(_isolate));
+	_promises.push_back(promise);
+	return promiseId;
+}
+
+v8::Handle<v8::Promise::Resolver> Task::getPromise(promiseid_t promise) {
+	v8::Handle<v8::Promise::Resolver> result;
+	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+		result = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
+	}
+	return result;
+}
+
+void Task::resolvePromise(promiseid_t promise, v8::Handle<v8::Value> value) {
+	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+		v8::HandleScope handleScope(_isolate);
+		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
+		resolver->Resolve(value);
+		_isolate->RunMicrotasks();
+		_promises[promise].Reset();
+	}
+}
+
+void Task::rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value) {
+	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+		v8::HandleScope handleScope(_isolate);
+		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
+		resolver->Reject(value);
+		_isolate->RunMicrotasks();
+		_promises[promise].Reset();
 	}
 }

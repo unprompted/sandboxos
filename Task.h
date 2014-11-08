@@ -10,6 +10,7 @@
 #include <v8-platform.h>
 #include <vector>
 
+class Socket;
 class Task;
 
 struct uv_async_s; typedef struct uv_async_s uv_async_t;
@@ -17,6 +18,8 @@ struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
 struct uv_work_s; typedef struct uv_work_s uv_work_t;
 
 typedef int taskid_t;
+typedef int socketid_t;
+typedef int promiseid_t;
 
 class Message {
 public:
@@ -35,8 +38,18 @@ public:
 	void Run();
 
 	int getId() const { return _id; }
-	static int getCount() { return _count; }
+	v8::Isolate* getIsolate() { return _isolate; }
+	uv_loop_t* getLoop() { return _loop; }
 	void kill();
+	promiseid_t allocatePromise();
+	v8::Handle<v8::Promise::Resolver> getPromise(promiseid_t promise);
+	void resolvePromise(promiseid_t promise, v8::Handle<v8::Value> value);
+	void rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value);
+	socketid_t allocateSocket();
+	Socket* getSocket(socketid_t id);
+
+	static int getCount() { return _count; }
+	static Task* get(taskid_t id);
 private:
 	static int _count;
 	static Mutex _mutex;
@@ -52,6 +65,7 @@ private:
 	uv_async_t* _asyncMessage;
 	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	uv_loop_t* _loop;
+	std::vector<Socket*> _sockets;
 
 	static void readLine(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -63,6 +77,7 @@ private:
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void createSocket(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
