@@ -21,6 +21,7 @@ public:
 	taskid_t _recipient;
 	std::string _message;
 	int _callback;
+	int _promise;
 };
 
 class Task : public v8::Task {
@@ -46,16 +47,18 @@ private:
 	Mutex _messageMutex;
 	Signal _messageSignal;
 	std::vector<v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _callbacks;
+	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 
 	void enqueueMessage(const Message& message);
 	bool dequeueMessage(Message& message);
 	void handleMessage(const Message& message);
 
+	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void send(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void receive(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void syscall(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void noDelete(Task* task) {}
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);

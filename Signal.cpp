@@ -1,6 +1,7 @@
 #include "Signal.h"
 
 #include <assert.h>
+#include <iostream>
 
 Signal::Signal()
 :	_count(0) {
@@ -16,11 +17,13 @@ Signal::~Signal() {
 void Signal::signal() {
 	Lock lock(_mutex);
 	++_count;
+	std::cout << "count => " << _count << "\n";
 	pthread_cond_signal(&_condition);
 }
 
 bool Signal::wait() {
 	bool gotSignal = false;
+	std::cout << "count = " << _count << "\n";
 	{
 		Lock lock(_mutex);
 		while (_count == 0) {

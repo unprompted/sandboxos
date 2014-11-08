@@ -60,10 +60,12 @@ void Task::Run() {
 		v8::HandleScope handleScope(_isolate);
 
 		v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+		global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 		global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
 		global->Set(v8::String::NewFromUtf8(_isolate, "sleep"), v8::FunctionTemplate::New(_isolate, sleep));
 		global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
 		global->Set(v8::String::NewFromUtf8(_isolate, "send"), v8::FunctionTemplate::New(_isolate, send));
+		global->Set(v8::String::NewFromUtf8(_isolate, "syscall"), v8::FunctionTemplate::New(_isolate, syscall));
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
 		v8::Context::Scope contextScope(context);
 		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
@@ -72,8 +74,10 @@ void Task::Run() {
 		}
 
 		while (true) {
+			std::cout << _id << " waiting for signal\n";
 			if (_messageSignal.wait()) {
 				if (_killed) {
+					std::cout << "task killed, break\n";
 					break;
 				} else {
 					std::cout << this << " got signal?\n";
@@ -86,6 +90,7 @@ void Task::Run() {
 		}
 	}
 	_callbacks.clear();
+	_promises.clear();
 	_isolate->Dispose();
 	_isolate = 0;
 	std::cout << "Task " << this << " is done.\n";
@@ -95,36 +100,79 @@ void Task::handleMessage(const Message& message) {
 	v8::HandleScope scope(_isolate);
 	v8::Local<v8::Context> context = _isolate->GetCurrentContext();
 
-	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(_isolate, _callbacks[message._callback]);
-
-	v8::Handle<v8::Object> object;
-	if (!message._response) {
-		v8::Local<v8::Value> value = context->Global()->Get(v8::String::NewFromUtf8(_isolate, "onMessage"));
-		function = v8::Handle<v8::Function>::Cast(value);
-		object = context->Global();
-	} else {
-		object = function;
-	}
-
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(_isolate, "JSON"))->ToObject();
-	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(_isolate, "stringify")));
 	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(_isolate, "parse")));
+	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(_isolate, "stringify")));
 
-	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(_isolate, message._message.c_str(), v8::String::kNormalString, message._message.size());
-	v8::Handle<v8::Value> arg = parse->Call(json, 1, &argAsString);
-	v8::Handle<v8::Value> result = function->Call(object, 1, &arg);
+	if (message._callback != -1) {
+		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(_isolate, _callbacks[message._callback]);
 
-	if (!message._response) {
-		Message response;
-		response._sender = _id;
-		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
-		response._message = toString(responseValue);
-		response._response = true;
-		response._callback = message._callback;
+		v8::Handle<v8::Object> object;
+		if (!message._response) {
+			v8::Local<v8::Value> value = context->Global()->Get(v8::String::NewFromUtf8(_isolate, "onMessage"));
+			function = v8::Handle<v8::Function>::Cast(value);
+			object = context->Global();
+		} else {
+			object = function;
+		}
 
-		Lock lock(_mutex);
-		if (Task* task = gTasks[message._sender]) {
-			task->enqueueMessage(response);
+
+		v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(_isolate, message._message.c_str(), v8::String::kNormalString, message._message.size());
+		v8::Handle<v8::Value> arg = parse->Call(json, 1, &argAsString);
+		v8::Handle<v8::Value> result = function->Call(object, 1, &arg);
+
+		if (!message._response) {
+			Message response;
+			response._sender = _id;
+			v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
+			response._message = toString(responseValue);
+			response._response = true;
+			response._callback = message._callback;
+
+			Lock lock(_mutex);
+			if (Task* task = gTasks[message._sender]) {
+				task->enqueueMessage(response);
+			}
+		}
+	} else if (message._promise != -1) {
+		v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(_isolate, message._message.c_str(), v8::String::kNormalString, message._message.size());
+		v8::Handle<v8::Value> arg = parse->Call(json, 1, &argAsString);
+
+		if (message._response) {
+			v8::TryCatch tryCatch;
+			std::cout << "handling response?\n";
+			v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[message._promise]);
+			std::cout << "Resolving!\n";
+			resolver->Resolve(arg);
+			_isolate->RunMicrotasks();
+			if (tryCatch.HasCaught()) {
+				v8::Local<v8::Value> exception = tryCatch.Exception();
+				v8::String::Utf8Value exceptionText(exception);
+				std::cerr << "Exception: " << toString(exceptionText) << "\n";
+			}
+			std::cout << "Resolved!\n";
+			//_promises.clear();
+			//std::cout << "cleared\n";
+		} else {
+			v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(_isolate, "onMessage")));
+			v8::Handle<v8::Value> result = function->Call(context->Global(), 1, &arg);
+
+			Message response;
+			response._sender = _id;
+			v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
+			response._message = toString(responseValue);
+			std::cout << "going to try to resolve to " << response._message << "\n";
+			response._response = true;
+			response._callback = -1;
+			response._promise = message._promise;
+
+			Lock lock(_mutex);
+			if (Task* task = gTasks[message._sender]) {
+				task->enqueueMessage(response);
+				std::cout << "response enqueued on " << task << "\n";
+			} else {
+				std::cout << "No task!\n";
+			}
 		}
 	}
 }
@@ -158,6 +206,14 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cout << toString(value);
 	}
 	std::cout << '\n';
+}
+
+void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	if (task) {
+		v8::V8::TerminateExecution(task->_isolate);
+		task->_killed = true;
+	}
 }
 
 void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -206,14 +262,18 @@ void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::enqueueMessage(const Message& message) {
+	std::cout << _id << "->enqueueMessage\n";
 	Lock lock(_messageMutex);
+	std::cout << _id << "->enqueueMessage (locked)\n";
 	_messages.push_back(message);
 	_messageSignal.signal();
 }
 
 bool Task::dequeueMessage(Message& message) {
 	bool haveMessage = false;
+	std::cout << _id << "->dequeueMessage\n";
 	Lock lock(_messageMutex);
+	std::cout << _id << "->dequeueMessage (locked)\n";
 
 	while (_messages.size() && !_messages.front()._sender) {
 		_messages.pop_front();
@@ -233,7 +293,7 @@ bool Task::dequeueMessage(Message& message) {
 }
 
 void Task::send(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::EscapableHandleScope scope(args.GetIsolate());
+	v8::HandleScope scope(args.GetIsolate());
 	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
 	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(args.GetIsolate(), "JSON"))->ToObject();
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
@@ -250,6 +310,7 @@ void Task::send(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), args[1].As<v8::Function>());
 		task->_callbacks.push_back(function);
 		message._callback = task->_callbacks.size() - 1;
+		message._promise = -1;
 
 		{
 			Lock lock(_mutex);
@@ -276,6 +337,39 @@ void execute(v8::Handle<v8::String> source) {
 		v8::Local<v8::Value> exception = tryCatch.Exception();
 		v8::String::Utf8Value exceptionText(exception);
 		std::cerr << "Exception: " << toString(exceptionText) << "\n";
+	}
+}
+
+void Task::syscall(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::EscapableHandleScope scope(args.GetIsolate());
+	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
+	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(args.GetIsolate(), "JSON"))->ToObject();
+	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
+	v8::Handle<v8::Value> arg = args[0];
+	v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
+
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	if (task) {
+		Message message;
+		message._message = *value;
+		message._sender = task->_id;
+		message._response = false;
+		std::cout << "making resolver\n";
+		v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(args.GetIsolate(), v8::Promise::Resolver::New(args.GetIsolate()));
+		std::cout << "made resolver\n";
+
+		message._callback = -1;
+		message._promise = task->_promises.size();
+
+		task->_promises.push_back(promise);
+		args.GetReturnValue().Set(promise);
+
+		{
+			Lock lock(_mutex);
+			if (Task* parent = gTasks[task->_parent]) {
+				parent->enqueueMessage(message);
+			}
+		}
 	}
 }
 
