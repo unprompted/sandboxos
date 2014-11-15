@@ -1,8 +1,39 @@
 <h2>Welcome to CoryWeb?</h2>
 
-<div>This is a wiki.  I made a wiki with it.  It's really bad, but you can make it better.</div>
+<div>I made a javascript thing for making webapps.  And then I made a wiki with it.  That is what you are looking at.  It's really bad, but you can make it better.</div>
 
-<div>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find potentially more interesting apps.</div>
+<div>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find potentially more interesting apps and edit them.</div>
 
 <h2>Overview</h2>
-<div>There is a sort of design to this thing.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.  A lot needs to be done to improve the API for sending messages.  And a lot needs to be done to improve the error handling and reporting.<div>
+<div>There is a sort of design to this thing.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.<div>
+
+<h2>Vision</h2>
+<div>Treating webapps like mobile apps is a thing that hasn't been explored to its full potential.  Being able to edit apps with the easy of a wiki is something that I've only seen done in toy environments.</div>
+<ul>
+<li>Yes, browsers have app stores.  But they're still essentially restricted to browser apps, and the stores are highly browser-specific.</li>
+<li>Yes, browser apps are crazy powerful these days.  But they still only provide access to small sliver of available resources.</li>
+<li>People shouldn't need to trust a cloud provider.  If they can achieve the same experience with their files remaining on their hard drives and devices and one new program that connects them, we should enable that.</li>
+</ul>
+
+<div>Possible directions:</div>
+<ul>
+<li>A music app lets me play music from any of my devices running this program from any device with a modern web browser.</li>
+<li>I can get a secure remote shell to any of my devices running this program from any device with a modern web browser.</li>
+<li>There is a rudimentary social network between any devices running this program.</li>
+<li>I can discover new apps in a public app directory as well as make modifications to any of them and resubmit.  Something like an app store + github.</li>
+</ul>
+
+<h2>Source</h2>
+<div>The source is <a href="http://www.unprompted.com/projects/browser/projects/sandboxos/trunk">here</a>, but I've only built it on Linux.  It requires v8 and libuv.</div>
+
+<h2>Known Issues</h2>
+<div>Too many.</div>
+<ul>
+<li>Feedback is really bad or missing.  If you break a task, it might just stop responding to web requests.  I have the benefit of being able to see console output, but that's really noisy and bad.  There might be times where it is necessary to restart the whole process.</li>
+<li>Inter-task messaging is really awkward to type.  And the way you need to respond to httpd requests is even weirder.  I will work on this.  It should be possible to get most things close to being first-class function calls, except asynchronous.
+<li>The security here is abysmal at the moment.  I'm essentially trusting you to please don't do bad things.  I have a general plan to improve that situation once things get further along.</li>
+</div>
+</ul>
+
+<h2>Too many cooks</h2>
+<iframe width="560" height="315" src="//www.youtube.com/embed/QrGrOK8oZG8" frameborder="0" allowfullscreen></iframe>
