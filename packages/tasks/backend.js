@@ -3,6 +3,8 @@ var kStaticFiles = [
 	{uri: '/tasks/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 
+var gWatchers = [];
+
 function decode(encoded) {
 	var result = "";
 	for (var i = 0; i < encoded.length; i++) {
@@ -35,6 +37,24 @@ function decodeForm(encoded) {
 	return result;
 }
 
+function sendLatestStatus(messageId) {
+	parent.invoke({
+		to: "system",
+		action: "getPackageList",
+	}).then(function(packages) {
+		parent.invoke({
+			to: "system",
+			action: "getTasks",
+		}).then(function(tasks) {
+			parent.invoke({
+				to: "httpd",
+				response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({tasks: tasks, packages: packages}),
+				messageId: messageId,
+			});
+		});
+	});
+}
+
 function onMessage(from, message) {
 	if (message.request) {
 		var found = false;
@@ -58,21 +78,7 @@ function onMessage(from, message) {
 		}
 		if (!found) {
 			if (message.request.uri == "/tasks/get") {
-				parent.invoke({
-					to: "system",
-					action: "getPackageList",
-				}).then(function(packages) {
-					parent.invoke({
-						to: "system",
-						action: "getTasks",
-					}).then(function(tasks) {
-						parent.invoke({
-							to: "httpd",
-							response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({tasks: tasks, packages: packages}),
-							messageId: message.messageId,
-						});
-					});
-				});
+				sendLatestStatus(message.messageId);
 			} else if (message.request.uri == "/tasks/start") {
 				form = decodeForm(message.request.query);
 				parent.invoke({
@@ -112,7 +118,13 @@ function onMessage(from, message) {
 						messageId: message.messageId,
 					});
 				});
+			} else if (message.request.uri == "/tasks/changes") {
+				gWatchers.push(message.messageId);
 			}
+		}
+	} else if (message.action == "taskStarted" || message.action == "updateTaskStatus") {
+		for (var i in gWatchers) {
+			sendLatestStatus(gWatchers[i]);
 		}
 	}
 }

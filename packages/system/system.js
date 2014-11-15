@@ -27,6 +27,7 @@ function startTask(packageName) {
 		task.task = startScript(packageFilePath(packageName, manifest.start), manifest.trusted);
 		task.manifest = manifest;
 		tasks[packageName] = task
+		broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"started"});
 		broadcast(null, {action: "taskStarted", taskName: packageName});
 	} else {
 		print("Package " + packageName + " has no package.json.");
@@ -98,18 +99,18 @@ function onMessage(from, message) {
 					print("killing " + message.taskName);
 					tasks[message.taskName].task.kill();
 					delete tasks[message.taskName];
-					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
+					broadcast(null, {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
 				} else if (message.action == "startTask") {
 					startTask(message.taskName);
-					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"starting..."});
+					broadcast(null, {action:"updateTaskStatus", taskName:message.taskName, state:"starting"});
 				} else if (message.action == "restartTask" && tasks[message.taskName]) {
 					print("killing " + message.taskName);
 					print(tasks[message.taskName]);
 					tasks[message.taskName].task.kill();
 					delete tasks[message.taskName];
-					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
+					broadcast(null, {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
 					startTask(message.taskName);
-					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"starting..."});
+					broadcast(null, {action:"updateTaskStatus", taskName:message.taskName, state:"starting"});
 				} else if (message.action == "put") {
 					var fileName = packageFilePath(message.taskName, message.fileName);
 					print("fileName = " + fileName);
