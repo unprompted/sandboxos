@@ -39,7 +39,7 @@ function decodeForm(encoded) {
 	return result;
 }
 
-function render(message, fileName, isEdit) {			
+function render(message, fileName, isEdit) {
 	parent.invoke({
 		to: "system",
 			action: "getData",
@@ -82,7 +82,7 @@ function onMessage(from, message) {
 				break;
 			}
 		}
-		
+
 		if (!found) {
 			var isEdit = false;
 			var fileName;
@@ -95,7 +95,7 @@ function onMessage(from, message) {
 			if (!fileName) {
 				fileName = "index";
 			}
-			
+
 			if (message.request.method == "POST") {
 				var form = decodeForm(message.request.body);
 				parent.invoke({

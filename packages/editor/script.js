@@ -43,6 +43,7 @@ function newPackage() {
 			data: {taskName: package},
 		}).then(function(data) {
 			alert("Package '" + package + "' created successfully.");
+			refreshPackageList();
 		}).fail(function(xhr, status, error) {
 			alert("Error: " + error);
 		});
@@ -108,7 +109,7 @@ function changeFile() {
 	}).done(setText);
 }
 
-$(document).ready(function() {
+function refreshPackageList() {
 	$.ajax({
 		url: "/editor/getPackageList",
 		dataType: "JSON",
@@ -121,6 +122,10 @@ $(document).ready(function() {
 			$("#packages").append(li);
 		}
 	});
+}
+
+$(document).ready(function() {
+	refreshPackageList();
 	var editor = document.getElementById("edit");
 	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false, lineNumbers: true, electricChars: false});
 });

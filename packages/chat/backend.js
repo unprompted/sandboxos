@@ -2,7 +2,7 @@
 var waiting = [];
 var index = 0;
 var messages = [];
-		
+
 var kStaticFiles = [
 	{uri: '/chat', path: 'index.html', type: 'text/html'},
 	{uri: '/chat/frontend.js', path: 'frontend.js', type: 'text/javascript'},
