@@ -1,14 +1,13 @@
 var cm;
 var currentFileName;
-var currentPackage;
 
 function saveFile() {
 	cm.save()
-	if (currentFileName && currentPackage) {
+	if (currentFileName) {
 		$.ajax({
 			type: "POST",
-			url: "/editor/put",
-			data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val()), taskName: currentPackage},
+			url: "put",
+			data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
 			dataType: "text",
 		});
 	}
@@ -41,11 +40,11 @@ function newPackage() {
 	var package = prompt("Name of new package:");
 	if (package) {
 		$.ajax({
-			url: "/editor/newPackage",
+			url: "new",
 			data: {taskName: package},
 		}).then(function(data) {
 			alert("Package '" + package + "' created successfully.");
-			refreshPackageList();
+			window.location.href = "/editor/" + package + "/";
 		}).fail(function(xhr, status, error) {
 			alert("Error: " + error);
 		});
@@ -54,13 +53,13 @@ function newPackage() {
 
 function clonePackage() {
 	var newPackage = prompt("Name of new package:");
-	if (currentPackage && newPackage) {
+	if (newPackage) {
 		$.ajax({
-			url: "/editor/clonePackage",
-			data: {oldName: currentPackage, newName: newPackage},
+			url: "clone",
+			data: {newName: newPackage},
 		}).then(function(data) {
 			alert("Package '" + newPackage + "' created successfully.");
-			refreshPackageList();
+			window.location.href = "/editor/" + newPackage + "/";
 		}).fail(function(xhr, status, error) {
 			alert("Error: " + error);
 		});
@@ -72,30 +71,27 @@ function newFile() {
 	if (fileName) {
 		$.ajax({
 			type: "POST",
-			url: "/editor/put",
-			data: {fileName: fileName, contents: JSON.stringify(""), taskName: currentPackage},
+			url: "put",
+			data: {fileName: fileName, contents: JSON.stringify("")},
 			dataType: "text",
 		});
 	}
 }
 
-function changePackage() {
-	currentPackage = $(this).text();
+function renameFile() {
+	alert("Unimplemented");
+}
+
+function deleteFile() {
+	alert("Unimplemented");
+}
+
+function refreshPackage() {
 	currentFileName = null;
-	$("#title").text("> " + currentPackage);
-	$("#packageSpecific").show();
 	$("#fileSpecific").hide();
 	setText("");
-	$("#packages").children().each(function (i) {
-		if ($(this).text() == currentPackage) {
-			$(this).addClass("current");
-		} else {
-			$(this).removeClass("current");
-		}
-	});
 	$.ajax({
-		url: "/editor/list",
-		data: {taskName: currentPackage},
+		url: "list",
 		dataType: "JSON",
 	}).then(function(data) {
 		$("#files").empty();
@@ -110,7 +106,6 @@ function changePackage() {
 
 function changeFile() {
 	currentFileName = $(this).text();
-	$("#title").text("> " + currentPackage + " > " + currentFileName);
 	$("#fileSpecific").show();
 	$("#save").val("Save " + currentFileName);
 	$("#files").children().each(function (i) {
@@ -121,29 +116,14 @@ function changeFile() {
 		}
 	});
 	$.ajax({
-		url: "/editor/get",
-		data: {taskName: currentPackage, fileName: currentFileName},
+		url: "get",
+		data: {fileName: currentFileName},
 		dataType: "text",
 	}).done(setText);
 }
 
-function refreshPackageList() {
-	$.ajax({
-		url: "/editor/getPackageList",
-		dataType: "JSON",
-	}).then(function(data) {
-		$("#packages").empty();
-		for (var i in data) {
-			var li = document.createElement("li");
-			$(li).text(data[i]);
-			$(li).click(changePackage);
-			$("#packages").append(li);
-		}
-	});
-}
-
 $(document).ready(function() {
-	refreshPackageList();
+	refreshPackage();
 	var editor = document.getElementById("edit");
 	cm = CodeMirror.fromTextArea(editor, {
 		indentWithTabs: true,

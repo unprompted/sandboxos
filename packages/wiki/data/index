@@ -7,7 +7,7 @@
 <h2>Overview</h2>
 <p>There is a sort of design to this thing.  There is a small C++ program that glues together v8 and libuv.  It loads up a "system" package which does the rest of the work.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.  If a javascript runtime were an operating system kernel, this would be a microkernel architecture.</p>
 
-<p>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find the currently running apps, and edit them.</p>
+<p>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find the currently running apps and edit them.</p>
 
 <h2>Vision</h2>
 <div>Treating webapps like mobile apps is a thing that hasn't been adequately explored.  Being able to edit apps with the ease of a wiki is something that I've only seen done in toy environments.</div>

@@ -56,65 +56,83 @@ function copyFile(oldPackage, newPackage, fileName) {
 }
 
 function onMessage(from, message) {
+	var handled = false;
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 	if (message.request) {
-		if (message.request.uri == "/editor/get") {
-			var form = decodeForm(message.request.query);
-			parent.invoke({to: "system", action: "get", taskName: form.taskName, fileName: form.fileName}).then(function(result) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
-			});
-		} else if (message.request.uri == "/editor/getPackageList") {
-			parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-			});
-		} else if (message.request.uri == "/editor/list") {
-			var form = decodeForm(message.request.query);
-			parent.invoke({to: "system", action: "list", taskName: form.taskName}).then(function(result) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-			});
-		} else if (message.request.uri == "/editor/put") {
-			var form = decodeForm(message.request.body);
-			parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
-			parent.invoke({to: "system", action: "put", taskName: form.taskName, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
-				parent.invoke({to: "system", action: "restartTask", taskName: form.taskName});
-			});
-		} else if (message.request.uri == "/editor/newPackage") {
-			var form = decodeForm(message.request.query);
-			parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
-			}).catch(function(error) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
-			});
-		} else if (message.request.uri == "/editor/clonePackage") {
-			var form = decodeForm(message.request.query);
-			parent.invoke({to: "system", action: "newPackage", taskName: form.newName}).then(function(result) {
-				parent.invoke({to: "system", action: "list", taskName: form.oldName}).then(function(oldPackageContents) {
-					promises = [];
-					for (var i in oldPackageContents) {
-						promises.push(copyFile(form.oldName, form.newName, oldPackageContents[i]));
-					}
-					Promise.all(promises).then(function(data) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\ncloned", messageId: message.messageId});
-					});
-				});
-			}).catch(function(error) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
-			});
-		} else {
-			var match;
-			for (var i in kStaticFiles) {
-				var file = kStaticFiles[i];
-				if (message.request.uri == file.uri) {
-					match = file;
-				}
-			}
-			if (match) {
-				parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
-					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
-				});
-			} else {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
+		var match;
+		for (var i in kStaticFiles) {
+			var file = kStaticFiles[i];
+			if (message.request.uri == file.uri) {
+				match = file;
 			}
 		}
+		if (new RegExp("^/editor/[^/]+/$").exec(message.request.uri)) {
+			match = {path: "package.html", type: "text/html"};
+		}
+		if (match) {
+			parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
+			});
+			handled = true;
+		}
+		if (!handled) {
+			var regex = new RegExp("^/editor/([^/]+)/(.*)$");
+			match = regex.exec(message.request.uri);
+			if (match) {
+				var package = match[1];
+				var action = match[2];
+				handled = true;
+				if (action == "get") {
+					var form = decodeForm(message.request.query);
+					parent.invoke({to: "system", action: "get", taskName: package, fileName: form.fileName}).then(function(result) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
+					});
+				} else if (action == "getPackageList") {
+					parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+					});
+				} else if (action == "list") {
+					var form = decodeForm(message.request.query);
+					parent.invoke({to: "system", action: "list", taskName: package}).then(function(result) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+					});
+				} else if (action == "put") {
+					var form = decodeForm(message.request.body);
+					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
+					parent.invoke({to: "system", action: "put", taskName: package, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
+						parent.invoke({to: "system", action: "restartTask", taskName: package});
+					});
+				} else if (action == "new") {
+					var form = decodeForm(message.request.query);
+					parent.invoke({to: "system", action: "newPackage", taskName: package}).then(function(result) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+					}).catch(function(error) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
+					});
+				} else if (action == "clone") {
+					var form = decodeForm(message.request.query);
+					var oldName = package;
+					var newName = form.newName;
+					parent.invoke({to: "system", action: "newPackage", taskName: newName}).then(function(result) {
+						parent.invoke({to: "system", action: "list", taskName: oldName}).then(function(oldPackageContents) {
+							promises = [];
+							for (var i in oldPackageContents) {
+								promises.push(copyFile(oldName, newName, oldPackageContents[i]));
+							}
+							Promise.all(promises).then(function(data) {
+								parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\ncloned", messageId: message.messageId});
+							});
+						});
+					}).catch(function(error) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
+					});
+				} else {
+					handled = false;
+				}
+			}
+		}
+	}
+	if (!handled) {
+		parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
 	}
 }

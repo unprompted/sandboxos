@@ -46,6 +46,10 @@ function refresh() {
 		$(th).text("Actions");
 		$(tr).append(th);
 
+		th = document.createElement("th");
+		$(th).text("Edit");
+		$(tr).append(th);
+
 		$("#tasks").append(tr);
 
 		for (var i in data.packages) {
@@ -107,6 +111,13 @@ function refresh() {
 				$(td).append(start);
 				$(tr).append(td);
 			}
+
+			var td = document.createElement("td");
+			var a = document.createElement("a");
+			$(a).text("edit");
+			$(a).attr("href", "/editor/" + package + "/");
+			$(td).append(a);
+			$(tr).append(td);
 
 			$("#tasks").append(tr);
 		}

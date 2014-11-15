@@ -1,52 +1,8 @@
 <html>
 	<head>
 		<title>Editor</title>
-		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
-		<script src="/editor/codemirror-compressed.js"></script>
-		<script src="/editor/script.js"></script>
-		<link rel="stylesheet" href="/editor/codemirror.css"></link>
-		<link rel="stylesheet" href="/editor/lesser-dark.css"></link>
-		<style>
-			li.current {
-				font-weight: bold;
-			}
-			.CodeMirror {
-				height: 100%;
-			}
-			.cm-trailingspace {
-				background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3QUXCToH00Y1UgAAACFJREFUCNdjPMDBUc/AwNDAAAFMTAwMDA0OP34wQgX/AQBYgwYEx4f9lQAAAABJRU5ErkJggg==);
-				background-position: bottom left;
-				background-repeat: repeat-x;
-			}
-			#nav {
-				width: 200px;
-				position: absolute;
-			}
-			#content {
-				margin-left: 200px;
-				height: 100%;
-			}
-		</style>
 	</head>
 	<body>
-		<div id="nav">
-			<h1>Editor</h1>
-			<div><a href="/wiki">home</a> <span id="title"></span></div>
-			<h2>Packages</h2>
-			<ul id="packages"></ul>
-			<input id="newPackage" type="button" value="New Package" onclick="newPackage()" style="clear: both"></input>
-			<div id="packageSpecific" style="display: none">
-				<input id="clonePackage" type="button" value="Clone Package" onclick="clonePackage()" style="clear: both"></input>
-				<h2>Files</h2>
-				<ul id="files"></ul>
-				<input id="newFile" type="button" value="New File" onclick="newFile()" style="clear: both"></input>
-				<div id="fileSpecific" style="display: none">
-					<input id="save" type="button" value="Save" onclick="saveFile()" style="clear: both"></input>
-				</div>
-			</div>
-		</div>
-		<div id="content">
-			<textarea id="edit" style="width: 100%; height: 40em"></textarea>
-		</div>
+		<div>Visit <a href="/tasks">/tasks</a> to choose a package to edit.</div>
 	</body>
 </html>
