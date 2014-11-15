@@ -65,7 +65,7 @@ function newFile() {
 function changePackage() {
 	currentPackage = $(this).text();
 	currentFileName = null;
-	$("#title").text(currentPackage);
+	$("#title").text("> " + currentPackage);
 	$("#packageSpecific").show();
 	$("#fileSpecific").hide();
 	$("#packages").children().each(function (i) {
@@ -92,7 +92,7 @@ function changePackage() {
 
 function changeFile() {
 	currentFileName = $(this).text();
-	$("#title").text(currentPackage + " > " + currentFileName);
+	$("#title").text("> " + currentPackage + " > " + currentFileName);
 	$("#fileSpecific").show();
 	$("#save").val("Save " + currentFileName);
 	$("#files").children().each(function (i) {
@@ -127,5 +127,13 @@ function refreshPackageList() {
 $(document).ready(function() {
 	refreshPackageList();
 	var editor = document.getElementById("edit");
-	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false, lineNumbers: true, electricChars: false});
+	cm = CodeMirror.fromTextArea(editor, {
+		indentWithTabs: true,
+		theme: 'lesser-dark',
+		indentUnit: 4,
+		smartIndent: false,
+		lineNumbers: true,
+		electricChars: false,
+		showTrailingSpace: true,
+	});
 });

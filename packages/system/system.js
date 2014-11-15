@@ -96,12 +96,14 @@ function onMessage(from, message) {
 				if (message.action == "stopTask") {
 					print("killing " + message.taskName);
 					tasks[message.taskName].task.kill();
+					delete tasks[message.taskName];
 				} else if (message.action == "startTask") {
 					startTask(message.taskName);
 				} else if (message.action == "restartTask" && tasks[message.taskName]) {
 					print("killing " + message.taskName);
 					print(tasks[message.taskName]);
 					tasks[message.taskName].task.kill();
+					delete tasks[message.taskName];
 					startTask(message.taskName);
 				} else if (message.action == "put") {
 					var fileName = packageFilePath(message.taskName, message.fileName);
