@@ -47,6 +47,14 @@ var kStaticFiles = [
 	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
 ];
 
+function copyFile(oldPackage, newPackage, fileName) {
+	return new Promise(function(resolve, reject) {
+		parent.invoke({to: "system", action: "get", taskName: oldPackage, fileName: fileName}).then(function(result) {
+			parent.invoke({to: "system", action: "put", taskName: newPackage, fileName: fileName, contents: result}).then(resolve).catch(reject);
+		}).catch(reject);
+	});
+}
+
 function onMessage(from, message) {
 	print("editor received: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 	if (message.request) {
@@ -74,6 +82,21 @@ function onMessage(from, message) {
 			var form = decodeForm(message.request.query);
 			parent.invoke({to: "system", action: "newPackage", taskName: form.taskName}).then(function(result) {
 				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+			}).catch(function(error) {
+				parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
+			});
+		} else if (message.request.uri == "/editor/clonePackage") {
+			var form = decodeForm(message.request.query);
+			parent.invoke({to: "system", action: "newPackage", taskName: form.newName}).then(function(result) {
+				parent.invoke({to: "system", action: "list", taskName: form.oldName}).then(function(oldPackageContents) {
+					promises = [];
+					for (var i in oldPackageContents) {
+						promises.push(copyFile(form.oldName, form.newName, oldPackageContents[i]));
+					}
+					Promise.all(promises).then(function(data) {
+						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\ncloned", messageId: message.messageId});
+					});
+				});
 			}).catch(function(error) {
 				parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
 			});

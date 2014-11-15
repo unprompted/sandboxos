@@ -8,7 +8,7 @@
 <div>There is a sort of design to this thing.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.<div>
 
 <h2>Vision</h2>
-<div>Treating webapps like mobile apps is a thing that hasn't been explored to its full potential.  Being able to edit apps with the easy of a wiki is something that I've only seen done in toy environments.</div>
+<div>Treating webapps like mobile apps is a thing that hasn't been explored to its full potential.  Being able to edit apps with the ease of a wiki is something that I've only seen done in toy environments.</div>
 <ul>
 <li>Yes, browsers have app stores.  But they're still essentially restricted to browser apps, and the stores are highly browser-specific.</li>
 <li>Yes, browser apps are crazy powerful these days.  But they still only provide access to small sliver of available resources.</li>
@@ -35,5 +35,5 @@
 </div>
 </ul>
 
-<h2>Too many cooks</h2>
+<h2>Too Many Cooks</h2>
 <iframe width="560" height="315" src="//www.youtube.com/embed/QrGrOK8oZG8" frameborder="0" allowfullscreen></iframe>

@@ -24,14 +24,16 @@ function setText(text) {
 	} else {
 		$("#edit").val(text);
 	}
-	if (endsWith(currentFileName, ".js")) {
-		cm.setOption("mode", "javascript");
-	} else if (endsWith(currentFileName, ".json")) {
-		cm.setOption("mode", {name: "javascript", json: true});
-	} else if (endsWith(currentFileName, ".html")) {
-		cm.setOption("mode", "htmlmixed");
-	} else if (endsWith(currentFileName, ".css")) {
-		cm.setOption("mode", "css");
+	if (currentFileName) {
+		if (endsWith(currentFileName, ".js")) {
+			cm.setOption("mode", "javascript");
+		} else if (endsWith(currentFileName, ".json")) {
+			cm.setOption("mode", {name: "javascript", json: true});
+		} else if (endsWith(currentFileName, ".html")) {
+			cm.setOption("mode", "htmlmixed");
+		} else if (endsWith(currentFileName, ".css")) {
+			cm.setOption("mode", "css");
+		}
 	}
 }
 
@@ -43,6 +45,21 @@ function newPackage() {
 			data: {taskName: package},
 		}).then(function(data) {
 			alert("Package '" + package + "' created successfully.");
+			refreshPackageList();
+		}).fail(function(xhr, status, error) {
+			alert("Error: " + error);
+		});
+	}
+}
+
+function clonePackage() {
+	var newPackage = prompt("Name of new package:");
+	if (currentPackage && newPackage) {
+		$.ajax({
+			url: "/editor/clonePackage",
+			data: {oldName: currentPackage, newName: newPackage},
+		}).then(function(data) {
+			alert("Package '" + newPackage + "' created successfully.");
 			refreshPackageList();
 		}).fail(function(xhr, status, error) {
 			alert("Error: " + error);
@@ -68,6 +85,7 @@ function changePackage() {
 	$("#title").text("> " + currentPackage);
 	$("#packageSpecific").show();
 	$("#fileSpecific").hide();
+	setText("");
 	$("#packages").children().each(function (i) {
 		if ($(this).text() == currentPackage) {
 			$(this).addClass("current");
