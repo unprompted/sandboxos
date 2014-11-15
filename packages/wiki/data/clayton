@@ -9,3 +9,8 @@ Thoughts:
 <p>In particular, I'm thinking about the "tasks" page not updating when you click on a button.
 system could broadcast out status update messages, so 'tasks' could listen for them and update.
 Other tasks could listen for e.g. newly created tasks or track uptime, etc.</p>
+
+<hr>
+<p>Yes.  It's not reflected well anywhere right now, but the "system" task is the parent of all other tasks.  parent.invoke(message); sends message to "system".  If message.to is set, system will forward it on to that task.  Any task that implements onMessage will receive messages.  There was a {action: "taskStarted", taskName: "foo"} message that I used so that the "httpd" task knew about all of the other tasks that could handle HTTP requests.  I hooked up updateTaskStatus too, now.  I haven't explored what my options are, but I'm sure this can be be streamlined.  One thing I know I can do is expose exported functions from one task to another as first-class objects.  They will all do essentially the same thing that's happening now, and they will all be asynchronous, but it will be less awkward to type.</p>
+<p>Unfortunately I think I have to do some security things first, having this all out on a public web server.  I will do something with accounts and permissions shortly so that Joe Internet can't modify the "tasks" package except by cloning it first.</p>
+<p>-Cory</p>
