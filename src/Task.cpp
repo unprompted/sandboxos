@@ -2,16 +2,21 @@
 
 #include "Socket.h"
 
-#include <dirent.h>
 #include <fstream>
 #include <iostream>
 #include <libplatform/libplatform.h>
 #include <map>
 #include <sys/types.h>
-#include <unistd.h>
 #include <uv.h>
 #include <v8.h>
 #include <v8-platform.h>
+
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <dirent.h>
+#include <unistd.h>
+#endif
 
 extern v8::Platform* gPlatform;
 std::map<taskid_t, Task*> gTasks;
@@ -115,7 +120,7 @@ v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
 		char* buffer = new char[fileSize];
 		file.read(buffer, fileSize);
 		std::string contents(buffer, buffer + fileSize);
-		value = v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(buffer), v8::String::String::kNormalString, fileSize);
+		value = v8::String::NewFromOneByte(isolate, reinterpret_cast<const uint8_t*>(buffer), v8::String::kNormalString, fileSize);
 		delete[] buffer;
 	}
 	return value;
@@ -424,7 +429,7 @@ void Task::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		char* buffer = new char[fileSize];
 		file.read(buffer, fileSize);
 		std::string contents(buffer, buffer + fileSize);
-		args.GetReturnValue().Set(v8::String::NewFromOneByte(args.GetIsolate(), reinterpret_cast<const uint8_t*>(buffer), v8::String::String::kNormalString, fileSize));
+		args.GetReturnValue().Set(v8::String::NewFromOneByte(args.GetIsolate(), reinterpret_cast<const uint8_t*>(buffer), v8::String::kNormalString, fileSize));
 		delete[] buffer;
 	}
 }
@@ -449,6 +454,19 @@ void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	v8::Handle<v8::Array> array = v8::Array::New(args.GetIsolate(), 0);
 
+#ifdef WIN32
+	WIN32_FIND_DATA find;
+	std::string pattern = *v8::String::Utf8Value(directory);
+	pattern += "\\*";
+	HANDLE handle = FindFirstFile(pattern.c_str(), &find);
+	if (handle != INVALID_HANDLE_VALUE) {
+		int index = 0;
+		do {
+			array->Set(v8::Integer::New(args.GetIsolate(), index++), v8::String::NewFromUtf8(args.GetIsolate(), find.cFileName));
+		} while (FindNextFile(handle, &find) != 0);
+		FindClose(handle);
+	}
+#else
 	if (DIR* dir = opendir(*v8::String::Utf8Value(directory))) {
 		int index = 0;
 		while (struct dirent* entry = readdir(dir)) {
@@ -456,6 +474,7 @@ void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		}
 		closedir(dir);
 	}
+#endif
 
 	args.GetReturnValue().Set(array);
 }
@@ -464,7 +483,11 @@ void Task::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::HandleScope scope(args.GetIsolate());
 	v8::Handle<v8::String> directory = args[0]->ToString();
 
+#ifdef WIN32
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), CreateDirectory(*v8::String::Utf8Value(directory), 0) == 0 ? -1 : 0));
+#else
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), mkdir(*v8::String::Utf8Value(directory), 0777)));
+#endif
 }
 
 void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
