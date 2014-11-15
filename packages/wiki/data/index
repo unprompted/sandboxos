@@ -1,25 +1,27 @@
 <h2>Welcome to CoryWeb?</h2>
 
-<div>I made a javascript thing for making webapps.  And then I made a wiki with it.  That is what you are looking at.  It's really bad, but you can make it better.</div>
+<p>I made a javascript thing for making webapps.  And then I made a wiki with it.  That is what you are looking at.  It's really bad, but you can make it better.  Which is to say, not only can you make this particular wiki page better, but you currently have the power to completely rewrite the wiki engine into something better.</p>
 
-<div>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find potentially more interesting apps and edit them.</div>
+<p>The concept is: web browser javascript runtime smushed into the mobile app security model gives you a very powerful environment where it is easy to edit any app.  Or, what if we took Google's v8 JavaScript engine and used it to run apps that we didn't necessarily trust, but since we run them in a sandbox with severely limited permissions, just like a web browser, we really don't care.  Also make discovering and installing apps under this system as easy as installing apps on a phone.</p>
 
 <h2>Overview</h2>
-<div>There is a sort of design to this thing.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.<div>
+<p>There is a sort of design to this thing.  There is a small C++ program that glues together v8 and libuv.  It loads up a "system" package which does the rest of the work.  A package is a bundle of files, with one javascript file that is the entry point.  The "system" package is a special one that is started first and starts all of the other ones.  Once a package is running, it is called a task.  Some tasks have more permissions than others.  Most tasks don't have any real permissions at all and do all of their work by sending messages to other tasks.  If a javascript runtime were an operating system kernel, this would be a microkernel architecture.</p>
+
+<p>There is a page where you can look an overview of the running tasks, <a href="/tasks">here</a>.  From there, you can find the currently running apps, and edit them.</p>
 
 <h2>Vision</h2>
-<div>Treating webapps like mobile apps is a thing that hasn't been explored to its full potential.  Being able to edit apps with the ease of a wiki is something that I've only seen done in toy environments.</div>
+<div>Treating webapps like mobile apps is a thing that hasn't been adequately explored.  Being able to edit apps with the ease of a wiki is something that I've only seen done in toy environments.</div>
 <ul>
-<li>Yes, browsers have app stores.  But they're still essentially restricted to browser apps, and the stores are highly browser-specific.</li>
-<li>Yes, browser apps are crazy powerful these days.  But they still only provide access to small sliver of available resources.</li>
-<li>People shouldn't need to trust a cloud provider.  If they can achieve the same experience with their files remaining on their hard drives and devices and one new program that connects them, we should enable that.</li>
+<li>Yes, browsers have app stores.  But they're still essentially restricted to browser apps, and the stores are highly browser-specific.  This will be able to run on most devices, and it will make its apps available to any web browser.</li>
+<li>Yes, browser apps are crazy powerful these days.  But they still only provide access to small sliver of available resources.  This will be more like phones, letting you play your music, share your photos, organize your documents, ...</li>
+<li>People shouldn't need to trust a cloud provider.  The same experience can be achieved with files remaining on your own hard drives and devices and one new program that connects them.  This concept isn't new, but the means of arriving there isn't one I've encountered.</li>
 </ul>
 
 <div>Possible directions:</div>
 <ul>
 <li>A music app lets me play music from any of my devices running this program from any device with a modern web browser.</li>
 <li>I can get a secure remote shell to any of my devices running this program from any device with a modern web browser.</li>
-<li>There is a rudimentary social network between any devices running this program.</li>
+<li>There is a rudimentary social network between any devices running this program.  You can easily share your photos with people by giving them a URL, and they need not even know what any of this is.</li>
 <li>I can discover new apps in a public app directory as well as make modifications to any of them and resubmit.  Something like an app store + github.</li>
 </ul>
 
@@ -37,3 +39,21 @@
 
 <h2>Too Many Cooks</h2>
 <iframe width="560" height="315" src="//www.youtube.com/embed/QrGrOK8oZG8" frameborder="0" allowfullscreen></iframe>
+
+<h2>TODO</h2>
+<div>In no particular order:</div>
+<ul>
+<li>Make this wiki actually use some sort of wiki syntax.  HTML is too 90s.</li>
+<li>The C++ program needs to use separate processes for each task in order to prevent OOM situations in one task from taking down the whole process.</li>
+<li>The C++ program needs to build and run on Windows.  It needs to do so as transparently in the background as possible while still being trivial to acquire and start (Windows service / system tray icon).</li>
+<li>Need to implement a real security model.  I was thinking once this has an authentication task, everything can use that to enforce that nobody but administrators changed the core tasks and that anonymous and untrusted users don't do anything too malicious.</li>
+<li>Set limits for everything.  n anonymous users can each make m tasks with p MB of storage and can make q HTTP request per second.</li>
+<li>Make some sort of TODO / bug tracker to replace this task list.</li>
+<li>Be able to marshal functions across task boundaries so that the httpd task can return a request object that has the same API as node.js.  I think this will greatly simplify the client code for webapps.</li>
+<li>Establish some conventions for non-webapp tasks.  Maybe make a shell that lets you run code from any task that exposes it.</li>
+<li>Establish some conventions for HTML fragments.  Include a persistent HTML header in every page or something like that.</li>
+<li>Need to implement something like proper javascript requires() and package dependencies for code sharing.</li>
+<li>Make an app store.  Not too important until we have multiple installs, but pretty important.</li>
+<li>Lots of the API exposed from C++ isn't async but should be.</li>
+<li>Pick a name for this thing.</li>
+</ul>

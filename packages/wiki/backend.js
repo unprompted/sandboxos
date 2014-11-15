@@ -24,7 +24,7 @@ function decode(encoded) {
 
 function decodeForm(encoded) {
 	var result = {};
-	// HACK
+	// HACK for E3 build
 	if (encoded) {
 		encoded = encoded.trim();
 		var items = encoded.split('&');

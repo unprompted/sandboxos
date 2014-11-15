@@ -1,4 +1,3 @@
-// handler.js - handles the handling
 var waiting = [];
 var index = 0;
 var messages = [];
