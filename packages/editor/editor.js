@@ -13,7 +13,7 @@ function decode(encoded) {
 		var c = encoded[i];
 		if (c == "+") {
 			result += " ";
-		} else if (c == '%') {
+		} else if (c == "%") {
 			result += String.fromCharCode(parseInt(encoded.slice(i + 1, i + 3), 16));
 			i += 2;
 		} else {
@@ -25,7 +25,6 @@ function decode(encoded) {
 
 function decodeForm(encoded) {
 	var result = {};
-	// HACK
 	if (encoded) {
 		encoded = encoded.trim();
 		var items = encoded.split('&');

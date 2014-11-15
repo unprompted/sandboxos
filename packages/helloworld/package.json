@@ -1,0 +1,5 @@
+{
+	"name": "helloworld",
+	"start": "hello.js",
+	"httpd": {"root": "/helloworld"}
+}

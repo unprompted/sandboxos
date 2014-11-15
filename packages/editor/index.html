@@ -11,29 +11,36 @@
 				font-weight: bold;
 			}
 			.CodeMirror {
-				width: 100%;
-				height: 40em;
-				float: right;
+				height: 100%;
+			}
+			#nav {
+				width: 200px;
+				position: absolute;
+			}
+			#content {
+				margin-left: 200px;
+				height: 100%;
 			}
 		</style>
 	</head>
 	<body>
-		<h1 id="title">Editor</h1>
-		<h2>Packages</h2>
-		<ul id="packages"></ul>
-		<input id="newPackage" type="button" value="New Package" onclick="newPackage()" style="clear: both"></input>
-		<div id="packageSpecific" style="display: none">
-			<h2>Files</h2>
-			<ul id="files"></ul>
-			<input id="newFile" type="button" value="New File" onclick="newFile()" style="clear: both"></input>
-			<div id="fileSpecific" style="display: none">
-				<input id="save" type="button" value="Save" onclick="saveFile()" style="clear: both"></input>
-				<div>
-					<textarea id="edit" style="width: 100%; height: 40em"></textarea>
-					<input id="reload" type="button" value="Reload" onclick="reload()" style="clear: both"></input>
-					<iframe id="iframe" style="width: 100%; height: 20em"></iframe>
+		<div id="nav">
+			<h1>Editor</h1>
+			<div id="title"></div>
+			<h2>Packages</h2>
+			<ul id="packages"></ul>
+			<input id="newPackage" type="button" value="New Package" onclick="newPackage()" style="clear: both"></input>
+			<div id="packageSpecific" style="display: none">
+				<h2>Files</h2>
+				<ul id="files"></ul>
+				<input id="newFile" type="button" value="New File" onclick="newFile()" style="clear: both"></input>
+				<div id="fileSpecific" style="display: none">
+					<input id="save" type="button" value="Save" onclick="saveFile()" style="clear: both"></input>
 				</div>
 			</div>
+		</div>
+		<div id="content">
+			<textarea id="edit" style="width: 100%; height: 40em"></textarea>
 		</div>
 	</body>
 </html>

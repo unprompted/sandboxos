@@ -14,8 +14,8 @@ function saveFile() {
 	}
 }
 
-function reload() {
-	$("#iframe")[0].src = "/" + currentPackage;
+function endsWith(string, suffix) {
+	return string.substring(string.length - suffix.length) == suffix;
 }
 
 function setText(text) {
@@ -23,6 +23,15 @@ function setText(text) {
 		cm.setValue(text);
 	} else {
 		$("#edit").val(text);
+	}
+	if (endsWith(currentFileName, ".js")) {
+		cm.setOption("mode", "javascript");
+	} else if (endsWith(currentFileName, ".json")) {
+		cm.setOption("mode", {name: "javascript", json: true});
+	} else if (endsWith(currentFileName, ".html")) {
+		cm.setOption("mode", "htmlmixed");
+	} else if (endsWith(currentFileName, ".css")) {
+		cm.setOption("mode", "css");
 	}
 }
 
@@ -55,10 +64,9 @@ function newFile() {
 function changePackage() {
 	currentPackage = $(this).text();
 	currentFileName = null;
-	$("#title").text("Editor - " + currentPackage);
+	$("#title").text(currentPackage);
 	$("#packageSpecific").show();
 	$("#fileSpecific").hide();
-	$("#iframe")[0].src = "";
 	$("#packages").children().each(function (i) {
 		if ($(this).text() == currentPackage) {
 			$(this).addClass("current");
@@ -83,7 +91,7 @@ function changePackage() {
 
 function changeFile() {
 	currentFileName = $(this).text();
-	$("#title").text("Editor - " + currentPackage + " - " + currentFileName);
+	$("#title").text(currentPackage + " > " + currentFileName);
 	$("#fileSpecific").show();
 	$("#save").val("Save " + currentFileName);
 	$("#files").children().each(function (i) {
@@ -114,5 +122,5 @@ $(document).ready(function() {
 		}
 	});
 	var editor = document.getElementById("edit");
-	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false, lineNumbers: true});
+	cm = CodeMirror.fromTextArea(editor, {indentWithTabs: true, theme: 'lesser-dark', indentUnit: 4, smartIndent: false, lineNumbers: true, electricChars: false});
 });
