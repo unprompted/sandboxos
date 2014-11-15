@@ -16,6 +16,7 @@ public:
 	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void read(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void write(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 	~Socket();
 
 	static v8::Handle<v8::Object> create(Task* task);

@@ -151,6 +151,19 @@ void Socket::keepPromise(uv_handle_t* handle, int status) {
 	}
 }
 
+void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+	if (Socket* socket = Socket::get(info.This())) {
+		struct sockaddr_in addr;
+		int nameLength = sizeof(addr);
+		if (uv_tcp_getpeername(&socket->_socket, reinterpret_cast<sockaddr*>(&addr), &nameLength) == 0) {
+			char name[1024];
+			if (uv_ip4_name(&addr, name, sizeof(name)) == 0) {
+				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), name));
+			}
+		}
+	}
+}
+
 v8::Handle<v8::Object> Socket::create(Task* task) {
 	v8::Handle<v8::Object> socketObject;
 
@@ -162,6 +175,7 @@ v8::Handle<v8::Object> Socket::create(Task* task) {
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write));
+	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName);
 
 	socketObject = socketTemplate->NewInstance();
 	socketObject->SetInternalField(0, v8::External::New(task->getIsolate(), task->getSocket(task->allocateSocket())));
