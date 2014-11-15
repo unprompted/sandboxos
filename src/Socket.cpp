@@ -15,12 +15,12 @@ Socket::~Socket() {
 	uv_close(reinterpret_cast<uv_handle_t*>(&_socket), 0);
 }
 
-void Socket::bind4(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::String::Utf8Value ip(args[0]->ToString());
 		int port = args[1]->ToInteger()->Value();
-		struct sockaddr_in address;
-		uv_ip4_addr(*ip, port, &address);
+		struct sockaddr_in6 address;
+		uv_ip6_addr(*ip, port, &address);
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_tcp_bind(&socket->_socket, reinterpret_cast<struct sockaddr*>(&address), 0)));
 	}
 }
@@ -153,11 +153,11 @@ void Socket::keepPromise(uv_handle_t* handle, int status) {
 
 void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
 	if (Socket* socket = Socket::get(info.This())) {
-		struct sockaddr_in addr;
+		struct sockaddr_in6 addr;
 		int nameLength = sizeof(addr);
 		if (uv_tcp_getpeername(&socket->_socket, reinterpret_cast<sockaddr*>(&addr), &nameLength) == 0) {
 			char name[1024];
-			if (uv_ip4_name(&addr, name, sizeof(name)) == 0) {
+			if (uv_ip6_name(&addr, name, sizeof(name)) == 0) {
 				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), name));
 			}
 		}
@@ -169,7 +169,7 @@ v8::Handle<v8::Object> Socket::create(Task* task) {
 
 	v8::Handle<v8::ObjectTemplate> socketTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	socketTemplate->SetInternalFieldCount(1);
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind4));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));

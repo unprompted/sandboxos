@@ -10,7 +10,7 @@ class Task;
 class Socket {
 public:
 	Socket(Task* task);
-	static void bind4(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void accept(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
