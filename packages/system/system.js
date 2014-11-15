@@ -91,20 +91,25 @@ function onMessage(from, message) {
 				if (fileName) {
 					print("writeFile(" + fileName + ") => " + writeFile(fileName, message.contents));
 				}
+			// some task management stuff
 			} else if (tasks[fromName] && tasks[fromName].manifest.trusted
 				|| (!message.taskName && message.action == "get")) {
 				if (message.action == "stopTask") {
 					print("killing " + message.taskName);
 					tasks[message.taskName].task.kill();
 					delete tasks[message.taskName];
+					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
 				} else if (message.action == "startTask") {
 					startTask(message.taskName);
+					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"starting..."});
 				} else if (message.action == "restartTask" && tasks[message.taskName]) {
 					print("killing " + message.taskName);
 					print(tasks[message.taskName]);
 					tasks[message.taskName].task.kill();
 					delete tasks[message.taskName];
+					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
 					startTask(message.taskName);
+					broadcast("system", {action:"updateTaskStatus", taskName:message.taskName, state:"starting..."});
 				} else if (message.action == "put") {
 					var fileName = packageFilePath(message.taskName, message.fileName);
 					print("fileName = " + fileName);

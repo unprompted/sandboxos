@@ -1,0 +1,5 @@
+{
+	"name": "log",
+	"start": "log.js",
+	"httpd": {"root": "/log"}
+}

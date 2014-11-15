@@ -4,8 +4,8 @@ var messages = [];
 
 //are these ever used... ?
 var kStaticFiles = [
-	{uri: '/chat', path: 'index.html', type: 'text/html'},
-	{uri: '/chat/frontend.js', path: 'frontend.js', type: 'text/javascript'},
+	{uri: '/chat2', path: 'index.html', type: 'text/html'},
+	{uri: '/chat2/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 
 function onMessage(from, message) {
@@ -31,7 +31,7 @@ function onMessage(from, message) {
 			}
 		}
 		if (!found) {
-			if (message.request.uri == "/chat/send") {
+			if (message.request.uri == "/chat2/send") {
 				messages[index++] = message.request.body;
 				for (var i in waiting) {
 					parent.invoke({
@@ -46,7 +46,7 @@ function onMessage(from, message) {
 					response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\nOK",
 					messageId: message.messageId,
 				});
-			} else if (message.request.uri == "/chat/receive") {
+			} else if (message.request.uri == "/chat2/receive") {
 				var haveIndex = parseInt(message.request.body);
 				if (haveIndex + 1 < index) {
 					parent.invoke({

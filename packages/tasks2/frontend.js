@@ -7,10 +7,10 @@ function enter() {
 }
 function receive() {
 	$.ajax({
-		url: "/chat/receive",
+		url: "/chat2/receive",
 			method: "POST",
 			data: haveIndex.toString(),
-			dataType: "json",
+			dataType: "text",
 	}).then(function(data) {
 		print(data.message);
 		haveIndex = data.index;
@@ -29,7 +29,7 @@ function send() {
 	var value = document.getElementById("input").value;
 	document.getElementById("input").value = "";
 	$.ajax({
-		url: "/chat/send",
+		url: "/chat2/send",
 			method: "POST",
 			data: value,
 			dataType: "text",

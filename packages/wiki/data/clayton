@@ -1,0 +1,11 @@
+Thoughts:
+
+<h2>Things it should be easy to do:</h2>
+<ul>
+<li>Send a message</li>
+<li>Receive a message (register to receive messages, whatever)</li>
+
+<p>Would it be useful is the tasks could send a message to system when they start?</p>
+<p>In particular, I'm thinking about the "tasks" page not updating when you click on a button.
+system could broadcast out status update messages, so 'tasks' could listen for them and update.
+Other tasks could listen for e.g. newly created tasks or track uptime, etc.</p>
