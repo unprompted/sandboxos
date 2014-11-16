@@ -8,13 +8,14 @@ var kStaticFiles = [
 	{uri: '/log/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 
-function sendMessages(messageId, start) {
+function sendMessages(message, start) {
 	var messages = gMessages;
 	if (start) {
 		var realStart = Math.max(gMessages.length - gMessageIndex + start, 0);
 		messages = messages.slice(realStart);
 	}
-	parent.invoke({to: "httpd", messageId: messageId, response: "HTTP/1.0 200 OK\nContent-Type text/plain\n\n" + JSON.stringify({next: gMessageIndex, messages: messages})});
+	message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+	message.response.end(JSON.stringify({next: gMessageIndex, messages: messages}));
 }
 
 function onMessage(from, message) {
@@ -29,11 +30,8 @@ function onMessage(from, message) {
 					action: "get",
 					fileName: file.path,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: " + file.type + "\nConnection: close\n\n" + data,
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end(data);
 				});
 				break;
 			}
@@ -42,12 +40,13 @@ function onMessage(from, message) {
 			if (message.request.uri == "/log/get") {
 				var start = Number(message.request.body);
 				if (!start || start < gMessageIndex) {
-					sendMessages(message.messageId, start);
+					sendMessages(message, start);
 				} else {
-					gWaiting.push({start: start, messageId: message.messageId});
+					gWaiting.push({start: start, message: message});
 				}
 			} else {
-				parent.invoke({to: "httpd", messageId: message.messageId, response: "HTTP/1.0 404 Not found\nContent-Type text/plain\n\nNot found"});
+				message.response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close"});
+				message.response.end("404 Not found");
 			}
 		}
 	} else {
@@ -58,7 +57,7 @@ function onMessage(from, message) {
 		}
 
 		for (var i in gWaiting) {
-			sendMessages(gWaiting[i].messageId, gWaiting[i].start);
+			sendMessages(gWaiting[i].message, gWaiting[i].start);
 		}
 		gWaiting.length = 0;
 	}

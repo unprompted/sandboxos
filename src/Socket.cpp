@@ -9,6 +9,7 @@ Socket::Socket(Task* task) {
 	_socket.data = this;
 	_task = task;
 	_promise = -1;
+	_open = false;
 }
 
 Socket::~Socket() {
@@ -31,6 +32,7 @@ void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
 		socket->_onConnect = callback;
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection)));
+		socket->_open = true;
 	}
 }
 
@@ -46,14 +48,21 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::Handle<v8::Object> client = Socket::create(socket->_task);
 		args.GetReturnValue().Set(client);
-		uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&Socket::get(client)->_socket));
+		if (uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&Socket::get(client)->_socket)) == 0) {
+			Socket::get(client)->_open = true;
+		}
 	}
 }
 
 void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		args.GetReturnValue().Set(socket->makePromise());
-		uv_close(reinterpret_cast<uv_handle_t*>(&socket->_socket), keepPromise);
+		if (socket->_open) {
+			uv_close(reinterpret_cast<uv_handle_t*>(&socket->_socket), keepPromise);
+			socket->_open = false;
+		} else {
+			socket->_task->rejectPromise(socket->_promise, v8::Undefined(socket->_task->getIsolate()));
+		}
 	}
 }
 

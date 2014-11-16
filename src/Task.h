@@ -11,6 +11,7 @@
 #include <v8-platform.h>
 #include <vector>
 
+struct ImportRecord;
 class Socket;
 class Task;
 
@@ -39,6 +40,8 @@ public:
 	std::vector<char> _result;
 	int _promise;
 	int _export;
+
+	ImportRecord* _record;
 };
 
 class Task {
@@ -92,6 +95,8 @@ private:
 	std::map<export_t, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _exports;
 	export_t _nextExport;
 
+	std::vector<ImportRecord*> _imports;
+
 	int64_t _memoryAllocated;
 	int64_t _memoryLimit;
 
@@ -130,6 +135,8 @@ private:
 	static void memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
+
+	friend class ImportRecord;
 };
 
 class TaskTryCatch {

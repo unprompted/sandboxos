@@ -51,11 +51,8 @@ function render(message, fileName, isEdit) {
 				fileName: isEdit ? "edit.html" : "index.html",
 		}).then(function(html) {
 			html = html.replace(/\$\(CONTENTS\)/g, data).replace(/\$\(PAGE\)/g, fileName);
-			parent.invoke({
-				to: "httpd",
-					response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\n" + html,
-					messageId: message.messageId,
-			});
+			message.response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
+			message.response.end(html);
 		});
 	});
 }
@@ -73,11 +70,8 @@ function onMessage(from, message) {
 					action: "get",
 					fileName: file.path,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: " + file.type + "\nConnection: close\n\n" + data,
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end(data);
 				});
 				break;
 			}
@@ -104,11 +98,8 @@ function onMessage(from, message) {
 					fileName: fileName,
 					contents: form.contents,
 				}).then(function() {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 303 See other\nLocation: /wiki/" + fileName + "\nContent-Type: text/plain\nConnection: Close\n\n",
-						messageId: message.messageId,
-					});
+					message.response.writeHead(303, {"Content-Type": "text/plain", "Connection": "close", "Location": "/wiki/" + fileName});
+					message.response.end("");
 				});
 			} else {
 				render(message, fileName, isEdit);

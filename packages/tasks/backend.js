@@ -37,7 +37,7 @@ function decodeForm(encoded) {
 	return result;
 }
 
-function sendLatestStatus(messageId) {
+function sendLatestStatus(message) {
 	parent.invoke({
 		to: "system",
 		action: "getPackageList",
@@ -46,11 +46,8 @@ function sendLatestStatus(messageId) {
 			to: "system",
 			action: "getTasks",
 		}).then(function(tasks) {
-			parent.invoke({
-				to: "httpd",
-				response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({tasks: tasks, packages: packages}),
-				messageId: messageId,
-			});
+			message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+			message.response.end(JSON.stringify({tasks: tasks, packages: packages}));
 		});
 	});
 }
@@ -67,18 +64,15 @@ function onMessage(from, message) {
 					action: "get",
 					fileName: file.path,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: " + file.type + "\nConnection: close\n\n" + data,
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end(data);
 				});
 				break;
 			}
 		}
 		if (!found) {
 			if (message.request.uri == "/tasks/get") {
-				sendLatestStatus(message.messageId);
+				sendLatestStatus(message);
 			} else if (message.request.uri == "/tasks/start") {
 				form = decodeForm(message.request.query);
 				parent.invoke({
@@ -86,11 +80,8 @@ function onMessage(from, message) {
 					action: "startTask",
 					taskName: form.taskName,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\nOK",
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end("OK");
 				});
 			} else if (message.request.uri == "/tasks/restart") {
 				form = decodeForm(message.request.query);
@@ -99,11 +90,8 @@ function onMessage(from, message) {
 					action: "restartTask",
 					taskName: form.taskName,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\nOK",
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end("OK");
 				});
 			} else if (message.request.uri == "/tasks/stop") {
 				form = decodeForm(message.request.query);
@@ -112,31 +100,17 @@ function onMessage(from, message) {
 					action: "stopTask",
 					taskName: form.taskName,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\nOK",
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end("OK");
 				});
 			} else if (message.request.uri == "/tasks/changes") {
-				gWatchers.push(message.messageId);
+				gWatchers.push(message);
 			}
 		}
-	} else if (message.action == "add") {
-		print("I got an add request");
-		message.data(2, 3).then(function (result) {
-			print(result);
-			for (var i in result) {
-				print(i);
-			}
-			print("I think I got a result: " + JSON.stringify(result));
-		}).catch(function (e) {
-			print("Guess it failed: " + e);
-		});
-		print("I think I called a remote function.");
 	} else if (message.action == "taskStarted" || message.action == "updateTaskStatus") {
 		for (var i in gWatchers) {
 			sendLatestStatus(gWatchers[i]);
 		}
+		gWatchers.length = 0;
 	}
 }

@@ -102,8 +102,6 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 	} else if (value->IsFunction()) {
 		writeInt32(buffer, kFunction);
 		export_t exportId = task->exportFunction(v8::Handle<v8::Function>::Cast(value));
-		v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(value);
-		std::cout << "EXPORTED FUNCTION " << exportId << *v8::String::Utf8Value(function->GetName()) << "\n";
 		writeInt32(buffer, exportId);
 	} else if (value->IsObject()) {
 		writeInt32(buffer, kObject);

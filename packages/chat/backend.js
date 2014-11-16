@@ -21,11 +21,8 @@ function onMessage(from, message) {
 					action: "get",
 					fileName: file.path,
 				}).then(function(data) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: " + file.type + "\nConnection: close\n\n" + data,
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+					message.response.end(data);
 				});
 				break;
 			}
@@ -34,28 +31,19 @@ function onMessage(from, message) {
 			if (message.request.uri == "/chat/send") {
 				messages[index++] = message.request.body;
 				for (var i in waiting) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({index: index, message: message.request.body}),
-						messageId: waiting[i],
-					});
+					waiting[i].response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					waiting[i].response.end(JSON.stringify({index: index, message: message.request.body}));
 				}
 				waiting.slice(0);
-				parent.invoke({
-					to: "httpd",
-					response: "HTTP/1.0 200 OK\nContent-Type: text/html\nConnection: close\n\nOK",
-					messageId: message.messageId,
-				});
+				message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+				message.response.end("OK");
 			} else if (message.request.uri == "/chat/receive") {
 				var haveIndex = parseInt(message.request.body);
 				if (haveIndex + 1 < index) {
-					parent.invoke({
-						to: "httpd",
-						response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify({index: haveIndex + 1, message: messages[haveIndex + 1]}),
-						messageId: message.messageId,
-					});
+					message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					message.response.end(JSON.stringify({index: haveIndex + 1, message: messages[haveIndex + 1]}));
 				} else {
-					waiting.push(message.messageId);
+					waiting.push(message);
 				}
 			}
 		}

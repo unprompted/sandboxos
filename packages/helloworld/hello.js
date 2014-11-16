@@ -6,6 +6,7 @@ function add(a, b) {
 
 function onMessage(from, message) {
 	if (message.request) {
-		message.request.respond("HTTP/1.0 200 OK\nContent-Type: text/plain\n\nHello, " + message.request.client.peerName + ".");
+		message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+		message.response.end("Hello, " + message.request.client.peerName + ".");
 	}
 }

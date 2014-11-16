@@ -38,37 +38,15 @@ function Request(method, uri, version, headers, body, client) {
 	}
 	this.version = version;
 	this.headers = headers;
-	this.client = client;
+	this.client = {peerName: client.peerName};
 	this.body = body;
 	return this;
 }
 
-var gMessageId = 0;
-var gMessages = {};
-
 function onMessage(from, message) {
 	if (message.action == "taskStarted") {
-		print(from);
-		print(message);
 		updatePackage(message.taskName);
-	} else {
-		print("httpd onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
-		var promise = gMessages[message.messageId];
-		if (promise) {
-			print("resolving promise?");
-			promise[0](message);
-			delete gMessages[message.messageId];
-		}
 	}
-}
-
-function invoke(message) {
-	return new Promise(function(resolve, reject) {
-		var id = ++gMessageId;
-		gMessages[id] = [resolve, reject];
-		message.messageId = id;
-		parent.invoke(message);
-	});
 }
 
 function findHandler(uri) {
@@ -84,38 +62,51 @@ function findHandler(uri) {
 	return matchedHandler;
 }
 
-function handleRequest(request) {
+function Response(client) {
+	var kStatusText = {
+		200: 'OK',
+		303: 'See other',
+		404: 'File not found',
+		500: 'Internal server error',
+	}
+	return {
+		writeHead: function(status) {
+			var reason;
+			var headers;
+			if (arguments.length == 3) {
+				reason = arguments[1];
+				headers = arguments[2];
+			} else {
+				reason = kStatusText[status];
+				headers = arguments[1];
+			}
+			client.write("HTTP/1.0 " + status + " " + reason + "\n");
+			for (var i in headers) {
+				client.write(i + ": " + headers[i] + "\n");
+			}
+			client.write("\n");
+		},
+		/*write: function(data) {
+			client.write(data);
+		},*/
+		end: function(data) {
+			if (data) {
+				client.write(data);
+			}
+			client.close();
+		},
+	};
+}
+
+function handleRequest(request, response) {
 	var  handler = findHandler(request.uri);
 	print(request);
 
 	if (handler) {
-		print(handler.taskName);
-		var requestCopy = {
-			method: request.method,
-			uri: request.uri,
-			query: request.query,
-			version: request.version,
-			headers: request.headers,
-			client: {peerName: request.client.peerName},
-			body: request.body,
-			respond: function(data) {
-				request.client.write(data).then(function() {
-					request.client.close();
-				});
-			},
-		};
-		invoke({to: handler.taskName, action: "handleRequest", request: requestCopy}).then(function(data) {
-			print("INVOKE -> " + JSON.stringify(data));
-			request.client.write(data.response).then(function() {
-				request.client.close();
-			});
-		});
+		parent.invoke({to: handler.taskName, action: "handleRequest", request: request, response: response});
 	} else {
-		request.client.write("HTTP/1.0 200 OK\n");
-		request.client.write("Content-Type: text/plain; encoding=utf-8\n");
-		request.client.write("Connection: close\n\n");
-		request.client.write("No handler found for request: " + request.uri);
-		request.client.close();
+		response.writeHead(200, {"Content-Type": "text/plain; encoding=utf-8", "Connection": "close"});
+		response.end("No handler found for request: " + request.uri);
 	}
 }
 
@@ -129,7 +120,7 @@ function handleConnection(client) {
 	var body = undefined;
 
 	function finish() {
-		handleRequest(new Request(request[0], request[1], request[2], headers, body, client));
+		handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client));
 	}
 
 	function handleLine(line, length) {
@@ -150,7 +141,7 @@ function handleConnection(client) {
 					body = "";
 					return true;
 				} else {
-					handleRequest(new Request(request[0], request[1], request[2], headers, body, client));
+					handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client));
 					return false;
 				}
 			}

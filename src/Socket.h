@@ -25,6 +25,7 @@ private:
 	Task* _task;
 	uv_tcp_t _socket;
 	promiseid_t _promise;
+	bool _open;
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;

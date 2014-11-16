@@ -70,8 +70,10 @@ function onMessage(from, message) {
 			match = {path: "package.html", type: "text/html"};
 		}
 		if (match) {
+			print("RESPONDING TO " + JSON.stringify(match));
 			parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
-				parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: " + match.type + "\nConnection: close\nContent-Length: " + contents.length + "\n\n" + contents, messageId: message.messageId});
+				message.response.writeHead(200, {"Content-Type": match.type, "Connection": "close", "Content-Length": contents.length});
+				message.response.end(contents);
 			});
 			handled = true;
 		}
@@ -85,29 +87,36 @@ function onMessage(from, message) {
 				if (action == "get") {
 					var form = decodeForm(message.request.query);
 					parent.invoke({to: "system", action: "get", taskName: package, fileName: form.fileName}).then(function(result) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + result, messageId: message.messageId});
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(result);
 					});
 				} else if (action == "getPackageList") {
 					parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(JSON.stringify(result));
 					});
 				} else if (action == "list") {
 					var form = decodeForm(message.request.query);
 					parent.invoke({to: "system", action: "list", taskName: package}).then(function(result) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(JSON.stringify(result));
 					});
 				} else if (action == "put") {
 					var form = decodeForm(message.request.body);
-					parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + "updated", messageId: message.messageId});
+					message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					message.response.end("updated");
+
 					parent.invoke({to: "system", action: "put", taskName: package, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
 						parent.invoke({to: "system", action: "restartTask", taskName: package});
 					});
 				} else if (action == "new") {
 					var form = decodeForm(message.request.query);
 					parent.invoke({to: "system", action: "newPackage", taskName: package}).then(function(result) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\n" + JSON.stringify(result), messageId: message.messageId});
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(JSON.stringify(result));
 					}).catch(function(error) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
+						message.response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(error);
 					});
 				} else if (action == "clone") {
 					var form = decodeForm(message.request.query);
@@ -120,19 +129,23 @@ function onMessage(from, message) {
 								promises.push(copyFile(oldName, newName, oldPackageContents[i]));
 							}
 							Promise.all(promises).then(function(data) {
-								parent.invoke({to: "httpd", response: "HTTP/1.0 200 OK\nContent-Type: text/plain\nConnection: close\n\ncloned", messageId: message.messageId});
+								message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+								message.response.end("cloned");
 							});
 						});
 					}).catch(function(error) {
-						parent.invoke({to: "httpd", response: "HTTP/1.0 500 Internal server error\nContent-Type: text/plain\nConnection: close\n\n" + error, messageId: message.messageId});
+						message.response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(error);
 					});
 				} else {
 					handled = false;
 				}
 			}
 		}
-	}
-	if (!handled) {
-		parent.invoke({to: "httpd", response: "HTTP/1.0 404 Not found\nContent-Type: text/plain\nConnection: close\n\n404 Not found", messageId: message.messageId});
+		if (!handled) {
+			print("NOT HANDLED?");
+			message.response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close"});
+			message.response.end("404 Not found");
+		}
 	}
 }

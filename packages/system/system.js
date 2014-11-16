@@ -132,6 +132,7 @@ function onMessage(from, message) {
 					print(getPackageList());
 					return getPackageList();
 				} else if (message.action == "getTasks") {
+					print(tasks);
 					return tasks;
 				} else if (message.action == "getManifest") {
 					return tasks[message.taskName].manifest;
