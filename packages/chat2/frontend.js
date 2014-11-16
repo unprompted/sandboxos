@@ -23,15 +23,16 @@ function print(message) {
 	if (document.getElementById("chat").value) {
 		document.getElementById("chat").value += "\n";
 	}
-	document.getElementById("chat").value += message;
+	document.getElementById("chat").value += message.name + ': ' + message.text;
 }
 function send() {
-	var value = document.getElementById("input").value;
+	var name = document.getElementById("name").value;
+	var text = document.getElementById("input").value;
 	document.getElementById("input").value = "";
 	$.ajax({
 		url: "/chat2/send",
 			method: "POST",
-			data: value,
+			data: {name: name, text: text},
 			dataType: "text",
 	}).fail(function(xhr, status, error) {
 		print("SEND FAILED: " + status + ": " + error)
