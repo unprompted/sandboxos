@@ -6,14 +6,6 @@ function add(a, b) {
 
 function onMessage(from, message) {
 	if (message.request) {
-		parent.invoke({
-			to: "httpd",
-			response: "HTTP/1.0 200 OK\nContent-Type: text/plain\n\nHello, " + message.request.client.peerName + ".",
-			messageId: message.messageId});
-		parent.invoke({
-			to: "tasks",
-			action: "add",
-			data: add,
-		});
+		message.request.respond("HTTP/1.0 200 OK\nContent-Type: text/plain\n\nHello, " + message.request.client.peerName + ".");
 	}
 }

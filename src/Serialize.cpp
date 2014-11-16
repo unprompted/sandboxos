@@ -182,6 +182,7 @@ v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std:
 				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "task"), v8::Int32::New(task->getIsolate(), from->getId()));
 				v8::Local<v8::Function> function = v8::Function::New(task->getIsolate(), Task::invokeExport, data);
 				result = function;
+				task->addImport(function, exportId, from->getId());
 			}
 			break;
 		case kObject:

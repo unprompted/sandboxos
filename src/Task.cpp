@@ -3,6 +3,7 @@
 #include "Serialize.h"
 #include "Socket.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <libplatform/libplatform.h>
@@ -246,7 +247,7 @@ void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
 void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	TaskTryCatch tryCatch(task);
-	v8::EscapableHandleScope scope(args.GetIsolate());
+	v8::HandleScope scope(args.GetIsolate());
 
 	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
 
@@ -345,6 +346,7 @@ void Task::asyncMessage(uv_async_t* work) {
 					}
 				}
 			}
+			task->_isolate->IdleNotification(100);
 		}
 	}
 }
@@ -382,6 +384,9 @@ void Task::startInvoke(Message& message) {
 			array.push_back(arguments->Get(i));
 		}
 		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(task->_isolate, task->_exports[message._export]);
+		if (function.IsEmpty()) {
+			std::cout << "I COULD NOT FIND THE FUNCTION\n";
+		}
 		result = function->Call(function, array.size(), &*array.begin());
 	}
 
@@ -711,8 +716,54 @@ void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationA
 }
 
 export_t Task::exportFunction(v8::Handle<v8::Function> function) {
-	export_t exportId = _nextExport++;
-	v8::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function> > persistent(_isolate, function);
-	_exports[exportId] = persistent;
+	bool found = false;
+	export_t exportId = -1;
+	typedef std::map<export_t, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > ExportMap;
+	for (ExportMap::iterator it = _exports.begin(); it != _exports.end(); ++it) {
+		if (it->second == function) {
+			found = true;
+			exportId = it->first;
+			break;
+		}
+	}
+
+	if (!found) {
+		exportId = _nextExport++;
+		v8::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function> > persistent(_isolate, function);
+		_exports[exportId] = persistent;
+	}
+
 	return exportId;
+}
+
+struct ImportRecord {
+	v8::Persistent<v8::Function> _persistent;
+	export_t _export;
+	taskid_t _task;
+
+	ImportRecord(v8::Isolate* isolate, v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId)
+	:	_persistent(isolate, function),
+		_export(exportId),
+		_task(taskId) {
+		_persistent.SetWeak(this, ImportRecord::release);
+	}
+
+	static void release(const v8::WeakCallbackData<v8::Function, ImportRecord >& data) {
+		std::cout << "I would notify task " << data.GetParameter()->_task << " that export " << data.GetParameter()->_export << " is done.\n";
+		Task::releaseExport(data.GetParameter()->_task, data.GetParameter()->_export);
+		data.GetParameter()->_persistent.Reset();
+		delete data.GetParameter();
+	}
+};
+
+void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
+	new ImportRecord(_isolate, function, exportId, taskId);
+	//_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+}
+
+void Task::releaseExport(taskid_t taskId, export_t exportId) {
+	Lock lock(_mutex);
+	if (Task* task = gTasks[taskId]) {
+		task->_exports.erase(exportId);
+	}
 }

@@ -54,7 +54,6 @@ function onMessage(from, message) {
 	} else {
 		print("httpd onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
 		var promise = gMessages[message.messageId];
-		print(promise);
 		if (promise) {
 			print("resolving promise?");
 			promise[0](message);
@@ -97,8 +96,13 @@ function handleRequest(request) {
 			query: request.query,
 			version: request.version,
 			headers: request.headers,
-			client: {peerAddress: request.client.peerAddress},
+			client: {peerName: request.client.peerName},
 			body: request.body,
+			respond: function(data) {
+				request.client.write(data).then(function() {
+					request.client.close();
+				});
+			},
 		};
 		invoke({to: handler.taskName, action: "handleRequest", request: requestCopy}).then(function(data) {
 			print("INVOKE -> " + JSON.stringify(data));

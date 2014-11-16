@@ -27,6 +27,7 @@ enum MessageType {
 	kSendMessage,
 	kResolvePromise,
 	kInvokeExport,
+	kReleaseExport,
 };
 
 class Message {
@@ -64,6 +65,9 @@ public:
 
 	export_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
+	void addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId);
+
+	static void releaseExport(taskid_t taskId, export_t exportId);
 
 private:
 	static int _count;
