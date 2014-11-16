@@ -809,7 +809,7 @@ export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 
 void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
 	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
-	_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
+	//_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
 }
 
 void Task::releaseExport(taskid_t taskId, export_t exportId) {
