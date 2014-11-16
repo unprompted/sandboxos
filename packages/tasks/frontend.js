@@ -87,7 +87,8 @@ function handleNewData(data) {
 			$(tr).append(td);
 		} else if (data.tasks[package]) {
 			var td = document.createElement("td");
-			$(td).text("running");
+			$(td).text("running ");
+			$(td).append(JSON.stringify(data.tasks[package].task.statistics));
 			$(tr).append(td);
 
 			var td = document.createElement("td");

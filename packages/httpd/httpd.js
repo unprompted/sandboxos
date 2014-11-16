@@ -91,7 +91,16 @@ function handleRequest(request) {
 
 	if (handler) {
 		print(handler.taskName);
-		invoke({to: handler.taskName, action: "handleRequest", request: request}).then(function(data) {
+		var requestCopy = {
+			method: request.method,
+			uri: request.uri,
+			query: request.query,
+			version: request.version,
+			headers: request.headers,
+			client: {peerAddress: request.client.peerAddress},
+			body: request.body,
+		};
+		invoke({to: handler.taskName, action: "handleRequest", request: requestCopy}).then(function(data) {
 			print("INVOKE -> " + JSON.stringify(data));
 			request.client.write(data.response).then(function() {
 				request.client.close();

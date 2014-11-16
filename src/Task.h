@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <list>
+#include <map>
 #include <string>
 #include <v8.h>
 #include <v8-platform.h>
@@ -20,15 +21,23 @@ struct uv_work_s; typedef struct uv_work_s uv_work_t;
 typedef int taskid_t;
 typedef int socketid_t;
 typedef int promiseid_t;
+typedef int export_t;
+
+enum MessageType {
+	kSendMessage,
+	kResolvePromise,
+	kInvokeExport,
+};
 
 class Message {
 public:
-	bool _isResponse;
+	MessageType _type;
 	taskid_t _sender;
 	taskid_t _recipient;
 	std::vector<char> _data;
 	std::vector<char> _result;
 	int _promise;
+	int _export;
 };
 
 class Task {
@@ -53,6 +62,9 @@ public:
 	static int getCount() { return _count; }
 	static Task* get(taskid_t id);
 
+	export_t exportFunction(v8::Handle<v8::Function> function);
+	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 private:
 	static int _count;
 	static Mutex _mutex;
@@ -67,10 +79,14 @@ private:
 	std::list<Message> _messages;
 	Mutex _messageMutex;
 	uv_async_t* _asyncMessage;
-	std::vector<v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
+	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
+	promiseid_t _nextPromise;
 	uv_loop_t* _loop;
 	std::vector<Socket*> _sockets;
 	uv_thread_t _thread;
+
+	std::map<export_t, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _exports;
+	export_t _nextExport;
 
 	int64_t _memoryAllocated;
 	int64_t _memoryLimit;
@@ -91,11 +107,14 @@ private:
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void createSocket(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 	static void run(void* data);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void asyncMessage(uv_async_t* handle);
 

@@ -122,6 +122,18 @@ function onMessage(from, message) {
 				gWatchers.push(message.messageId);
 			}
 		}
+	} else if (message.action == "add") {
+		print("I got an add request");
+		message.data(2, 3).then(function (result) {
+			print(result);
+			for (var i in result) {
+				print(i);
+			}
+			print("I think I got a result: " + JSON.stringify(result));
+		}).catch(function (e) {
+			print("Guess it failed: " + e);
+		});
+		print("I think I called a remote function.");
 	} else if (message.action == "taskStarted" || message.action == "updateTaskStatus") {
 		for (var i in gWatchers) {
 			sendLatestStatus(gWatchers[i]);

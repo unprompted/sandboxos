@@ -35,11 +35,13 @@ struct SleepData {
 };
 
 Task::Task(const char* scriptName)
-:	_killed(false),
+:	_trusted(false),
+	_killed(false),
 	_isolate(0),
+	_nextPromise(0),
+	_nextExport(0),
 	_memoryAllocated(0),
-	_memoryLimit(64 * 1024 * 1024),
-	_trusted(false) {
+	_memoryLimit(64 * 1024 * 1024) {
 
 	{
 		Lock lock(_mutex);
@@ -203,16 +205,14 @@ void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	SleepData* data = new SleepData;
 	data->_task = task->_id;
-	data->_promise = task->_promises.size();
+	data->_promise = task->allocatePromise();
 
 	uv_timer_t* timer = new uv_timer_t();
 	uv_timer_init(task->_loop, timer);
 	timer->data = data;
 	uv_timer_start(timer, sleepCallback, static_cast<uint64_t>(args[0].As<v8::Number>()->Value() * 1000), 0);
 
-	v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(args.GetIsolate(), v8::Promise::Resolver::New(args.GetIsolate()));
-	task->_promises.push_back(promise);
-	args.GetReturnValue().Set(promise);
+	args.GetReturnValue().Set(task->getPromise(data->_promise));
 }
 
 void Task::sleepCallback(uv_timer_t* timer) {
@@ -225,10 +225,7 @@ void Task::sleepCallback(uv_timer_t* timer) {
 	}
 
 	if (task) {
-		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(task->_isolate, task->_promises[data->_promise]);
-		resolver->Resolve(v8::Undefined(task->_isolate));
-		task->_isolate->RunMicrotasks();
-		task->_promises[data->_promise].Reset();
+		task->resolvePromise(data->_promise, v8::Undefined(task->_isolate));
 	}
 
 	delete data;
@@ -258,24 +255,63 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		Serialize::store(task, message._data, args[0]);
 		message._sender = task->_id;
 		message._recipient = recipientId;
-		message._promise = task->_promises.size();
-		message._isResponse = false;
+		message._promise = task->allocatePromise();
+		message._type = kSendMessage;
+		args.GetReturnValue().Set(task->getPromise(message._promise));
 
-		v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(args.GetIsolate(), v8::Promise::Resolver::New(args.GetIsolate()));
-		task->_promises.push_back(promise);
-		args.GetReturnValue().Set(promise);
-
+		Task* recipient = 0;
 		{
 			Lock lock(_mutex);
-			if (Task* recipient = gTasks[recipientId]) {
-				{
-					Lock messageLock(recipient->_messageMutex);
-					recipient->_messages.push_back(message);
-				}
-
-				uv_async_send(recipient->_asyncMessage);
-			}
+			recipient = gTasks[recipientId];
 		}
+
+		if (recipient) {
+			{
+				Lock messageLock(recipient->_messageMutex);
+				recipient->_messages.push_back(message);
+			}
+
+			uv_async_send(recipient->_asyncMessage);
+		}
+	}
+}
+
+void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* sender = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
+	export_t exportId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "export"))->Int32Value();
+	export_t recipientId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value();
+
+	std::cout << *sender << " invokeExport export=" << exportId << " recipient=" << recipientId << "\n";
+
+	Message message;
+
+	v8::Local<v8::Array> array = v8::Array::New(args.GetIsolate(), args.Length());
+	for (int i = 0; i < args.Length(); ++i) {
+		array->Set(i, args[i]);
+	}
+
+	Serialize::store(sender, message._data, array);
+	message._sender = sender->_id;
+	message._recipient = recipientId;
+	message._promise = sender->allocatePromise();
+	message._type = kInvokeExport;
+	message._export = exportId;
+
+	args.GetReturnValue().Set(sender->getPromise(message._promise));
+
+	Task* recipient = 0;
+	{
+		Lock lock(_mutex);
+		recipient = gTasks[recipientId];
+	}
+
+	if (recipient) {
+		{
+			Lock messageLock(recipient->_messageMutex);
+			recipient->_messages.push_back(message);
+		}
+		uv_async_send(recipient->_asyncMessage);
 	}
 }
 
@@ -300,9 +336,11 @@ void Task::asyncMessage(uv_async_t* work) {
 				}
 
 				if (moreMessages) {
-					if (nextMessage._isResponse) {
+					if (nextMessage._type == kResolvePromise) {
 						finishInvoke(nextMessage);
-					} else {
+					} else if (nextMessage._type == kSendMessage) {
+						startInvoke(nextMessage);
+					} else if (nextMessage._type == kInvokeExport) {
 						startInvoke(nextMessage);
 					}
 				}
@@ -313,9 +351,11 @@ void Task::asyncMessage(uv_async_t* work) {
 
 void Task::startInvoke(Message& message) {
 	Task* task = 0;
+	Task* from = 0;
 	{
 		Lock lock(_mutex);
 		task = gTasks[message._recipient];
+		from = gTasks[message._sender];
 	}
 
 	if (!task) {
@@ -327,39 +367,87 @@ void Task::startInvoke(Message& message) {
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
 
-	v8::Handle<v8::Value> args[2];
+	v8::Handle<v8::Value> result;
 
-	args[0] = task->makeTaskObject(message._sender);
-	args[1] = Serialize::load(task, message._data);
-
-	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
-	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
-
-	if (result.IsEmpty() || result->IsUndefined() || result->IsNull()) {
-		message._result.clear();
-	} else {
-		Serialize::store(task, message._result, result);
+	if (message._type == kSendMessage) {
+		v8::Handle<v8::Value> args[2];
+		args[0] = task->makeTaskObject(message._sender);
+		args[1] = Serialize::load(task, from, message._data);
+		v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
+		result = function->Call(context->Global(), 2, &args[0]);
+	} else if (message._type == kInvokeExport) {
+		v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(task, from, message._data));
+		std::vector<v8::Handle<v8::Value> > array;
+		for (int i = 0; i < arguments->Length(); ++i) {
+			array.push_back(arguments->Get(i));
+		}
+		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(task->_isolate, task->_exports[message._export]);
+		result = function->Call(function, array.size(), &*array.begin());
 	}
 
-	message._isResponse = true;
+	if (result->IsPromise()) {
+		// We're not going to serialize/deserialize a promise...
+		v8::Handle<v8::Object> data = v8::Object::New(task->_isolate);
+		data->Set(v8::String::NewFromUtf8(task->_isolate, "task"), v8::Int32::New(task->_isolate, message._sender));
+		data->Set(v8::String::NewFromUtf8(task->_isolate, "promise"), v8::Int32::New(task->_isolate, message._promise));
+		v8::Handle<v8::Function> then = v8::Function::New(task->_isolate, invokeThen, data);
+		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
+		promise->Then(then);
+	} else {
+		if (result.IsEmpty() || result->IsUndefined() || result->IsNull()) {
+			message._result.clear();
+		} else {
+			Serialize::store(task, message._result, result);
+		}
+
+		message._type = kResolvePromise;
+
+		Task* sender = 0;
+		{
+			Lock lock(_mutex);
+			sender = gTasks[message._sender];
+		}
+
+		if (sender) {
+			Lock messageLock(sender->_messageMutex);
+			sender->_messages.push_back(message);
+		}
+		uv_async_send(sender->_asyncMessage);
+	}
+}
+
+void Task::invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+
+	Message message;
+	message._recipient = task->_id;
+
+	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
+	message._sender = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value();
+	Serialize::store(task, message._result, args[0]);
+	message._type = kResolvePromise;
+	message._promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
 
 	Task* sender = 0;
 	{
 		Lock lock(_mutex);
 		sender = gTasks[message._sender];
-		if (sender) {
-			Lock messageLock(sender->_messageMutex);
-			sender->_messages.push_back(message);
-			uv_async_send(sender->_asyncMessage);
-		}
 	}
+
+	if (sender) {
+		Lock messageLock(sender->_messageMutex);
+		sender->_messages.push_back(message);
+	}
+	uv_async_send(sender->_asyncMessage);
 }
 
 void Task::finishInvoke(Message& message) {
 	Task* task = 0;
+	Task* from = 0;
 	{
 		Lock lock(_mutex);
 		task = gTasks[message._sender];
+		from = gTasks[message._recipient];
 	}
 
 	if (!task) {
@@ -373,14 +461,12 @@ void Task::finishInvoke(Message& message) {
 	v8::Handle<v8::Value> arg;
 
 	if (message._result.size()) {
-		arg = Serialize::load(task, message._result);
+		arg = Serialize::load(task, from, message._result);
 	} else {
 		arg = v8::Undefined(task->_isolate);
 	}
 
-	v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(task->_isolate, task->_promises[message._promise]);
-	resolver->Resolve(arg);
-	task->_isolate->RunMicrotasks();
+	task->resolvePromise(message._promise, arg);
 }
 
 void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
@@ -394,12 +480,22 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 		v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(_isolate);
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "kill"), v8::FunctionTemplate::New(_isolate, Task::kill));
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, Task::invoke));
+		taskTemplate->SetAccessorProperty(v8::String::NewFromUtf8(_isolate, "statistics"), v8::FunctionTemplate::New(_isolate, Task::getStatistics));
 		taskTemplate->SetInternalFieldCount(1);
 		taskObject = taskTemplate->NewInstance();
 		taskObject->SetInternalField(0, v8::Integer::New(_isolate, id));
 		taskObject->Set(v8::String::NewFromUtf8(_isolate, "id"), v8::Integer::New(_isolate, id));
 	}
 	return taskObject;
+}
+
+void Task::getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	v8::Handle<v8::Object> result = v8::Object::New(args.GetIsolate());
+	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "sockets"), v8::Integer::New(args.GetIsolate(), task->_sockets.size()));
+	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "promises"), v8::Integer::New(args.GetIsolate(), task->_promises.size()));
+	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), v8::Integer::New(args.GetIsolate(), task->_exports.size()));
+	args.GetReturnValue().Set(result);
 }
 
 void Task::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -515,32 +611,32 @@ Socket* Task::getSocket(socketid_t id) {
 }
 
 promiseid_t Task::allocatePromise() {
-	promiseid_t promiseId = _promises.size();
+	promiseid_t promiseId = _nextPromise++;
 	v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(_isolate, v8::Promise::Resolver::New(_isolate));
-	_promises.push_back(promise);
+	_promises[promiseId] = promise;
 	return promiseId;
 }
 
 v8::Handle<v8::Promise::Resolver> Task::getPromise(promiseid_t promise) {
 	v8::Handle<v8::Promise::Resolver> result;
-	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+	if (!_promises[promise].IsEmpty()) {
 		result = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
 	}
 	return result;
 }
 
 void Task::resolvePromise(promiseid_t promise, v8::Handle<v8::Value> value) {
-	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+	if (!_promises[promise].IsEmpty()) {
 		v8::HandleScope handleScope(_isolate);
 		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
 		resolver->Resolve(value);
 		_isolate->RunMicrotasks();
-		_promises[promise].Reset();
+		_promises.erase(promise);
 	}
 }
 
 void Task::rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value) {
-	if (promise >= 0 && promise < _promises.size() && !_promises[promise].IsEmpty()) {
+	if (!_promises[promise].IsEmpty()) {
 		v8::HandleScope handleScope(_isolate);
 		v8::Handle<v8::Promise::Resolver> resolver = v8::Local<v8::Promise::Resolver>::New(_isolate, _promises[promise]);
 		resolver->Reject(value);
@@ -612,4 +708,11 @@ void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationA
 			}
 		}
 	}
+}
+
+export_t Task::exportFunction(v8::Handle<v8::Function> function) {
+	export_t exportId = _nextExport++;
+	v8::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function> > persistent(_isolate, function);
+	_exports[exportId] = persistent;
+	return exportId;
 }

@@ -14,6 +14,7 @@ enum Types {
 	kString,
 	kArray,
 	kObject,
+	kFunction,
 };
 
 void Serialize::writeInt8(std::vector<char>& buffer, int8_t value) {
@@ -98,6 +99,12 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 		for (int i = 0; i < array->Length(); ++i) {
 			storeInternal(task, buffer, array->Get(i), depth + 1);
 		}
+	} else if (value->IsFunction()) {
+		writeInt32(buffer, kFunction);
+		export_t exportId = task->exportFunction(v8::Handle<v8::Function>::Cast(value));
+		v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(value);
+		std::cout << "EXPORTED FUNCTION " << exportId << *v8::String::Utf8Value(function->GetName()) << "\n";
+		writeInt32(buffer, exportId);
 	} else if (value->IsObject()) {
 		writeInt32(buffer, kObject);
 		v8::Handle<v8::Object> object = value->ToObject();
@@ -118,12 +125,12 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 	return true;
 }
 
-v8::Handle<v8::Value> Serialize::load(Task* task, const std::vector<char>& buffer) {
+v8::Handle<v8::Value> Serialize::load(Task* task, Task* from, const std::vector<char>& buffer) {
 	int offset = 0;
-	return loadInternal(task, buffer, offset, 0);
+	return loadInternal(task, from, buffer, offset, 0);
 }
 
-v8::Handle<v8::Value> Serialize::loadInternal(Task* task, const std::vector<char>& buffer, int& offset, int depth) {
+v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std::vector<char>& buffer, int& offset, int depth) {
 	if (offset >= buffer.size()) {
 		return v8::Undefined(task->getIsolate());
 	} else {
@@ -161,10 +168,20 @@ v8::Handle<v8::Value> Serialize::loadInternal(Task* task, const std::vector<char
 				int32_t length = readInt32(buffer, offset);
 				v8::Handle<v8::Array> array = v8::Array::New(task->getIsolate());
 				for (int i = 0; i < length; ++i) {
-					v8::Handle<v8::Value> value = loadInternal(task, buffer, offset, depth + 1);
+					v8::Handle<v8::Value> value = loadInternal(task, from, buffer, offset, depth + 1);
 					array->Set(i, value);
 				}
 				result = array;
+			}
+			break;
+		case kFunction:
+			{
+				export_t exportId = readInt32(buffer, offset);
+				v8::Local<v8::Object> data = v8::Object::New(task->getIsolate());
+				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "export"), v8::Int32::New(task->getIsolate(), exportId));
+				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "task"), v8::Int32::New(task->getIsolate(), from->getId()));
+				v8::Local<v8::Function> function = v8::Function::New(task->getIsolate(), Task::invokeExport, data);
+				result = function;
 			}
 			break;
 		case kObject:
@@ -172,8 +189,8 @@ v8::Handle<v8::Value> Serialize::loadInternal(Task* task, const std::vector<char
 				int32_t length = readInt32(buffer, offset);
 				v8::Handle<v8::Object> object = v8::Object::New(task->getIsolate());
 				for (int i = 0; i < length; ++i) {
-					v8::Handle<v8::Value> key = loadInternal(task, buffer, offset, depth + 1);
-					v8::Handle<v8::Value> value = loadInternal(task, buffer, offset, depth + 1);
+					v8::Handle<v8::Value> key = loadInternal(task, from, buffer, offset, depth + 1);
+					v8::Handle<v8::Value> value = loadInternal(task, from, buffer, offset, depth + 1);
 					object->Set(key, value);
 				}
 				result = object;

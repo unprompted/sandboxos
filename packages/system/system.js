@@ -150,7 +150,7 @@ function onMessage(from, message) {
 				print("PERMISSION DENIED");
 			}
 		} else if (message.to) {
-			tasks[message.to].task.invoke(message);
+			return tasks[message.to].task.invoke(message);
 		} else {
 			broadcast(tasks[fromName], message);
 		}
