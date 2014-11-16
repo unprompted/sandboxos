@@ -26,8 +26,8 @@ public:
 	bool _isResponse;
 	taskid_t _sender;
 	taskid_t _recipient;
-	std::string _data;
-	std::string _result;
+	std::vector<char> _data;
+	std::vector<char> _result;
 	int _promise;
 };
 

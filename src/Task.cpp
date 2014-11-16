@@ -1,5 +1,6 @@
 #include "Task.h"
 
+#include "Serialize.h"
 #include "Socket.h"
 
 #include <fstream>
@@ -249,17 +250,12 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	TaskTryCatch tryCatch(task);
 	v8::EscapableHandleScope scope(args.GetIsolate());
-	v8::Local<v8::Context> context = args.GetIsolate()->GetCurrentContext();
-	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(args.GetIsolate(), "JSON"))->ToObject();
-	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
-	v8::Handle<v8::Value> arg = args[0];
-	v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
 
 	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
 
 	if (task) {
 		Message message;
-		message._data = *value;
+		Serialize::store(task, message._data, args[0]);
 		message._sender = task->_id;
 		message._recipient = recipientId;
 		message._promise = task->_promises.size();
@@ -331,24 +327,18 @@ void Task::startInvoke(Message& message) {
 	v8::HandleScope scope(task->_isolate);
 	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
 
-	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "JSON"))->ToObject();
-	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "parse")));
-	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "stringify")));
-
-	v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._data.c_str(), v8::String::kNormalString, message._data.size());
 	v8::Handle<v8::Value> args[2];
 
 	args[0] = task->makeTaskObject(message._sender);
-	args[1] = parse->Call(json, 1, &argAsString);
+	args[1] = Serialize::load(task, message._data);
 
 	v8::Local<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "onMessage")));
 	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
 
 	if (result.IsEmpty() || result->IsUndefined() || result->IsNull()) {
-		message._result = "";
+		message._result.clear();
 	} else {
-		v8::String::Utf8Value responseValue(stringify->Call(json, 1, &result));
-		message._result = toString(responseValue);
+		Serialize::store(task, message._result, result);
 	}
 
 	message._isResponse = true;
@@ -379,16 +369,11 @@ void Task::finishInvoke(Message& message) {
 
 	TaskTryCatch tryCatch(task);
 	v8::HandleScope scope(task->_isolate);
-	v8::Local<v8::Context> context = task->_isolate->GetCurrentContext();
-
-	v8::Handle<v8::Object> json = context->Global()->Get(v8::String::NewFromUtf8(task->_isolate, "JSON"))->ToObject();
-	v8::Handle<v8::Function> parse = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(task->_isolate, "parse")));
 
 	v8::Handle<v8::Value> arg;
 
 	if (message._result.size()) {
-		v8::Handle<v8::Value> argAsString = v8::String::NewFromUtf8(task->_isolate, message._result.c_str(), v8::String::kNormalString, message._result.size());
-		arg = parse->Call(json, 1, &argAsString);
+		arg = Serialize::load(task, message._result);
 	} else {
 		arg = v8::Undefined(task->_isolate);
 	}
