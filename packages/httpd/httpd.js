@@ -103,6 +103,13 @@ function handleRequest(request, response) {
 	var  handler = findHandler(request.uri);
 	print(request);
 
+	if (request.uri != "/log/get") {
+		parent.invoke({
+			to: "log",
+			request: request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version,
+		});
+	}
+
 	if (handler) {
 		parent.invoke({to: handler.taskName, action: "handleRequest", request: request, response: response});
 	} else {

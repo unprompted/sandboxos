@@ -19,7 +19,7 @@ function sendMessages(message, start) {
 }
 
 function onMessage(from, message) {
-	if (message.request) {
+	if (message.request && message.response) {
 		var found = false;
 		for (var i in kStaticFiles) {
 			if (kStaticFiles[i].uri == message.request.uri) {
