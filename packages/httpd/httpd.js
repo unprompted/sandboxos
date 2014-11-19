@@ -91,9 +91,10 @@ function Response(client) {
 		},*/
 		end: function(data) {
 			if (data) {
-				client.write(data);
+				client.write(data).then(function() { client.close(); });
+			} else {
+				client.close();
 			}
-			client.close();
 		},
 	};
 }

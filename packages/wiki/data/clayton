@@ -42,4 +42,5 @@ Being able to do something like replyOK(json_object) or replyOK(text) would be a
 <p>I had never heard of tilde club.  I like the sound of that.  That's pretty much how we ran things in college, so maybe indirectly it is.</p>
 <blockquote><i>What if we just built some tiny tools on top of Unix so tilde.club could somehow be used to supplant-even just a little-the commercial social networks of today?</i></blockquote>
 <p>That's what I'm talking about.  Except a little C++ program with a lot of little bits of javascript can easily do the same thing on Windows and Android phones and smart watches and ...</p>
+<p>I made a way to call functions across tasks.  The implementation broke my brain, and it might still be leaky/crashy.  It's difficult to tell.  I think it's a vast improvement.  I updated all of the HTTP mess to use it.</p>
 <p><em>--Cory</em></p>
