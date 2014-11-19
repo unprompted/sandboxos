@@ -1,12 +1,12 @@
 <html>
 	<body>
-		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
-		<script src="/chat/frontend.js"></script>
 		<h1>Chat 'em up</h1>
 		<div><a href="/wiki">Home</a></div>
 		<form method='POST' action='/chat/post'>
 			<textarea id="chat" style="width: 100%; height: 10em" readonly></textarea>
-			Type here!: <input type='text' id='input' style="width: 100%" onkeydown="enter()"></input>
+			What is happening?: <input type='text' id='input' style="width: 100%" onkeydown="enter()"></input>
 		</form>
+		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+		<script src="/chat/frontend.js"></script>
 	</body>
 </html>
