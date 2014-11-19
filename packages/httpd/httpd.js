@@ -106,7 +106,7 @@ function handleRequest(request, response) {
 	if (request.uri != "/log/get") {
 		parent.invoke({
 			to: "log",
-			request: request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version,
+			request: request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version + " \"" + request.headers["user-agent"] + "\"",
 		});
 	}
 
@@ -140,11 +140,11 @@ function handleConnection(client) {
 				var colon = line.indexOf(':');
 				var key = line.slice(0, colon).trim();
 				var value = line.slice(colon + 1).trim();
-				headers[key] = value;
+				headers[key.toLowerCase()] = value;
 				return true;
 			} else {
-				if (headers["Content-Length"] > 0) {
-					bodyToRead = headers["Content-Length"];
+				if (headers["content-length"] > 0) {
+					bodyToRead = headers["content-length"];
 					lineByLine = false;
 					body = "";
 					return true;

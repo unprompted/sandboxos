@@ -5,11 +5,14 @@
 #include <v8.h>
 
 typedef int promiseid_t;
+typedef int socketid_t;
 class Task;
 
 class Socket {
 public:
-	Socket(Task* task);
+	Socket(Task* task, socketid_t id);
+	void close();
+
 	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void accept(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -26,6 +29,7 @@ private:
 	uv_tcp_t _socket;
 	promiseid_t _promise;
 	bool _open;
+	socketid_t _id;
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;
@@ -33,8 +37,7 @@ private:
 	v8::Handle<v8::Promise::Resolver> makePromise();
 
 	static Socket* get(v8::Handle<v8::Object> socketObject);
-	static void keepPromise(uv_handle_t* handle);
-	static void keepPromise(uv_handle_t* handle, int status);
+	static void onClose(uv_handle_t* handle);
 	static void onNewConnection(uv_stream_t* server, int status);
 
 	static void allocateBuffer(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer);

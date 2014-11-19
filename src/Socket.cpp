@@ -4,16 +4,26 @@
 
 #include <uv.h>
 
-Socket::Socket(Task* task) {
+Socket::Socket(Task* task, socketid_t id) {
+	_id = id;
 	uv_tcp_init(task->getLoop(), &_socket);
+	_open = true;
 	_socket.data = this;
 	_task = task;
 	_promise = -1;
-	_open = false;
 }
 
 Socket::~Socket() {
-	uv_close(reinterpret_cast<uv_handle_t*>(&_socket), 0);
+	close();
+}
+
+void Socket::close() {
+	if (_open) {
+		_open = false;
+		uv_close(reinterpret_cast<uv_handle_t*>(&_socket), onClose);
+	} else if (_promise != -1) {
+		_task->rejectPromise(_promise, v8::Undefined(_task->getIsolate()));
+	}
 }
 
 void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -32,7 +42,6 @@ void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
 		socket->_onConnect = callback;
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection)));
-		socket->_open = true;
 	}
 }
 
@@ -48,21 +57,14 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::Handle<v8::Object> client = Socket::create(socket->_task);
 		args.GetReturnValue().Set(client);
-		if (uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&Socket::get(client)->_socket)) == 0) {
-			Socket::get(client)->_open = true;
-		}
+		uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&Socket::get(client)->_socket));
 	}
 }
 
 void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		args.GetReturnValue().Set(socket->makePromise());
-		if (socket->_open) {
-			uv_close(reinterpret_cast<uv_handle_t*>(&socket->_socket), keepPromise);
-			socket->_open = false;
-		} else {
-			socket->_task->rejectPromise(socket->_promise, v8::Undefined(socket->_task->getIsolate()));
-		}
+		socket->close();
 	}
 }
 
@@ -136,27 +138,16 @@ v8::Handle<v8::Promise::Resolver> Socket::makePromise() {
 	return _task->getPromise(_promise);
 }
 
-void Socket::keepPromise(uv_handle_t* handle) {
+void Socket::onClose(uv_handle_t* handle) {
 	if (Socket* socket = reinterpret_cast<Socket*>(handle->data)) {
 		if (socket->_promise != -1) {
 			promiseid_t promise = socket->_promise;
 			socket->_promise = -1;
 			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), 0));
 		}
-	}
-}
-
-void Socket::keepPromise(uv_handle_t* handle, int status) {
-	if (Socket* socket = reinterpret_cast<Socket*>(handle->data)) {
-		if (socket->_promise != -1) {
-			promiseid_t promise = socket->_promise;
-			socket->_promise = -1;
-			if (status == 0) {
-				socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
-			} else {
-				socket->_task->rejectPromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
-			}
-		}
+		handle->data = 0;
+		socket->_task->releaseSocket(socket->_id);
+		delete socket;
 	}
 }
 
@@ -187,11 +178,15 @@ v8::Handle<v8::Object> Socket::create(Task* task) {
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName);
 
 	socketObject = socketTemplate->NewInstance();
-	socketObject->SetInternalField(0, v8::External::New(task->getIsolate(), task->getSocket(task->allocateSocket())));
+	socketObject->SetInternalField(0, v8::Int32::New(task->getIsolate(), task->allocateSocket()));
 
 	return socketObject;
 }
 
 Socket* Socket::get(v8::Handle<v8::Object> socketObject) {
-	return reinterpret_cast<Socket*>(socketObject->GetInternalField(0).As<v8::External>()->Value());
+	Socket* result = 0;
+	if (Task* task = reinterpret_cast<Task*>(socketObject->GetIsolate()->GetData(0))) {
+		result = task->getSocket(socketObject->GetInternalField(0)->Int32Value());
+	}
+	return result;
 }

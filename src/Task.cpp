@@ -155,6 +155,8 @@ void Task::run() {
 		uv_run(_loop, UV_RUN_DEFAULT);
 	}
 	_promises.clear();
+	_exports.clear();
+	_imports.clear();
 	_isolate->Dispose();
 	_isolate = 0;
 }
@@ -238,6 +240,13 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Task::kill() {
 	if (!_killed) {
 		v8::V8::TerminateExecution(_isolate);
+		for (std::map<socketid_t, Socket*>::iterator it = _sockets.begin();
+			it != _sockets.end();
+			++it) {
+			if (it->second) {
+				it->second->close();
+			}
+		}
 		_killed = true;
 		uv_async_send(_asyncMessage);
 		//uv_thread_join(&_thread);
@@ -453,7 +462,7 @@ void Task::startInvoke(Message& message) {
 		}
 	}
 
-	if (result->IsPromise()) {
+	if (!result.IsEmpty() && result->IsPromise()) {
 		// We're not going to serialize/deserialize a promise...
 		v8::Handle<v8::Object> data = v8::Object::New(task->_isolate);
 		data->Set(v8::String::NewFromUtf8(task->_isolate, "task"), v8::Int32::New(task->_isolate, message._sender));
@@ -667,9 +676,13 @@ std::ostream& operator<<(std::ostream& stream, const Task& task) {
 }
 
 socketid_t Task::allocateSocket() {
-	socketid_t id = _sockets.size();
-	_sockets.push_back(new Socket(this));
+	socketid_t id = _nextSocket++;
+	_sockets[id] = new Socket(this, id);
 	return id;
+}
+
+void Task::releaseSocket(socketid_t id) {
+	_sockets.erase(id);
 }
 
 Task* Task::get(taskid_t id) {
