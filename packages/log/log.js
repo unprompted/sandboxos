@@ -1,4 +1,4 @@
-var kMessageLimit = 1024;
+var kMessageLimit = 256;
 var gMessages = [];
 var gMessageIndex = 0;
 var gWaiting = [];
@@ -49,7 +49,7 @@ function onMessage(from, message) {
 				message.response.end("404 Not found");
 			}
 		}
-	} else {
+	} else if (message.payload) {
 		gMessages.push(message.payload);
 		gMessageIndex++;
 		if (gMessages.length > kMessageLimit) {
