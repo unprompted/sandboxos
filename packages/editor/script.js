@@ -74,16 +74,29 @@ function newFile() {
 			url: "put",
 			data: {fileName: fileName, contents: JSON.stringify("")},
 			dataType: "text",
-		});
+		}).then(refreshPackage);
 	}
 }
 
 function renameFile() {
-	alert("Unimplemented");
+	var fileName = prompt("Rename " + currentFileName + " to:");
+	if (fileName) {
+		$.ajax({
+			url: "rename",
+			data: {oldName: currentFileName, newName: fileName},
+			dataType: "text",
+		}).then(refreshPackage);
+	}
 }
 
 function deleteFile() {
-	alert("Unimplemented");
+	if (confirm("Are you sure you want to delete " + currentFileName + "?")) {
+		$.ajax({
+			url: "unlink",
+			data: {fileName: currentFileName},
+			dataType: "text",
+		}).then(refreshPackage);
+	}
 }
 
 function refreshPackage() {
@@ -108,6 +121,8 @@ function changeFile() {
 	currentFileName = $(this).text();
 	$("#fileSpecific").show();
 	$("#save").val("Save " + currentFileName);
+	$("#rename").val("Rename " + currentFileName);
+	$("#delete").val("Delete " + currentFileName);
 	$("#files").children().each(function (i) {
 		if ($(this).text() == currentFileName) {
 			$(this).addClass("current");

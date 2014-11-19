@@ -122,6 +122,17 @@ function onMessage(from, message) {
 					if (fileName) {
 						return readFile(fileName);
 					}
+				} else if (message.action == "rename") {
+					var oldName = packageFilePath(message.taskName || fromName, message.fileName);
+					var newName = packageFilePath(message.taskName || fromName, message.newName);
+					if (oldName && newName) {
+						return renameFile(oldName, newName);
+					}
+				} else if (message.action == "unlink") {
+					var fileName = packageFilePath(message.taskName || fromName, message.fileName);
+					if (fileName) {
+						return unlinkFile(fileName);
+					}
 				} else if (message.action == "newPackage") {
 					var path = packageFilePath(message.taskName, "");
 					if (path) {

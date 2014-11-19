@@ -141,6 +141,8 @@ void Task::run() {
 			global->Set(v8::String::NewFromUtf8(_isolate, "readDirectory"), v8::FunctionTemplate::New(_isolate, readDirectory));
 			global->Set(v8::String::NewFromUtf8(_isolate, "makeDirectory"), v8::FunctionTemplate::New(_isolate, makeDirectory));
 			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
+			global->Set(v8::String::NewFromUtf8(_isolate, "renameFile"), v8::FunctionTemplate::New(_isolate, renameFile));
+			global->Set(v8::String::NewFromUtf8(_isolate, "unlinkFile"), v8::FunctionTemplate::New(_isolate, unlinkFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
 		}
 
@@ -607,6 +609,29 @@ void Task::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (!file.write(*utf8Contents, utf8Contents.length())) {
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
 	}
+}
+
+void Task::renameFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	v8::HandleScope scope(args.GetIsolate());
+
+	v8::String::Utf8Value oldName(args[0]->ToString());
+	v8::String::Utf8Value newName(args[1]->ToString());
+
+	uv_fs_t req;
+	int result = uv_fs_rename(task->_loop, &req, *oldName, *newName, 0);
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), result));
+}
+
+void Task::unlinkFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	v8::HandleScope scope(args.GetIsolate());
+
+	v8::String::Utf8Value fileName(args[0]->ToString());
+
+	uv_fs_t req;
+	int result = uv_fs_unlink(task->_loop, &req, *fileName, 0);
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), result));
 }
 
 void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {

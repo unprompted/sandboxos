@@ -118,6 +118,24 @@ function onMessage(from, message) {
 						message.response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 						message.response.end(error);
 					});
+				} else if (action == "unlink") {
+					var form = decodeForm(message.request.query);
+					parent.invoke({to: "system", action: "unlink", taskName: package, fileName: form.fileName}).then(function(result) {
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(JSON.stringify(result));
+					}).catch(function(error) {
+						message.response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(error);
+					});
+				} else if (action == "rename") {
+					var form = decodeForm(message.request.query);
+					parent.invoke({to: "system", action: "rename", taskName: package, fileName: form.oldName, newName: form.newName}).then(function(result) {
+						message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(JSON.stringify(result));
+					}).catch(function(error) {
+						message.response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+						message.response.end(error);
+					});
 				} else if (action == "clone") {
 					var form = decodeForm(message.request.query);
 					var oldName = package;
