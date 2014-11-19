@@ -50,7 +50,7 @@ function onMessage(from, message) {
 			}
 		}
 	} else {
-		gMessages.push([from, message]);
+		gMessages.push(message.payload);
 		gMessageIndex++;
 		if (gMessages.length > kMessageLimit) {
 			gMessages.splice(0, gMessages.length - kMessageLimit);

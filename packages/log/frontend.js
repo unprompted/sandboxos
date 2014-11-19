@@ -12,7 +12,7 @@ function requestLog(start) {
 		dataType: "json",
 	}).then(function(data) {
 		for (var i = 0; i < data.messages.length; i++) {
-			log(JSON.stringify(data.messages[i]));
+			log(data.messages[i]);
 		}
 		requestLog(data.next);
 	}).fail(function(xhr, error, status) {

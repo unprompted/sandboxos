@@ -106,7 +106,7 @@ function handleRequest(request, response) {
 	if (request.uri != "/log/get") {
 		parent.invoke({
 			to: "log",
-			request: request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version + " \"" + request.headers["user-agent"] + "\"",
+			payload: request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version + " \"" + request.headers["user-agent"] + "\"",
 		});
 	}
 
