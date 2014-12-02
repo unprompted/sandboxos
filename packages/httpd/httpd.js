@@ -14,13 +14,11 @@ function updatePackage(packageName) {
 				path: manifest.httpd.root,
 				taskName: packageName,
 			});
-			print(gHandlers);
 		}
 	});
 }
 
 parent.invoke({to: "system", action: "getPackageList"}).then(function(packages) {
-	print(packages);
 	for (var i in packages) {
 		updatePackage(packages[i]);
 	}
@@ -96,6 +94,7 @@ function Response(client) {
 				client.close();
 			}
 		},
+		isConnected: function() { return client.isConnected; },
 	};
 }
 

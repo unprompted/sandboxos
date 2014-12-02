@@ -8,7 +8,8 @@
 int Socket::_count = 0;
 
 Socket::Socket(Task* task)
-:	_refCount(1) {
+:	_refCount(1),
+	_connected(false) {
 	v8::HandleScope scope(task->getIsolate());
 	++_count;
 
@@ -21,6 +22,7 @@ Socket::Socket(Task* task)
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write));
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName);
+	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "isConnected"), isConnected);
 
 	v8::Local<v8::Object> socketObject = socketTemplate->NewInstance();
 	socketObject->SetInternalField(0, v8::External::New(task->getIsolate(), this));
@@ -92,7 +94,9 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::Handle<v8::Object> result = v8::Local<v8::Object>::New(args.GetIsolate(), client->_object);
 		args.GetReturnValue().Set(result);
 		client->release();
-		uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&client->_socket));
+		if (uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&client->_socket)) == 0) {
+			client->_connected = true;
+		}
 	}
 }
 
@@ -121,6 +125,10 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 		TaskTryCatch tryCatch(socket->_task);
 		v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 		v8::Handle<v8::Value> data;
+		if (readSize <= 0) {
+			socket->_connected = false;
+		}
+
 		if (readSize >= 0) {
 			data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer->base), v8::String::kNormalString, readSize);
 		} else {
@@ -199,6 +207,12 @@ void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallb
 				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), name));
 			}
 		}
+	}
+}
+
+void Socket::isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+	if (Socket* socket = Socket::get(info.This())) {
+		info.GetReturnValue().Set(v8::Boolean::New(socket->_task->getIsolate(), socket->_connected));
 	}
 }
 

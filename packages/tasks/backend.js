@@ -52,6 +52,17 @@ function sendLatestStatus(message) {
 	});
 }
 
+function removeIfDisconnected(connection) {
+	connection.response.isConnected().then(function (connected) {
+		if (!connected) {
+			var index = gWatchers.indexOf(connection);
+			if (index != -1) {
+				gWatchers.splice(index, 1);
+			}
+		}
+	});
+}
+
 function onMessage(from, message) {
 	if (message.request) {
 		var found = false;
@@ -105,6 +116,9 @@ function onMessage(from, message) {
 				});
 			} else if (message.request.uri == "/tasks/changes") {
 				gWatchers.push(message);
+				for (var i in gWatchers) {
+					removeIfDisconnected(gWatchers[i]);
+				}
 			}
 		}
 	} else if (message.action == "taskStarted" || message.action == "updateTaskStatus") {
