@@ -1,5 +1,6 @@
 #include "TaskStub.h"
 
+#include "PacketStream.h"
 #include "Task.h"
 #include "TaskTryCatch.h"
 
@@ -22,6 +23,27 @@ void TaskStub::release() {
 	}
 }
 
+TaskStub* TaskStub::createParent(Task* task, uv_stream_t* handle) {
+	v8::Isolate::Scope isolateScope(task->_isolate);
+	v8::HandleScope scope(task->_isolate);
+
+	v8::Local<v8::Context> context = v8::Context::New(task->_isolate, 0);
+	context->Enter();
+
+	v8::Handle<v8::ObjectTemplate> parentTemplate = v8::ObjectTemplate::New(task->_isolate);
+	parentTemplate->Set(v8::String::NewFromUtf8(task->_isolate, "invoke"), v8::FunctionTemplate::New(task->_isolate, TaskStub::invoke));
+	parentTemplate->SetInternalFieldCount(1);
+
+	v8::Handle<v8::Object> parentObject = parentTemplate->NewInstance();
+	TaskStub* parentStub = new TaskStub(task->_isolate, v8::Local<v8::Object>::New(task->_isolate, parentObject));
+	parentObject->SetInternalField(0, v8::External::New(task->_isolate, parentStub));
+	parentStub->_owner = task;
+
+	parentStub->_stream.setOnReceive(Task::onReceivePacket, parentStub);
+	parentStub->_stream.accept(handle);
+	return parentStub;
+}
+
 void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* parent = Task::get(args.GetIsolate());
 	v8::HandleScope scope(args.GetIsolate());
@@ -41,24 +63,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	//stub->_task = new Task();
 	//stub->_task->_stub = stub;
 
-	/*{
-		v8::Isolate::Scope isolateScope(stub->_task->_isolate);
-		v8::HandleScope scope(stub->_task->_isolate);
-
-		v8::Local<v8::Context> context = v8::Context::New(stub->_task->_isolate, 0);
-		context->Enter();
-
-		v8::Handle<v8::ObjectTemplate> parentTemplate = v8::ObjectTemplate::New(stub->_task->_isolate);
-		parentTemplate->Set(v8::String::NewFromUtf8(stub->_task->_isolate, "invoke"), v8::FunctionTemplate::New(stub->_task->_isolate, TaskStub::invoke));
-		parentTemplate->SetInternalFieldCount(1);
-
-		v8::Handle<v8::Object> parentObject = parentTemplate->NewInstance();
-		TaskStub* parentStub = new TaskStub(stub->_task->_isolate, v8::Local<v8::Object>::New(stub->_task->_isolate, parentObject));
-		parentObject->SetInternalField(0, v8::External::New(stub->_task->_isolate, parentStub));
-		parentStub->_owner = stub->_task;
-		parentStub->_task = parent;
-		stub->_task->_parent = parentStub;
-	}*/
 
 	taskid_t id = 0;
 	if (parent) {
@@ -118,7 +122,7 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cerr << "uv_tcp_open failed\n";
 	}
 
-	stub->_stream.setOnReceive(onReceivePacket, stub);
+	stub->_stream.setOnReceive(Task::onReceivePacket, stub);
 	stub->_stream.createFrom(parent->getLoop(), sock[1]);
 
 	uv_write_t* request = reinterpret_cast<uv_write_t*>(new char[sizeof(uv_write_t) + sizeof(int)]);
@@ -150,7 +154,7 @@ void TaskStub::onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data)
 }
 
 void TaskStub::getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
-	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), TaskStub::get(args.This())->_task->_trusted));
+	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), false /*TaskStub::get(args.This())->_task->_trusted)*/));
 }
 
 void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
@@ -165,23 +169,34 @@ TaskStub* TaskStub::get(v8::Handle<v8::Object> object) {
 }
 
 v8::Handle<v8::Object> TaskStub::getTaskObject() {
-	return v8::Local<v8::Object>::New(_task->getIsolate(), _taskObject);
+	return v8::Local<v8::Object>::New(_owner->getIsolate(), _taskObject);
 }
 
 void TaskStub::start(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	TaskStub* stub = TaskStub::get(args.This());
-	stub->_task->start();
+	//TaskStub* stub = TaskStub::get(args.This());
+	//stub->_task->start();
 }
 
 void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskStub* stub = TaskStub::get(args.This());
 	TaskTryCatch tryCatch(stub->_owner);
 	v8::HandleScope scope(args.GetIsolate());
-	stub->_task->execute(*v8::String::Utf8Value(args[0]->ToString(args.GetIsolate())));
+	v8::String::Utf8Value fileName(args[0]->ToString(args.GetIsolate()));
+	stub->_stream.send(kExecute, *fileName, fileName.length());
 }
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	std::cout << "kill called\n";
+	/*
+	Task* self = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	taskid_t taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
+
+	if (TaskStub* task = self->get(taskId)) {
+		task->kill();
+	} else {
+		std::cout << "Could not find task!\n";
+	}
+	*/
 }
 
 void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -192,9 +207,4 @@ void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	promiseid_t promise = stub->_owner->allocatePromise();
 	Task::sendPromiseMessage(stub->_owner, stub, kSendMessage, promise, args[0]);
 	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
-}
-
-void TaskStub::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {
-	TaskStub* stub = reinterpret_cast<TaskStub*>(userData);
-	std::cout << "Received " << packetType << " packet from " << stub->_task << "\n";
 }

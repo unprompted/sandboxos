@@ -15,9 +15,9 @@ public:
 	void release();
 
 	static void create(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static TaskStub* createParent(Task* task, uv_stream_t* handle);
 
 	taskid_t getId() { return _id; }
-	Task* getTask() { return _task; }
 	Task* getOwner() { return _owner; }
 	v8::Handle<v8::Object> getTaskObject();
 	PacketStream& getStream() { return _stream; }
@@ -28,7 +28,6 @@ private:
 
 	Task* _owner = 0;
 	PacketStream _stream;
-	Task* _task = 0;
 	taskid_t _id = -1;
 	uv_process_t _process = {0};
 
@@ -45,7 +44,6 @@ private:
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data);
-	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
 
 	static void onProcessExit(uv_process_t* process, int64_t status, int terminationSignal);
 	static void onPipeWrite(uv_write_t* request, int status);

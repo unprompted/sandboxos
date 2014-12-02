@@ -103,7 +103,7 @@ v8::Handle<v8::ObjectTemplate> Task::createGlobal() {
 	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 
-	if (_trusted && (!_stub || !_stub->getTask() || !_stub->getTask()->_parent)) {
+	if (_trusted) {
 		global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
@@ -177,17 +177,6 @@ void Task::wait() {
 void Task::run(void* data) {
 	//Task* task = reinterpret_cast<Task*>(data);
 	//task->run();
-}
-
-void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* self = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	int taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
-
-	if (Task* task = self->_children[taskId]->getTask()) {
-		task->kill();
-	} else {
-		std::cout << "Could not find task!\n";
-	}
 }
 
 void Task::kill() {
@@ -300,7 +289,7 @@ void Task::sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::H
 }
 
 PacketStream& Task::getPacketStream(Task* from, TaskStub* to) {
-	return to == from->_parent ? from->_stub->getStream() : to->getStream();
+	return to->getStream();
 }
 
 void Task::sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
@@ -427,15 +416,14 @@ v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
 void Task::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {
 	TaskStub* stub = reinterpret_cast<TaskStub*>(userData);
 	TaskStub* from = stub;
-	Task* to = stub->getTask();
+	Task* to = stub->getOwner();
 
 	TaskTryCatch tryCatch(to);
 	v8::HandleScope scope(to->_isolate);
 
-	std::cout << "Received " << packetType << " packet from " << stub->getId() << "\n";
-
 	switch (static_cast<MessageType>(packetType)) {
 	case kSendMessage: {
+		std::cout << to->_scriptName << " <- kSendMessage\n";
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promise));
 		v8::Handle<v8::Value> result = invokeOnMessage(from, to, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
@@ -443,6 +431,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kInvokeExport: {
+		std::cout << to->_scriptName << " <- kInvokeExport\n";
 		promiseid_t promise;
 		exportid_t exportId;
 		std::memcpy(&promise, begin, sizeof(promise));
@@ -452,6 +441,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kResolvePromise: {
+		std::cout << to->_scriptName << " <- kResolvePromise\n";
 		v8::Handle<v8::Value> arg;
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
@@ -464,6 +454,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kReleaseExport:
+		std::cout << to->_scriptName << " <- kReleaseExport\n";
 		assert(length == sizeof(exportid_t));
 		exportid_t exportId;
 		memcpy(&exportId, begin, sizeof(exportId));
@@ -472,7 +463,16 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		to->_exports.erase(exportId);
 		break;
 	case kSetTrusted:
+		std::cout << to->_scriptName << " <- kSetTrusted\n";
 		// XXX
+		break;
+	case kExecute:
+		std::cout << to->_scriptName << " <- kExecute\n";
+		to->execute(std::string(begin, begin + length).c_str());
+		break;
+	case kKill:
+		std::cout << to->_scriptName << " <- kKill\n";
+		to->kill();
 		break;
 	}
 }
@@ -502,8 +502,7 @@ void Task::onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer
 	std::cout << "onPipeRead\n";
 	if (uv_pipe_pending_count(reinterpret_cast<uv_pipe_t*>(handle)) != 0) {
 		std::cout << "pipe pending\n";
-		task->_stream.setOnReceive(Task::onReceivePacket, task->_parent);
-		task->_stream.accept(handle);
+		task->_parent = TaskStub::createParent(task, handle);
 
 		uv_read_stop(handle);
 		uv_close(reinterpret_cast<uv_handle_t*>(handle), 0);

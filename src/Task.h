@@ -28,6 +28,8 @@ enum MessageType {
 	kInvokeExport,
 	kReleaseExport,
 	kSetTrusted,
+	kExecute,
+	kKill,
 };
 
 class Task {
@@ -90,8 +92,6 @@ private:
 	int64_t _memoryAllocated = 0;
 	int64_t _memoryLimit = 64 * 1024 * 1024;
 
-	PacketStream _stream;
-
 	v8::Handle<v8::ObjectTemplate> createGlobal();
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
 	void run();
@@ -104,8 +104,6 @@ private:
 	static void run(void* data);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
-
-	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static v8::Handle<v8::Value> invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer);
 	static v8::Handle<v8::Value> invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);

@@ -1,9 +1,9 @@
 print("CHILD");
 
 function onMessage(from, message) {
-	console.debug("onMessage");
-	//console.debug("child received message " + JSON.stringify(from) + ": " + JSON.stringify(message));
+	print("child received message " + JSON.stringify(from) + ": " + JSON.stringify(message));
 	return 1;
 }
 
-//parent.invoke({hello: "world"});
+parent.invoke({goodbye: "world"}).then(function(result) { print("RESULT: " + result); });
+"child";
