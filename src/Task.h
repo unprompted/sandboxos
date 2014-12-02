@@ -16,7 +16,6 @@ struct ExportRecord;
 struct ImportRecord;
 class Task;
 
-struct uv_async_s; typedef struct uv_async_s uv_async_t;
 struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
 
 typedef int taskid_t;
@@ -28,17 +27,6 @@ enum MessageType {
 	kResolvePromise,
 	kInvokeExport,
 	kReleaseExport,
-};
-
-class Message {
-public:
-	MessageType _type;
-	taskid_t _sender;
-	taskid_t _recipient;
-	std::vector<char> _data;
-	std::vector<char> _result;
-	int _promise;
-	int _export;
 };
 
 class Task {
@@ -115,9 +103,9 @@ private:
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-	static void asyncMessage(uv_async_t* handle);
-
-	static void startInvoke(Message& message);
+	static v8::Handle<v8::Value> invokeOnMessage(Task* from, Task* to, const std::vector<char>& buffer);
+	static v8::Handle<v8::Value> invokeExport(Task* from, Task* to, export_t exportId, const std::vector<char>& buffer);
+	static void sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handle<v8::Value> result);
 
 	static void sleepCallback(uv_timer_t* timer);
 
