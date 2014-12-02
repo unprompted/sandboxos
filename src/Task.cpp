@@ -3,8 +3,10 @@
 #include "File.h"
 #include "Serialize.h"
 #include "Socket.h"
+#include "TaskTryCatch.h"
 
 #include <algorithm>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <libplatform/libplatform.h>
@@ -19,7 +21,6 @@ std::map<taskid_t, Task*> gTasks;
 int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
-const char* toString(const v8::String::Utf8Value& value);
 
 int Task::_count;
 Mutex Task::_mutex;
@@ -89,6 +90,7 @@ struct ImportRecord {
 Task::Task(const char* scriptName)
 :	_trusted(false),
 	_killed(false),
+	_parent(0),
 	_isolate(0),
 	_nextPromise(0),
 	_nextExport(0),
@@ -191,7 +193,7 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
 		v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
-		std::cout << toString(value);
+		std::cout << *value ? *value : "(null)";
 	}
 	std::cout << '\n';
 }
@@ -211,9 +213,22 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		Lock lock(_mutex);
 		task->_parent = parent->_id;
 	}
-	task->_scriptName = toString(v8::String::Utf8Value(args[0]));
+	task->_scriptName = *v8::String::Utf8Value(args[0]);
 	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
 	uv_thread_create(&task->_thread, run, task);
+
+	uv_os_sock_t sock[2];
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sock) != 0) {
+		perror("socketpair");
+	}
+	task->_parentStreamData[0] = task;
+	task->_parentStreamData[1] = parent;
+	task->_parentStream.setOnReceive(onReceivePacket, task->_parentStreamData);
+	task->_parentStream.createFrom(parent->_loop, sock[0]);
+	task->_childStreamData[0] = parent;
+	task->_childStreamData[1] = task;
+	task->_childStream.setOnReceive(onReceivePacket, task->_childStreamData);
+	task->_childStream.createFrom(task->_loop, sock[1]);
 
 	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
 }
@@ -287,7 +302,7 @@ void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
 	if (!script.IsEmpty()) {
 		v8::Handle<v8::Value> result = script->Run();
 		v8::String::Utf8Value stringResult(result);
-		std::cout << "Script returned: " << toString(stringResult) << '\n';
+		std::cout << "Script returned: " << *stringResult << '\n';
 	} else {
 		std::cerr << "Failed to compile script.\n";
 	}
@@ -298,9 +313,21 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskTryCatch tryCatch(task);
 	v8::HandleScope scope(args.GetIsolate());
 
-	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
+	promiseid_t promise = task->allocatePromise();
+	std::vector<char> buffer;
+	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
+	Serialize::store(task, buffer, args[0]);
 
-	if (task) {
+	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
+	Lock lock(_mutex);
+	if (Task* recipient = gTasks[recipientId]) {
+		std::cout << "Writing to thing on " << *recipient << " promise " << promise << "\n";
+		PacketStream& stream = recipient->_parent ? recipient->_parentStream : task->_childStream;
+		stream.send(kSendMessage, &*buffer.begin(), buffer.size());
+		args.GetReturnValue().Set(task->getPromise(promise));
+	}
+
+	/*if (task) {
 		Message message;
 		Serialize::store(task, message._data, args[0]);
 		message._sender = task->_id;
@@ -323,7 +350,7 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 			uv_async_send(recipient->_asyncMessage);
 		}
-	}
+	}*/
 }
 
 struct InvokeRecord {
@@ -575,10 +602,6 @@ void Task::getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(result);
 }
 
-const char* toString(const v8::String::Utf8Value& value) {
-	return *value ? *value : "(null)";
-}
-
 std::ostream& operator<<(std::ostream& stream, const Task& task) {
 	if (&task) {
 		return stream << "Task[" << task.getId() << ':' + task.getName() << ']';
@@ -635,55 +658,6 @@ void Task::rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value) {
 	}
 }
 
-TaskTryCatch::TaskTryCatch(Task* task)
-:	_task(task) {
-	_tryCatch.SetCaptureMessage(true);
-	_tryCatch.SetVerbose(true);
-}
-
-TaskTryCatch::~TaskTryCatch() {
-	if (_tryCatch.HasCaught()) {
-		if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
-			if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
-				std::cerr << *task << ' ';
-			}
-		}
-		std::cerr << "Exception:\n";
-
-		v8::Handle<v8::Message> message(_tryCatch.Message());
-		if (!message.IsEmpty()) {
-			std::cerr
-				<< toString(v8::String::Utf8Value(message->GetScriptResourceName()))
-				<< ':'
-				<< message->GetLineNumber()
-				<< ": "
-				<< toString(v8::String::Utf8Value(_tryCatch.Exception()))
-				<< '\n';
-			std::cerr << toString(v8::String::Utf8Value(message->GetSourceLine())) << '\n';
-
-			for (int i = 0; i < message->GetStartColumn(); ++i) {
-				std::cerr << ' ';
-			}
-			for (int i = message->GetStartColumn(); i < message->GetEndColumn(); ++i) {
-				std::cerr << '^';
-			}
-			if (!message->GetStackTrace().IsEmpty()) {
-				for (int i = 0; i < message->GetStackTrace()->GetFrameCount(); ++i) {
-					std::cerr << "oops " << i << "\n";
-				}
-			}
-			std::cerr << '\n';
-		} else {
-			std::cerr << toString(v8::String::Utf8Value(_tryCatch.Exception())) << '\n';
-		}
-
-		v8::String::Utf8Value stackTrace(_tryCatch.StackTrace());
-		if (stackTrace.length() > 0) {
-			std::cerr << *stackTrace << '\n';
-		}
-	}
-}
-
 void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size) {
 	if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
 		if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
@@ -732,4 +706,20 @@ void Task::releaseExport(taskid_t taskId, export_t exportId) {
 
 void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
 	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
+}
+
+void Task::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {
+	Task** tasks = reinterpret_cast<Task**>(userData);
+	Task* from = tasks[0];
+	Task* to = tasks[1];
+
+	Message message;
+	message._type = static_cast<MessageType>(packetType);
+	message._sender = from->_id;
+	message._recipient = to->_id;
+	message._data.insert(message._data.end(), begin + sizeof(promiseid_t), begin + length);
+	std::memcpy(&message._promise, begin, sizeof(promiseid_t));
+	message._export = -1;
+	std::cout << "Message " << message._type << " from " << *from << " to " << *to << " promise " << message._promise << "\n";
+	startInvoke(message);
 }

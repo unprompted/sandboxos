@@ -2,6 +2,7 @@
 #define INCLUDED_Task
 
 #include "Mutex.h"
+#include "PacketStream.h"
 
 #include <iostream>
 #include <list>
@@ -38,8 +39,6 @@ public:
 	std::vector<char> _result;
 	int _promise;
 	int _export;
-
-	ImportRecord* _record;
 };
 
 class Task {
@@ -97,6 +96,11 @@ private:
 	int64_t _memoryAllocated;
 	int64_t _memoryLimit;
 
+	PacketStream _parentStream;
+	Task* _parentStreamData[2];
+	PacketStream _childStream;
+	Task* _childStreamData[2];
+
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -123,19 +127,11 @@ private:
 
 	static void memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size);
 
+	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
+
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 
 	friend struct ImportRecord;
-};
-
-class TaskTryCatch {
-public:
-	TaskTryCatch(Task* task);
-	~TaskTryCatch();
-
-private:
-	v8::TryCatch _tryCatch;
-	Task* _task;
 };
 
 std::ostream& operator<<(std::ostream& stream, const Task& task);

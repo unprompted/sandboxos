@@ -1,6 +1,7 @@
 #include "Socket.h"
 
 #include "Task.h"
+#include "TaskTryCatch.h"
 
 #include <assert.h>
 #include <uv.h>
