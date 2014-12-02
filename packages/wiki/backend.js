@@ -24,7 +24,6 @@ function decode(encoded) {
 
 function decodeForm(encoded) {
 	var result = {};
-	// HACK for E3 build
 	if (encoded) {
 		encoded = encoded.trim();
 		var items = encoded.split('&');
@@ -39,7 +38,7 @@ function decodeForm(encoded) {
 	return result;
 }
 
-function render(message, fileName, isEdit) {
+function render(response, fileName, isEdit) {
 	parent.invoke({
 		to: "system",
 			action: "getData",
@@ -51,60 +50,59 @@ function render(message, fileName, isEdit) {
 				fileName: isEdit ? "edit.html" : "index.html",
 		}).then(function(html) {
 			html = html.replace(/\$\(CONTENTS\)/g, data).replace(/\$\(PAGE\)/g, fileName);
-			message.response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
-			message.response.end(html);
+			response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
+			response.end(html);
 		});
 	});
 }
 
-function onMessage(from, message) {
-	print(message);
-	if (message.request) {
-		var found = false;
-		for (var i in kStaticFiles) {
-			if (kStaticFiles[i].uri == message.request.uri) {
-				found = true;
-				var file = kStaticFiles[i];
-				parent.invoke({
-					to: "system",
-					action: "get",
-					fileName: file.path,
-				}).then(function(data) {
-					message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
-					message.response.end(data);
-				});
-				break;
-			}
+function get(request, response) {
+	var found = false;
+	for (var i in kStaticFiles) {
+		if (kStaticFiles[i].uri == request.uri) {
+			found = true;
+			var file = kStaticFiles[i];
+			parent.invoke({
+				to: "system",
+				action: "get",
+				fileName: file.path,
+			}).then(function(data) {
+				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+				response.end(data);
+			});
+			break;
+		}
+	}
+
+	if (!found) {
+		var isEdit = false;
+		var fileName;
+		if (startsWith(request.uri, "/wiki/edit/")) {
+			isEdit = true;
+			fileName = request.uri.substring("/wiki/edit/".length);
+		} else {
+			fileName = request.uri.substring("/wiki/".length);
+		}
+		if (!fileName) {
+			fileName = "index";
 		}
 
-		if (!found) {
-			var isEdit = false;
-			var fileName;
-			if (startsWith(message.request.uri, "/wiki/edit/")) {
-				isEdit = true;
-				fileName = message.request.uri.substring("/wiki/edit/".length);
-			} else {
-				fileName = message.request.uri.substring("/wiki/".length);
-			}
-			if (!fileName) {
-				fileName = "index";
-			}
-
-			if (message.request.method == "POST") {
-				var form = decodeForm(message.request.body);
-				parent.invoke({
-				to: "system",
-					action: "putData",
-					fileName: fileName,
-					contents: form.contents,
-				}).then(function() {
-					message.response.writeHead(303, {"Content-Type": "text/plain", "Connection": "close", "Location": "/wiki/" + fileName});
-					message.response.end("");
-				});
-			} else {
-				render(message, fileName, isEdit);
-			}
+		if (request.method == "POST") {
+			var form = decodeForm(request.body);
+			parent.invoke({
+			to: "system",
+				action: "putData",
+				fileName: fileName,
+				contents: form.contents,
+			}).then(function() {
+				response.writeHead(303, {"Content-Type": "text/plain", "Connection": "close", "Location": "/wiki/" + fileName});
+				response.end("");
+			});
+		} else {
+			render(response, fileName, isEdit);
 		}
 	}
 	return true;
 }
+
+imports.httpd.get('/wiki', get);

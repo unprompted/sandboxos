@@ -29,9 +29,12 @@ enum MessageType {
 	kReleaseExport,
 	kReleaseImport,
 	kSetTrusted,
+	kActivate,
 	kExecute,
 	kKill,
 	kStatistics,
+	kSetImports,
+	kGetExports,
 };
 
 class Task {
@@ -52,6 +55,7 @@ public:
 	void configureFromStdin();
 	void setTrusted(bool trusted) { _trusted = trusted; }
 	void execute(const char* fileName);
+	void activate();
 	void run();
 
 	static int getCount() { return _count; }
@@ -76,7 +80,6 @@ private:
 	bool _killed = false;
 	std::string _scriptName;
 	v8::Isolate* _isolate = 0;
-	v8::Persistent<v8::Context> _context;
 
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	promiseid_t _nextPromise = 0;
@@ -86,22 +89,31 @@ private:
 	std::map<exportid_t, ExportRecord*> _exports;
 	exportid_t _nextExport = 0;
 
+	v8::Persistent<v8::Context, v8::CopyablePersistentTraits<v8::Context> > _context;
+
 	std::vector<ImportRecord*> _imports;
+
+	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _importObject;
+	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _exportObject;
 
 	int64_t _memoryAllocated = 0;
 	int64_t _memoryLimit = 64 * 1024 * 1024;
 
-	v8::Handle<v8::ObjectTemplate> createGlobal();
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
 
 	v8::Handle<v8::Object> getStatistics();
 
+	static void activate(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
+
+	static void getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
+	static void getExports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
+	static void setExports(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
 
 	static v8::Handle<v8::Value> invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer);
 	static v8::Handle<v8::Value> invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);

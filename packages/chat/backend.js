@@ -7,10 +7,10 @@ var kStaticFiles = [
 	{uri: '/chat/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 
-function onRequestWithSession(from, message, session) {
+function sessionHandler(request, response, session) {
 	var found = false;
 	for (var i in kStaticFiles) {
-		if (kStaticFiles[i].uri == message.request.uri) {
+		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
 			parent.invoke({
@@ -18,44 +18,44 @@ function onRequestWithSession(from, message, session) {
 				action: "get",
 				fileName: file.path,
 			}).then(function(data) {
-				message.response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
-				message.response.end(data);
+				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+				response.end(data);
 			});
 			break;
 		}
 	}
 	if (!found) {
-		if (message.request.uri == "/chat/send") {
-			var newMessage = "<" + session.name + "> " + message.request.body;
+		if (request.uri == "/chat/send") {
+			var newMessage = "<" + session.name + "> " + request.body;
 			messages[index++] = newMessage;
 			for (var i in waiting) {
 				waiting[i].response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 				waiting[i].response.end(JSON.stringify({index: index, message: newMessage}));
 			}
 			waiting.slice(0);
-			message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-			message.response.end("OK");
-		} else if (message.request.uri == "/chat/receive") {
-			var haveIndex = parseInt(message.request.body);
+			response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+			response.end("OK");
+		} else if (request.uri == "/chat/receive") {
+			var haveIndex = parseInt(request.body);
 			if (haveIndex + 1 < index) {
-				message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-				message.response.end(JSON.stringify({index: haveIndex + 1, message: messages[haveIndex + 1]}));
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+				response.end(JSON.stringify({index: haveIndex + 1, message: messages[haveIndex + 1]}));
 			} else {
-				waiting.push(message);
+				waiting.push({request: request, response: response});
 			}
 		}
 	}
 }
 
-function onMessage(from, message) {
-	if (message.request) {
-		parent.invoke({to: "auth", action: "query", headers: message.request.headers}).then(function(authResponse) {
-			if (authResponse) {
-				onRequestWithSession(from, message, authResponse.session);
-			} else {
-				message.response.writeHead(303, {"Location": "/login?return=/chat", "Connection": "close"});
-				message.response.end();
-			}
-		});
-	}
+function handler(request, response) {
+	imports.auth.query(request.headers).then(function(authResponse) {
+		if (authResponse) {
+			sessionHandler(request, response, authResponse.session);
+		} else {
+			response.writeHead(303, {"Location": "/login?return=/chat", "Connection": "close"});
+			response.end();
+		}
+	});
 }
+
+imports.httpd.all("/chat", handler);

@@ -2,5 +2,5 @@
 	"name": "editor",
 	"start": "editor.js",
 	"trusted": true,
-	"httpd": {"root": "/editor"}
+	"imports": ["httpd"]
 }

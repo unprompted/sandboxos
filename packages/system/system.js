@@ -13,6 +13,52 @@ function start() {
 	}
 }
 
+function importsReady(task) {
+	var ready = true;
+	if (task.manifest.imports) {
+		for (var i in task.manifest.imports) {
+			if (!tasks[task.manifest.imports[i]]
+			 || !tasks[task.manifest.imports[i]].task
+			 || !tasks[task.manifest.imports[i]].started) {
+				ready = false;
+			}
+		}
+	}
+	return ready;
+}
+
+function updatePendingTasks() {
+	for (var i in tasks) {
+		if (tasks[i].pending && importsReady(tasks[i])) {
+			startTask(i);
+		}
+	}
+}
+
+function nameExports(name) {
+	return function(exports) {
+		return {name: name, imports: exports};
+	};
+}
+
+function gatherImports(task) {
+	var promises = [];
+	if (task.manifest.imports) {
+		for (var i in task.manifest.imports) {
+			var name = task.manifest.imports[i];
+			var other = tasks[name];
+			promises.push(other.task.getExports().then(nameExports(name)));
+		}
+	}
+	return Promise.all(promises).then(function(imports) {
+		var result = {};
+		for (var i in imports) {
+			result[imports[i].name] = imports[i].imports;
+		}
+		return task.task.setImports(result);
+	});
+}
+
 function startTask(packageName) {
 	var manifest;
 	var task;
@@ -25,21 +71,31 @@ function startTask(packageName) {
 	if (manifest) {
 		task = {}
 		task.manifest = manifest;
-		task.task = new Task();
-		task.task.trusted = true;
-		task.task.onExit = function(exitCode, terminationSignal) {
-			if (terminationSignal) {
-				print("Task " + packageName + " terminated with signal " + terminationSignal + ".");
-			} else {
-				print("Task " + packageName + " returned " + exitCode + ".");
-			}
-			delete tasks[packageName];
-			broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"stopped"});
-		};
-		task.task.execute(packageFilePath(packageName, manifest.start));
+		task.pending = !importsReady(task);
 		tasks[packageName] = task
-		broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"started"});
-		broadcast(null, {action: "taskStarted", taskName: packageName});
+
+		if (!task.pending) {
+			task.task = new Task();
+			task.task.trusted = true;
+			task.task.onExit = function(exitCode, terminationSignal) {
+				if (terminationSignal) {
+					print("Task " + packageName + " terminated with signal " + terminationSignal + ".");
+				} else {
+					print("Task " + packageName + " returned " + exitCode + ".");
+				}
+				delete tasks[packageName];
+				broadcast(null, {action: "updateTaskStatus", taskName:packageName, state: "stopped"});
+			};
+			task.task.activate();
+			gatherImports(task).then(function() {
+				task.task.execute(packageFilePath(packageName, manifest.start)).then(function() {
+					task.started = true;
+					broadcast(null, {action: "updateTaskStatus", taskName:packageName, state: "started"});
+					broadcast(null, {action: "taskStarted", taskName: packageName});
+					updatePendingTasks();
+				});
+			});
+		}
 	} else {
 		print("Package " + packageName + " has no package.json.");
 	}
@@ -80,7 +136,7 @@ var exports = {};
 
 function broadcast(from, message) {
 	for (var taskName in tasks) {
-		if (from != tasks[taskName]) {
+		if (from != tasks[taskName] && tasks[taskName].task) {
 			tasks[taskName].task.invoke(message);
 		}
 	}
@@ -151,7 +207,6 @@ function onMessage(from, message) {
 					}
 					return path;
 				} else if (message.action == "getPackageList") {
-					print(getPackageList());
 					return getPackageList();
 				} else if (message.action == "getTasks") {
 					var taskNames = [];

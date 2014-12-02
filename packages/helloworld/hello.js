@@ -1,6 +1,6 @@
-function onMessage(from, message) {
-	if (message.request) {
-		message.response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-		message.response.end("Hello, " + message.request.client.peerName + ".");
-	}
+function sayHello(request, response) {
+	response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+	response.end("Hello, " + request.client.peerName + ".");
 }
+
+imports.httpd.get('/helloworld', sayHello);

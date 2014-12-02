@@ -30,11 +30,13 @@ int main(int argc, char* argv[]) {
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		Task task;
 		task.configureFromStdin();
+		task.activate();
 		task.run();
 	} else {
 		setpgid(0, 0);
 		Task task;
 		task.setTrusted(true);
+		task.activate();
 		task.execute("packages/system/system.js");
 		task.run();
 	}

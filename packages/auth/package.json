@@ -1,5 +1,5 @@
 {
 	"name": "auth",
 	"start": "auth.js",
-	"httpd": {"root": "/login"}
+	"imports": ["httpd"]
 }

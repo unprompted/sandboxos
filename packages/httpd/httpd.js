@@ -1,28 +1,19 @@
 var gHandlers = [];
 
-function updatePackage(packageName) {
-	var newHandlers = [];
-	for (var i in gHandlers) {
-		if (gHandlers[i].taskName != packageName) {
-			newHandlers.push(gHandlers[i]);
-		}
-	}
-	gHandlers = newHandlers;
-	parent.invoke({to: "system", action: "getManifest", taskName: packageName}).then(function(manifest) {
-		if (manifest && manifest.httpd && manifest.httpd.root) {
-			gHandlers.push({
-				path: manifest.httpd.root,
-				taskName: packageName,
-			});
-		}
+function get(prefix, handler) {
+	gHandlers.push({
+		method: "GET",
+		path: prefix,
+		invoke: handler,
 	});
 }
 
-parent.invoke({to: "system", action: "getPackageList"}).then(function(packages) {
-	for (var i in packages) {
-		updatePackage(packages[i]);
-	}
-});
+function all(prefix, handler) {
+	gHandlers.push({
+		path: prefix,
+		invoke: handler,
+	});
+}
 
 function Request(method, uri, version, headers, body, client) {
 	this.method = method;
@@ -41,18 +32,12 @@ function Request(method, uri, version, headers, body, client) {
 	return this;
 }
 
-function onMessage(from, message) {
-	if (message.action == "taskStarted") {
-		updatePackage(message.taskName);
-	}
-}
-
-function findHandler(uri) {
+function findHandler(request) {
 	var matchedHandler = null;
 	for (var name in gHandlers) {
 		var handler = gHandlers[name];
-		if (uri == handler.path ||
-			uri.slice(0, handler.path.length + 1) == handler.path + '/') {
+		if ((!handler.method || handler.method == request.method)
+			&& (request.uri == handler.path || request.uri.slice(0, handler.path.length + 1) == handler.path + '/')) {
 			matchedHandler = handler;
 			break;
 		}
@@ -99,8 +84,7 @@ function Response(client) {
 }
 
 function handleRequest(request, response) {
-	var  handler = findHandler(request.uri);
-	print(request);
+	var  handler = findHandler(request);
 
 	if (request.uri != "/log/get") {
 		parent.invoke({
@@ -110,7 +94,7 @@ function handleRequest(request, response) {
 	}
 
 	if (handler) {
-		parent.invoke({to: handler.taskName, action: "handleRequest", request: request, response: response});
+		handler.invoke(request, response);
 	} else {
 		response.writeHead(200, {"Content-Type": "text/plain; encoding=utf-8", "Connection": "close"});
 		response.end("No handler found for request: " + request.uri);
@@ -207,3 +191,9 @@ function runServer(ip, port) {
 }
 
 runServer("0.0.0.0", 12345);
+
+exports = {
+	all: all,
+	get: get,
+};
+print(exports);

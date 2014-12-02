@@ -1,5 +1,5 @@
 {
 	"name": "chat",
 	"start": "backend.js",
-	"httpd": {"root": "/chat"}
+	"imports": ["auth", "httpd"]
 }

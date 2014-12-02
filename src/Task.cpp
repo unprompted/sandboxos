@@ -91,6 +91,13 @@ Task::Task() {
 }
 
 Task::~Task() {
+	{
+		v8::Isolate::Scope isolateScope(_isolate);
+		v8::HandleScope handleScope(_isolate);
+		_isolate->GetCurrentContext()->Exit();
+		_context.Reset();
+	}
+
 	_isolate->Dispose();
 	_isolate = 0;
 
@@ -98,24 +105,11 @@ Task::~Task() {
 	--_count;
 }
 
-v8::Handle<v8::ObjectTemplate> Task::createGlobal() {
-	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
-	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
-	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
-	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
-
-	if (_trusted) {
-		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
-		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
-		File::configure(_isolate, global);
-	}
-	return global;
-}
-
 void Task::run() {
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
+		v8::Context::Scope contextScope(v8::Local<v8::Context>::New(_isolate, _context));
 		uv_run(_loop, UV_RUN_DEFAULT);
 	}
 	_promises.clear();
@@ -136,6 +130,31 @@ v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
 		delete[] buffer;
 	}
 	return value;
+}
+
+void Task::activate() {
+	v8::Isolate::Scope isolateScope(_isolate);
+	v8::HandleScope handleScope(_isolate);
+
+	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
+	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "imports"), getImports);
+	if (_trusted) {
+		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
+		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
+		File::configure(_isolate, global);
+	}
+
+	v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
+	_context = v8::Persistent<v8::Context, v8::CopyablePersistentTraits<v8::Context> >(_isolate, context);
+}
+
+void Task::activate(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = Task::get(args.GetIsolate());
+	task->activate();
 }
 
 void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -169,8 +188,8 @@ void Task::kill() {
 void Task::execute(const char* fileName) {
 	v8::Isolate::Scope isolateScope(_isolate);
 	v8::HandleScope handleScope(_isolate);
-	v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, createGlobal());
-	context->Enter();
+	v8::Context::Scope contextScope(v8::Local<v8::Context>::New(_isolate, _context));
+
 	v8::Handle<v8::String> script = loadFile(_isolate, fileName);
 	std::cout << "Running script " << fileName << "\n";
 	_scriptName = fileName;
@@ -218,12 +237,16 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer) {
 	TaskTryCatch tryCatch(to);
-	v8::Local<v8::Context> context = to->_isolate->GetCurrentContext();
+	v8::Context::Scope contextScope(v8::Local<v8::Context>::New(to->_isolate, to->_context));
+	v8::Handle<v8::Context> context = to->_isolate->GetCurrentContext();
 	v8::Handle<v8::Value> args[2];
 	args[0] = from->getTaskObject();
 	args[1] = Serialize::load(to, from, buffer);
 	v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(to->_isolate, "onMessage")));
-	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
+	v8::Handle<v8::Value> result;
+	if (!function.IsEmpty() && function->IsFunction()) {
+		result = function->Call(context->Global(), 2, &args[0]);
+	}
 	return result;
 }
 
@@ -298,6 +321,18 @@ void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo
 	} else {
 		args.GetReturnValue().Set(v8::Undefined(task->_isolate));
 	}
+}
+
+void Task::getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	args.GetReturnValue().Set(v8::Local<v8::Object>::New(args.GetIsolate(), Task::get(args.GetIsolate())->_importObject));
+}
+
+void Task::getExports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	args.GetReturnValue().Set(v8::Local<v8::Object>::New(args.GetIsolate(), Task::get(args.GetIsolate())->_exportObject));
+}
+
+void Task::setExports(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
+	Task::get(args.GetIsolate())->_exportObject = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(args.GetIsolate(), v8::Handle<v8::Object>::Cast(value));
 }
 
 Task* Task::get(v8::Isolate* isolate) {
@@ -461,11 +496,33 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		to->_trusted = trusted;
 		}
 		break;
-	case kExecute:
-		to->execute(std::string(begin, begin + length).c_str());
+	case kActivate:
+		to->activate();
+		break;
+	case kExecute: {
+		assert(length >= sizeof(promiseid_t));
+		v8::Handle<v8::Value> arg;
+		promiseid_t promise;
+		std::memcpy(&promise, begin, sizeof(promiseid_t));
+		arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+		to->execute(*v8::String::Utf8Value(arg));
+		sendInvokeResult(to, from, promise, v8::Undefined(to->_isolate));
+		}
 		break;
 	case kKill:
 		to->kill();
+		break;
+	case kSetImports: {
+		v8::Handle<v8::Object> result = v8::Handle<v8::Object>::Cast(Serialize::load(to, from, std::vector<char>(begin, begin + length)));
+		to->_importObject = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(to->_isolate, result);
+		}
+		break;
+	case kGetExports:
+		promiseid_t promise;
+		assert(length == sizeof(promise));
+		std::memcpy(&promise, begin, sizeof(promiseid_t));
+		v8::Handle<v8::Object> result = v8::Local<v8::Object>::New(to->_isolate, to->_exportObject);
+		sendInvokeResult(to, from, promise, result);
 		break;
 	}
 }

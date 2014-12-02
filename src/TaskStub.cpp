@@ -1,6 +1,7 @@
 #include "TaskStub.h"
 
 #include "PacketStream.h"
+#include "Serialize.h"
 #include "Task.h"
 #include "TaskTryCatch.h"
 
@@ -51,7 +52,10 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(args.GetIsolate());
 	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "trusted"), getTrusted, setTrusted);
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "setImports"), v8::FunctionTemplate::New(args.GetIsolate(), setImports));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "getExports"), v8::FunctionTemplate::New(args.GetIsolate(), getExports));
 	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "onExit"), getOnExit, setOnExit);
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "activate"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::activate));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "invoke"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::invoke));
@@ -148,7 +152,6 @@ void TaskStub::onPipeClose(uv_handle_t* handle) {
 
 void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminationSignal) {
 	TaskStub* stub = reinterpret_cast<TaskStub*>(process->data);
-	std::cout << "PROCESS " << stub->_id << " EXITED: " << status << " " << terminationSignal << "\n";
 	if (!stub->_onExit.IsEmpty()) {
 		TaskTryCatch tryCatch(stub->_owner);
 		v8::HandleScope scope(stub->_owner->_isolate);
@@ -175,6 +178,25 @@ void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> v
 	}
 }
 
+void TaskStub::getExports(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(args.GetIsolate());
+
+		promiseid_t promise = stub->_owner->allocatePromise();
+		Task::sendPromiseMessage(stub->_owner, stub, kGetExports, promise, v8::Undefined(args.GetIsolate()));
+		args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+	}
+}
+
+void TaskStub::setImports(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		std::vector<char> buffer;
+		Serialize::store(Task::get(args.GetIsolate()), buffer, args[0]);
+		stub->_stream.send(kSetImports, &*buffer.begin(), buffer.size());
+	}
+}
+
 void TaskStub::getOnExit(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
 	TaskTryCatch tryCatch(TaskStub::get(args.This())->_owner);
 	v8::HandleScope scope(args.GetIsolate());
@@ -196,12 +218,22 @@ v8::Handle<v8::Object> TaskStub::getTaskObject() {
 	return v8::Local<v8::Object>::New(_owner->getIsolate(), _taskObject);
 }
 
-void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void TaskStub::activate(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskStub* stub = TaskStub::get(args.This());
 	TaskTryCatch tryCatch(stub->_owner);
 	v8::HandleScope scope(args.GetIsolate());
 	v8::String::Utf8Value fileName(args[0]->ToString(args.GetIsolate()));
-	stub->_stream.send(kExecute, *fileName, fileName.length());
+	stub->_stream.send(kActivate, 0, 0);
+}
+
+void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	TaskStub* stub = TaskStub::get(args.This());
+	TaskTryCatch tryCatch(stub->_owner);
+	v8::HandleScope scope(args.GetIsolate());
+
+	promiseid_t promise = stub->_owner->allocatePromise();
+	Task::sendPromiseMessage(stub->_owner, stub, kExecute, promise, args[0]);
+	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
 }
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
