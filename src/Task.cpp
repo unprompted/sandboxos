@@ -35,6 +35,19 @@ struct SleepData {
 	int _promise;
 };
 
+struct ExportRecord {
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
+
+	ExportRecord(v8::Isolate* isolate, v8::Handle<v8::Function> function)
+	:	_persistent(isolate, function) {
+	}
+
+	static void onRelease(const v8::WeakCallbackData<v8::Function, ExportRecord >& data) {
+		data.GetParameter()->_persistent.Reset();
+		delete data.GetParameter();
+	}
+};
+
 struct ImportRecord {
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
 	export_t _export;
@@ -48,33 +61,33 @@ struct ImportRecord {
 		_task(taskId),
 		_owner(owner),
 		_useCount(0) {
-		_persistent.SetWeak(this, ImportRecord::release);
+		_persistent.SetWeak(this, ImportRecord::onRelease);
 	}
 
 	void ref() {
 		if (_useCount++ == 0) {
 			// Make a strong ref again until an in-flight function call is finished.
-			_persistent = v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> >(_persistent);
+			_persistent.ClearWeak();
 		}
 	}
 
 	void release() {
 		if (--_useCount == 0) {
 			// All in-flight calls are finished.  Make weak.
-			_persistent.SetWeak(this, ImportRecord::release);
+			_persistent.SetWeak(this, ImportRecord::onRelease);
 		}
 	}
 
-	static void release(const v8::WeakCallbackData<v8::Function, ImportRecord >& data) {
+	static void onRelease(const v8::WeakCallbackData<v8::Function, ImportRecord >& data) {
 		ImportRecord* import = data.GetParameter();
 		Task::releaseExport(import->_task, import->_export);
-		import->_persistent.Reset();
 		for (int i = 0; i < import->_owner->_imports.size(); ++i) {
 			if (import->_owner->_imports[i] == import) {
 				import->_owner->_imports.erase(import->_owner->_imports.begin() + i);
 				break;
 			}
 		}
+		import->_persistent.Reset();
 		delete import;
 	}
 };
@@ -143,7 +156,7 @@ void Task::run() {
 			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "renameFile"), v8::FunctionTemplate::New(_isolate, renameFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "unlinkFile"), v8::FunctionTemplate::New(_isolate, unlinkFile));
-			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, createSocket));
+			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
 		}
 
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
@@ -242,13 +255,6 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Task::kill() {
 	if (!_killed) {
 		v8::V8::TerminateExecution(_isolate);
-		for (std::map<socketid_t, Socket*>::iterator it = _sockets.begin();
-			it != _sockets.end();
-			++it) {
-			if (it->second) {
-				it->second->close();
-			}
-		}
 		_killed = true;
 		uv_async_send(_asyncMessage);
 		//uv_thread_join(&_thread);
@@ -448,9 +454,9 @@ void Task::startInvoke(Message& message) {
 		for (int i = 0; i < arguments->Length(); ++i) {
 			array.push_back(arguments->Get(i));
 		}
-		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(task->_isolate, task->_exports[message._export]);
+		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(task->_isolate, task->_exports[message._export]->_persistent);
 		if (function.IsEmpty()) {
-			std::cout << "I COULD NOT FIND THE FUNCTION " << message._export << " ON " << task->_id << " (" << task->_exports.size() << ") " << task->_exports[message._export].IsEmpty() << "\n";
+			std::cout << "I COULD NOT FIND THE FUNCTION " << message._export << " ON " << task->_id << " (" << task->_exports.size() << ") " << task->_exports[message._export]->_persistent.IsEmpty() << "\n";
 			result = v8::Undefined(task->_isolate);
 		} else {
 			result = function->Call(function, array.size(), &*array.begin());
@@ -574,9 +580,10 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 void Task::getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	v8::Handle<v8::Object> result = v8::Object::New(args.GetIsolate());
-	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "sockets"), v8::Integer::New(args.GetIsolate(), task->_sockets.size()));
+	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "sockets"), v8::Integer::New(args.GetIsolate(), Socket::getCount()));
 	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "promises"), v8::Integer::New(args.GetIsolate(), task->_promises.size()));
 	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), v8::Integer::New(args.GetIsolate(), task->_exports.size()));
+	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "imports"), v8::Integer::New(args.GetIsolate(), task->_imports.size()));
 	args.GetReturnValue().Set(result);
 }
 
@@ -683,11 +690,6 @@ void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-void Task::createSocket(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	args.GetReturnValue().Set(Socket::create(task));
-}
-
 const char* toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
 }
@@ -700,23 +702,13 @@ std::ostream& operator<<(std::ostream& stream, const Task& task) {
 	}
 }
 
-socketid_t Task::allocateSocket() {
-	socketid_t id = _nextSocket++;
-	_sockets[id] = new Socket(this, id);
-	return id;
-}
-
-void Task::releaseSocket(socketid_t id) {
-	_sockets.erase(id);
-}
-
 Task* Task::get(taskid_t id) {
 	Lock lock(_mutex);
 	return gTasks[id];
 }
 
-Socket* Task::getSocket(socketid_t id) {
-	return _sockets[id];
+Task* Task::get(v8::Isolate* isolate) {
+	return reinterpret_cast<Task*>(isolate->GetData(0));
 }
 
 promiseid_t Task::allocatePromise() {
@@ -826,9 +818,9 @@ void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationA
 export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 	bool found = false;
 	export_t exportId = -1;
-	typedef std::map<export_t, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > ExportMap;
+	typedef std::map<export_t, ExportRecord*> ExportMap;
 	for (ExportMap::iterator it = _exports.begin(); it != _exports.end(); ++it) {
-		if (it->second == function) {
+		if (it->second->_persistent == function) {
 			found = true;
 			exportId = it->first;
 			break;
@@ -837,24 +829,23 @@ export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 
 	if (!found) {
 		exportId = _nextExport++;
-		v8::Persistent<v8::Function, v8::NonCopyablePersistentTraits<v8::Function> > persistent(_isolate, function);
-		_exports[exportId] = persistent;
-		std::cout << "EXPORTED " << exportId << " ON " << _id << "\n";
+		ExportRecord* record = new ExportRecord(_isolate, function);
+		_exports[exportId] = record;
 	}
 
 	return exportId;
 }
 
-void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
-	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
-	//_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
-}
-
 void Task::releaseExport(taskid_t taskId, export_t exportId) {
 	Lock lock(_mutex);
 	if (Task* task = gTasks[taskId]) {
-		std::cout << "RELEASE " << exportId << " ON " << taskId << "\n";
-		task->_exports[exportId].Reset();
+		task->_exports[exportId]->_persistent.Reset();
+		delete task->_exports[exportId];
 		task->_exports.erase(exportId);
 	}
+}
+
+void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
+	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
+	_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
 }

@@ -11,6 +11,7 @@
 #include <v8-platform.h>
 #include <vector>
 
+struct ExportRecord;
 struct ImportRecord;
 class Socket;
 class Task;
@@ -20,7 +21,6 @@ struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
 struct uv_work_s; typedef struct uv_work_s uv_work_t;
 
 typedef int taskid_t;
-typedef int socketid_t;
 typedef int promiseid_t;
 typedef int export_t;
 
@@ -61,14 +61,11 @@ public:
 	void resolvePromise(promiseid_t promise, v8::Handle<v8::Value> value);
 	void rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value);
 
-	socketid_t allocateSocket();
-	Socket* getSocket(socketid_t id);
-	void releaseSocket(socketid_t id);
-
 	void setTrusted(bool trusted) { _trusted = trusted; }
 
 	static int getCount() { return _count; }
 	static Task* get(taskid_t id);
+	static Task* get(v8::Isolate* isolate);
 
 	export_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -92,11 +89,9 @@ private:
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	promiseid_t _nextPromise;
 	uv_loop_t* _loop;
-	std::map<socketid_t, Socket*> _sockets;
-	socketid_t _nextSocket;
 	uv_thread_t _thread;
 
-	std::map<export_t, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > > _exports;
+	std::map<export_t, ExportRecord*> _exports;
 	export_t _nextExport;
 
 	std::vector<ImportRecord*> _imports;
@@ -120,7 +115,6 @@ private:
 	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void createSocket(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
 
