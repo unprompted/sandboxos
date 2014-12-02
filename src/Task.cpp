@@ -75,7 +75,7 @@ struct ImportRecord {
 	static void onRelease(const v8::WeakCallbackData<v8::Function, ImportRecord >& data) {
 		ImportRecord* import = data.GetParameter();
 		Task::releaseExport(import->_task, import->_export);
-		for (int i = 0; i < import->_owner->_imports.size(); ++i) {
+		for (size_t i = 0; i < import->_owner->_imports.size(); ++i) {
 			if (import->_owner->_imports[i] == import) {
 				import->_owner->_imports.erase(import->_owner->_imports.begin() + i);
 				break;
@@ -337,7 +337,7 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	export_t exportId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "export"))->Int32Value();
 	taskid_t recipientId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value();
 
-	for (int i = 0; i < sender->_imports.size(); ++i) {
+	for (size_t i = 0; i < sender->_imports.size(); ++i) {
 		if (sender->_imports[i]->_task == recipientId && sender->_imports[i]->_export == exportId) {
 			sender->_imports[i]->ref();
 			break;
@@ -439,7 +439,7 @@ void Task::startInvoke(Message& message) {
 	} else if (message._type == kInvokeExport) {
 		v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(task, from, message._data));
 		std::vector<v8::Handle<v8::Value> > array;
-		for (int i = 0; i < arguments->Length(); ++i) {
+		for (size_t i = 0; i < arguments->Length(); ++i) {
 			array.push_back(arguments->Get(i));
 		}
 		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(task->_isolate, task->_exports[message._export]->_persistent);
@@ -450,7 +450,7 @@ void Task::startInvoke(Message& message) {
 			result = function->Call(function, array.size(), &*array.begin());
 		}
 
-		for (int i = 0; i < from->_imports.size(); ++i) {
+		for (size_t i = 0; i < from->_imports.size(); ++i) {
 			if (from->_imports[i]->_task == message._recipient && from->_imports[i]->_export == message._export) {
 				from->_imports[i]->release();
 				break;

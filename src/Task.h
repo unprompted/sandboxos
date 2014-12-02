@@ -125,7 +125,7 @@ private:
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 
-	friend class ImportRecord;
+	friend struct ImportRecord;
 };
 
 class TaskTryCatch {

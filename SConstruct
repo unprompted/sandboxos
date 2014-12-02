@@ -25,7 +25,7 @@ if sys.platform == 'win32':
 	])
 else:
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv', 'rt'])
-	env.Append(CXXFLAGS=['--std=c++0x', '-g'])
+	env.Append(CXXFLAGS=['--std=c++0x', '-g', '-Wall'])
 	env.Append(LINKFLAGS=['-g'])
 	env.Append(LIBPATH=[
 		os.path.join(v8, 'out/native/obj.target/third_party/icu'),

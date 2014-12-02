@@ -96,7 +96,7 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 		writeInt32(buffer, kArray);
 		v8::Handle<v8::Array> array = v8::Handle<v8::Array>::Cast(value);
 		writeInt32(buffer, array->Length());
-		for (int i = 0; i < array->Length(); ++i) {
+		for (size_t i = 0; i < array->Length(); ++i) {
 			storeInternal(task, buffer, array->Get(i), depth + 1);
 		}
 	} else if (value->IsFunction()) {
@@ -108,7 +108,7 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 		v8::Handle<v8::Object> object = value->ToObject();
 		v8::Handle<v8::Array> keys = object->GetOwnPropertyNames();
 		writeInt32(buffer, keys->Length());
-		for (int i = 0; i < keys->Length(); ++i) {
+		for (size_t i = 0; i < keys->Length(); ++i) {
 			v8::Handle<v8::Value> key = keys->Get(i);
 			storeInternal(task, buffer, key, depth + 1);
 			storeInternal(task, buffer, object->Get(key), depth + 1);
@@ -129,7 +129,7 @@ v8::Handle<v8::Value> Serialize::load(Task* task, Task* from, const std::vector<
 }
 
 v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std::vector<char>& buffer, int& offset, int depth) {
-	if (offset >= buffer.size()) {
+	if (static_cast<size_t>(offset) >= buffer.size()) {
 		return v8::Undefined(task->getIsolate());
 	} else {
 		int32_t type = readInt32(buffer, offset);
