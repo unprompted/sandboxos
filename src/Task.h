@@ -80,8 +80,6 @@ private:
 	std::string _scriptName;
 	v8::Isolate* _isolate;
 
-	std::list<Message> _messages;
-	Mutex _messageMutex;
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	promiseid_t _nextPromise;
 	uv_loop_t* _loop;
@@ -129,6 +127,7 @@ private:
 
 	static void sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
 	static void sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promiseId, export_t exportId, v8::Handle<v8::Value> result);
+	static PacketStream& getPacketStream(Task* from, Task* to);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 

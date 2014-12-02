@@ -116,7 +116,6 @@ Task::Task(const char* scriptName)
 
 Task::~Task() {
 	Lock lock(_mutex);
-	Lock messageLock(_messageMutex);
 	uv_loop_delete(_loop);
 	{
 		gTasks.erase(gTasks.find(_id));
@@ -207,10 +206,7 @@ void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* parent = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	v8::HandleScope scope(args.GetIsolate());
 	Task* task = new Task();
-	{
-		Lock lock(_mutex);
-		task->_parent = parent->_id;
-	}
+	task->_parent = parent->_id;
 	task->_scriptName = *v8::String::Utf8Value(args[0]);
 	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
 	uv_thread_create(&task->_thread, run, task);
@@ -241,8 +237,7 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* self = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	int taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
 
-	Lock lock(_mutex);
-	if (Task* task = gTasks[taskId]) {
+	if (Task* task = Task::get(taskId)) {
 		if (task->_parent == self->_id) {
 			task->kill();
 		} else {
@@ -280,13 +275,7 @@ void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Task::sleepCallback(uv_timer_t* timer) {
 	SleepData* data = reinterpret_cast<SleepData*>(timer->data);
 
-	Task* task = 0;
-	{
-		Lock lock(_mutex);
-		task = gTasks[data->_task];
-	}
-
-	if (task) {
+	if (Task* task = Task::get(data->_task)) {
 		task->resolvePromise(data->_promise, v8::Undefined(task->_isolate));
 	}
 
@@ -313,8 +302,7 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	promiseid_t promise = task->allocatePromise();
 	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
 
-	Lock lock(_mutex);
-	if (Task* recipient = gTasks[recipientId]) {
+	if (Task* recipient = Task::get(recipientId)) {
 		sendPromiseMessage(task, recipient, kSendMessage, promise, args[0]);
 		args.GetReturnValue().Set(task->getPromise(promise));
 	}
@@ -343,25 +331,15 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		array->Set(i, args[i]);
 	}
 
-	Task* recipient = 0;
-	{
-		Lock lock(_mutex);
-		recipient = gTasks[recipientId];
-	}
-
+	Task* recipient = Task::get(recipientId);
 	promiseid_t promise = sender->allocatePromise();
 	sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
 	args.GetReturnValue().Set(sender->getPromise(promise));
 }
 
 void Task::startInvoke(Message& message) {
-	Task* task = 0;
-	Task* from = 0;
-	{
-		Lock lock(_mutex);
-		task = gTasks[message._recipient];
-		from = gTasks[message._sender];
-	}
+	Task* task = Task::get(message._recipient);
+	Task* from = Task::get(message._sender);
 
 	if (!task) {
 		std::cerr << "processInvoke with invalid recipient\n";
@@ -415,14 +393,17 @@ void Task::startInvoke(Message& message) {
 	}
 }
 
+PacketStream& Task::getPacketStream(Task* from, Task* to) {
+	return to->_parent ? to->_parentStream : from->_childStream;
+}
+
 void Task::sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
 	std::vector<char> buffer;
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
 	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
 		Serialize::store(from, buffer, result);
 	}
-	PacketStream& stream = to->_parent ? to->_parentStream : from->_childStream;
-	stream.send(messageType, &*buffer.begin(), buffer.size());
+	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
 }
 
 void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, export_t exportId, v8::Handle<v8::Value> result) {
@@ -432,8 +413,7 @@ void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageTyp
 	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
 		Serialize::store(from, buffer, result);
 	}
-	PacketStream& stream = to->_parent ? to->_parentStream : from->_childStream;
-	stream.send(messageType, &*buffer.begin(), buffer.size());
+	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
 }
 
 void Task::invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -451,7 +431,7 @@ void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo
 
 v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 	v8::Handle<v8::Object> taskObject;
-	if (gTasks[id]) {
+	if (Task::get(id)) {
 		v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(_isolate);
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "kill"), v8::FunctionTemplate::New(_isolate, Task::kill));
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, Task::invoke));
@@ -568,12 +548,10 @@ export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 }
 
 void Task::releaseExport(taskid_t taskId, export_t exportId) {
-	Lock lock(_mutex);
-	if (Task* task = gTasks[taskId]) {
+	if (Task* task = Task::get(taskId)) {
 		std::vector<char> buffer;
 		buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
-		PacketStream& stream = task->_parent ? task->_parentStream : _childStream;
-		stream.send(kReleaseExport, &*buffer.begin(), buffer.size());
+		getPacketStream(this, task).send(kReleaseExport, &*buffer.begin(), buffer.size());
 	}
 }
 
@@ -634,5 +612,4 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		to->_exports.erase(exportId);
 		break;
 	}
-
 }
