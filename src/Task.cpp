@@ -26,11 +26,6 @@ v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
 int Task::_count;
 Mutex Task::_mutex;
 
-struct SleepData {
-	taskid_t _task;
-	int _promise;
-};
-
 struct ExportRecord {
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
 
@@ -38,7 +33,7 @@ struct ExportRecord {
 	:	_persistent(isolate, function) {
 	}
 
-	static void onRelease(const v8::WeakCallbackData<v8::Function, ExportRecord >& data) {
+	static void onRelease(const v8::WeakCallbackData<v8::Function, ExportRecord>& data) {
 		data.GetParameter()->_persistent.Reset();
 		delete data.GetParameter();
 	}
@@ -124,18 +119,14 @@ Task::~Task() {
 }
 
 void Task::run() {
-	v8::Isolate::CreateParams params;
-	//params.constraints.set_max_old_space_size(_memoryLimit);
-	_isolate = v8::Isolate::New(params);
+	_isolate = v8::Isolate::New();
 	_isolate->SetData(0, this);
-	_isolate->AddMemoryAllocationCallback(memoryAllocationCallback, v8::kObjectSpaceAll, v8::kAllocationActionAll);
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
 
 		v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
 		global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
-		global->Set(v8::String::NewFromUtf8(_isolate, "sleep"), v8::FunctionTemplate::New(_isolate, sleep));
 		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 
 		if (_trusted) {
@@ -185,7 +176,7 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	TaskTryCatch tryCatch(task);
-	std::cout << *task << '>';
+	std::cout << "Task[" << task->_id << ':' << task->_scriptName << "]>";
 	for (int i = 0; i < args.Length(); i++) {
 		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
@@ -241,7 +232,7 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		if (task->_parent == self->_id) {
 			task->kill();
 		} else {
-			std::cerr << *task << " is not a child of " << *self << "\n";
+			std::cerr << task << " is not a child of " << self << "\n";
 		}
 	} else {
 		std::cout << "Could not find task!\n";
@@ -254,32 +245,6 @@ void Task::kill() {
 		_killed = true;
 		//uv_thread_join(&_thread);
 	}
-}
-
-void Task::sleep(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::HandleScope scope(args.GetIsolate());
-
-	SleepData* data = new SleepData;
-	data->_task = task->_id;
-	data->_promise = task->allocatePromise();
-
-	uv_timer_t* timer = new uv_timer_t();
-	uv_timer_init(task->_loop, timer);
-	timer->data = data;
-	uv_timer_start(timer, sleepCallback, static_cast<uint64_t>(args[0].As<v8::Number>()->Value() * 1000), 0);
-
-	args.GetReturnValue().Set(task->getPromise(data->_promise));
-}
-
-void Task::sleepCallback(uv_timer_t* timer) {
-	SleepData* data = reinterpret_cast<SleepData*>(timer->data);
-
-	if (Task* task = Task::get(data->_task)) {
-		task->resolvePromise(data->_promise, v8::Undefined(task->_isolate));
-	}
-
-	delete data;
 }
 
 void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
@@ -307,10 +272,6 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		args.GetReturnValue().Set(task->getPromise(promise));
 	}
 }
-
-struct InvokeRecord {
-	v8::Persistent<v8::Function> _persistent;
-};
 
 void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* sender = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
@@ -426,31 +387,12 @@ v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
 		v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(_isolate);
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "kill"), v8::FunctionTemplate::New(_isolate, Task::kill));
 		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, Task::invoke));
-		taskTemplate->SetAccessorProperty(v8::String::NewFromUtf8(_isolate, "statistics"), v8::FunctionTemplate::New(_isolate, Task::getStatistics));
 		taskTemplate->SetInternalFieldCount(1);
 		taskObject = taskTemplate->NewInstance();
 		taskObject->SetInternalField(0, v8::Integer::New(_isolate, id));
 		taskObject->Set(v8::String::NewFromUtf8(_isolate, "id"), v8::Integer::New(_isolate, id));
 	}
 	return taskObject;
-}
-
-void Task::getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::Handle<v8::Object> result = v8::Object::New(args.GetIsolate());
-	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "sockets"), v8::Integer::New(args.GetIsolate(), Socket::getCount()));
-	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "promises"), v8::Integer::New(args.GetIsolate(), task->_promises.size()));
-	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), v8::Integer::New(args.GetIsolate(), task->_exports.size()));
-	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "imports"), v8::Integer::New(args.GetIsolate(), task->_imports.size()));
-	args.GetReturnValue().Set(result);
-}
-
-std::ostream& operator<<(std::ostream& stream, const Task& task) {
-	if (&task) {
-		return stream << "Task[" << task.getId() << ':' + task.getName() << ']';
-	} else {
-		return stream << "Task[Null]";
-	}
 }
 
 Task* Task::get(taskid_t id) {
@@ -498,22 +440,6 @@ void Task::rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value) {
 		_isolate->RunMicrotasks();
 		_promises[promise].Reset();
 		_promises.erase(promise);
-	}
-}
-
-void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size) {
-	if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
-		if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
-			if (action == v8::kAllocationActionAllocate) {
-				task->_memoryAllocated += size;
-				if (task->_memoryAllocated > task->_memoryLimit) {
-					std::cout << *task << " OOM " << task->_memoryAllocated << " allocated " << task->_memoryLimit << " limit.\n";
-					task->kill();
-				}
-			} else if (action == v8::kAllocationActionFree) {
-				task->_memoryAllocated -= size;
-			}
-		}
 	}
 }
 
@@ -577,9 +503,8 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		break;
 	case kResolvePromise: {
 		v8::Handle<v8::Value> arg;
-		promiseid_t promise = -1;
+		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
-
 		if (length > sizeof(promiseid_t)) {
 			arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
 		} else {

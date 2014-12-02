@@ -18,7 +18,7 @@ TaskTryCatch::~TaskTryCatch() {
 	if (_tryCatch.HasCaught()) {
 		if (v8::Isolate* isolate = v8::Isolate::GetCurrent()) {
 			if (Task* task = reinterpret_cast<Task*>(isolate->GetData(0))) {
-				std::cerr << *task << ' ';
+				std::cerr << "Task[" << task->getId() << ':' << task->getName() << "] ";
 			}
 		}
 		std::cerr << "Exception:\n";

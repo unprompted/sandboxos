@@ -175,7 +175,6 @@ void Socket::onWrite(uv_write_t* request, int status) {
 
 v8::Handle<v8::Promise::Resolver> Socket::makePromise() {
 	if (_promise != -1) {
-		std::cerr << *_task << " making a second promise?\n";
 		promiseid_t promise = _promise;
 		_promise = -1;
 		_task->rejectPromise(promise, v8::Integer::New(_task->getIsolate(), -1));

@@ -90,7 +90,6 @@ private:
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void sleep(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -101,15 +100,10 @@ private:
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static v8::Handle<v8::Value> invokeOnMessage(Task* from, Task* to, const std::vector<char>& buffer);
 	static v8::Handle<v8::Value> invokeExport(Task* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
 	static void sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handle<v8::Value> result);
-
-	static void sleepCallback(uv_timer_t* timer);
-
-	static void memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size);
 
 	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
 
@@ -121,7 +115,5 @@ private:
 
 	friend struct ImportRecord;
 };
-
-std::ostream& operator<<(std::ostream& stream, const Task& task);
 
 #endif
