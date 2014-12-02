@@ -157,7 +157,7 @@ function onMessage(from, message) {
 						print("STATISTICS: " + JSON.stringify(statistics));
 						var result = {};
 						for (var i in taskNames) {
-							result[taskNames[i]] = {statistics: statistics[i]};
+							result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
 						}
 						return result;
 					});
