@@ -67,7 +67,7 @@ public:
 	export_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
 	void addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId);
-	static void releaseExport(taskid_t taskId, export_t exportId);
+	void releaseExport(taskid_t taskId, export_t exportId);
 
 private:
 	static int _count;
@@ -82,7 +82,6 @@ private:
 
 	std::list<Message> _messages;
 	Mutex _messageMutex;
-	uv_async_t* _asyncMessage;
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	promiseid_t _nextPromise;
 	uv_loop_t* _loop;
@@ -121,13 +120,15 @@ private:
 	static void asyncMessage(uv_async_t* handle);
 
 	static void startInvoke(Message& message);
-	static void finishInvoke(Message& message);
 
 	static void sleepCallback(uv_timer_t* timer);
 
 	static void memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationAction action, int size);
 
 	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
+
+	static void sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
+	static void sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promiseId, export_t exportId, v8::Handle<v8::Value> result);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
 

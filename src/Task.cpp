@@ -6,6 +6,7 @@
 #include "TaskTryCatch.h"
 
 #include <algorithm>
+#include <assert.h>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -75,7 +76,7 @@ struct ImportRecord {
 
 	static void onRelease(const v8::WeakCallbackData<v8::Function, ImportRecord >& data) {
 		ImportRecord* import = data.GetParameter();
-		Task::releaseExport(import->_task, import->_export);
+		import->_owner->releaseExport(import->_task, import->_export);
 		for (size_t i = 0; i < import->_owner->_imports.size(); ++i) {
 			if (import->_owner->_imports[i] == import) {
 				import->_owner->_imports.erase(import->_owner->_imports.begin() + i);
@@ -106,9 +107,6 @@ Task::Task(const char* scriptName)
 	}
 
 	_loop = uv_loop_new();
-	_asyncMessage = new uv_async_t();
-	_asyncMessage->data = this;
-	uv_async_init(_loop, _asyncMessage, asyncMessage);
 
 	++_count;
 	if (scriptName) {
@@ -259,7 +257,6 @@ void Task::kill() {
 	if (!_killed && _isolate) {
 		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
-		uv_async_send(_asyncMessage);
 		//uv_thread_join(&_thread);
 	}
 }
@@ -314,43 +311,13 @@ void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::HandleScope scope(args.GetIsolate());
 
 	promiseid_t promise = task->allocatePromise();
-	std::vector<char> buffer;
-	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
-	Serialize::store(task, buffer, args[0]);
-
 	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
+
 	Lock lock(_mutex);
 	if (Task* recipient = gTasks[recipientId]) {
-		std::cout << "Writing to thing on " << *recipient << " promise " << promise << "\n";
-		PacketStream& stream = recipient->_parent ? recipient->_parentStream : task->_childStream;
-		stream.send(kSendMessage, &*buffer.begin(), buffer.size());
+		sendPromiseMessage(task, recipient, kSendMessage, promise, args[0]);
 		args.GetReturnValue().Set(task->getPromise(promise));
 	}
-
-	/*if (task) {
-		Message message;
-		Serialize::store(task, message._data, args[0]);
-		message._sender = task->_id;
-		message._recipient = recipientId;
-		message._promise = task->allocatePromise();
-		message._type = kSendMessage;
-		args.GetReturnValue().Set(task->getPromise(message._promise));
-
-		Task* recipient = 0;
-		{
-			Lock lock(_mutex);
-			recipient = gTasks[recipientId];
-		}
-
-		if (recipient) {
-			{
-				Lock messageLock(recipient->_messageMutex);
-				recipient->_messages.push_back(message);
-			}
-
-			uv_async_send(recipient->_asyncMessage);
-		}
-	}*/
 }
 
 struct InvokeRecord {
@@ -371,21 +338,10 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		}
 	}
 
-	Message message;
-
 	v8::Local<v8::Array> array = v8::Array::New(args.GetIsolate(), args.Length());
 	for (int i = 0; i < args.Length(); ++i) {
 		array->Set(i, args[i]);
 	}
-
-	Serialize::store(sender, message._data, array);
-	message._sender = sender->_id;
-	message._recipient = recipientId;
-	message._promise = sender->allocatePromise();
-	message._type = kInvokeExport;
-	message._export = exportId;
-
-	args.GetReturnValue().Set(sender->getPromise(message._promise));
 
 	Task* recipient = 0;
 	{
@@ -393,48 +349,9 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		recipient = gTasks[recipientId];
 	}
 
-	if (recipient) {
-		{
-			Lock messageLock(recipient->_messageMutex);
-			recipient->_messages.push_back(message);
-		}
-		uv_async_send(recipient->_asyncMessage);
-	}
-}
-
-void Task::asyncMessage(uv_async_t* work) {
-	bool moreMessages = true;
-	Task* task = (Task*)work->data;
-	if (task) {
-		if (task->_killed) {
-			uv_close(reinterpret_cast<uv_handle_t*>(task->_asyncMessage), 0);
-		} else {
-			while (moreMessages) {
-				moreMessages = false;
-				Message nextMessage;
-
-				{
-					Lock lock(task->_messageMutex);
-					if (task->_messages.size()) {
-						moreMessages = true;
-						nextMessage = task->_messages.front();
-						task->_messages.pop_front();
-					}
-				}
-
-				if (moreMessages) {
-					if (nextMessage._type == kResolvePromise) {
-						finishInvoke(nextMessage);
-					} else if (nextMessage._type == kSendMessage) {
-						startInvoke(nextMessage);
-					} else if (nextMessage._type == kInvokeExport) {
-						startInvoke(nextMessage);
-					}
-				}
-			}
-			task->_isolate->IdleNotification(100);
-		}
-	}
+	promiseid_t promise = sender->allocatePromise();
+	sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
+	args.GetReturnValue().Set(sender->getPromise(promise));
 }
 
 void Task::startInvoke(Message& message) {
@@ -494,82 +411,37 @@ void Task::startInvoke(Message& message) {
 		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
 		promise->Then(then);
 	} else {
-		if (result.IsEmpty() || result->IsUndefined() || result->IsNull()) {
-			message._result.clear();
-		} else {
-			Serialize::store(task, message._result, result);
-		}
-
-		message._type = kResolvePromise;
-
-		Task* sender = 0;
-		{
-			Lock lock(_mutex);
-			sender = gTasks[message._sender];
-		}
-
-		if (sender) {
-			Lock messageLock(sender->_messageMutex);
-			sender->_messages.push_back(message);
-		}
-		uv_async_send(sender->_asyncMessage);
+		sendPromiseMessage(task, from, kResolvePromise, message._promise, result);
 	}
+}
+
+void Task::sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
+	std::vector<char> buffer;
+	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
+	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
+		Serialize::store(from, buffer, result);
+	}
+	PacketStream& stream = to->_parent ? to->_parentStream : from->_childStream;
+	stream.send(messageType, &*buffer.begin(), buffer.size());
+}
+
+void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, export_t exportId, v8::Handle<v8::Value> result) {
+	std::vector<char> buffer;
+	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
+	buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
+	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
+		Serialize::store(from, buffer, result);
+	}
+	PacketStream& stream = to->_parent ? to->_parentStream : from->_childStream;
+	stream.send(messageType, &*buffer.begin(), buffer.size());
 }
 
 void Task::invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-
-	Message message;
-	message._recipient = task->_id;
-
+	Task* from = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
-	message._sender = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value();
-	Serialize::store(task, message._result, args[0]);
-	message._type = kResolvePromise;
-	message._promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
-
-	Task* sender = 0;
-	{
-		Lock lock(_mutex);
-		sender = gTasks[message._sender];
-	}
-
-	if (sender) {
-		Lock messageLock(sender->_messageMutex);
-		sender->_messages.push_back(message);
-	}
-
-	if (sender) {
-		uv_async_send(sender->_asyncMessage);
-	}
-}
-
-void Task::finishInvoke(Message& message) {
-	Task* task = 0;
-	Task* from = 0;
-	{
-		Lock lock(_mutex);
-		task = gTasks[message._sender];
-		from = gTasks[message._recipient];
-	}
-
-	if (!task) {
-		std::cerr << "invokeComplete with invalid sender\n";
-		return;
-	}
-
-	TaskTryCatch tryCatch(task);
-	v8::HandleScope scope(task->_isolate);
-
-	v8::Handle<v8::Value> arg;
-
-	if (message._result.size()) {
-		arg = Serialize::load(task, from, message._result);
-	} else {
-		arg = v8::Undefined(task->_isolate);
-	}
-
-	task->resolvePromise(message._promise, arg);
+	Task* to = Task::get(data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value());
+	promiseid_t promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
+	sendPromiseMessage(from, to, kResolvePromise, promise, args[0]);
 }
 
 void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
@@ -698,9 +570,10 @@ export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 void Task::releaseExport(taskid_t taskId, export_t exportId) {
 	Lock lock(_mutex);
 	if (Task* task = gTasks[taskId]) {
-		task->_exports[exportId]->_persistent.Reset();
-		delete task->_exports[exportId];
-		task->_exports.erase(exportId);
+		std::vector<char> buffer;
+		buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
+		PacketStream& stream = task->_parent ? task->_parentStream : _childStream;
+		stream.send(kReleaseExport, &*buffer.begin(), buffer.size());
 	}
 }
 
@@ -713,13 +586,53 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 	Task* from = tasks[0];
 	Task* to = tasks[1];
 
-	Message message;
-	message._type = static_cast<MessageType>(packetType);
-	message._sender = from->_id;
-	message._recipient = to->_id;
-	message._data.insert(message._data.end(), begin + sizeof(promiseid_t), begin + length);
-	std::memcpy(&message._promise, begin, sizeof(promiseid_t));
-	message._export = -1;
-	std::cout << "Message " << message._type << " from " << *from << " to " << *to << " promise " << message._promise << "\n";
-	startInvoke(message);
+	TaskTryCatch tryCatch(to);
+	v8::HandleScope scope(to->_isolate);
+
+	switch (static_cast<MessageType>(packetType)) {
+	case kSendMessage: {
+		Message message;
+		message._type = static_cast<MessageType>(packetType);
+		message._sender = from->_id;
+		message._recipient = to->_id;
+		message._data.insert(message._data.end(), begin + sizeof(promiseid_t), begin + length);
+		std::memcpy(&message._promise, begin, sizeof(promiseid_t));
+		message._export = -1;
+		startInvoke(message);
+		}
+		break;
+	case kResolvePromise: {
+		v8::Handle<v8::Value> arg;
+		promiseid_t promise = -1;
+		std::memcpy(&promise, begin, sizeof(promiseid_t));
+
+		if (length > sizeof(promiseid_t)) {
+			arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+		} else {
+			arg = v8::Undefined(to->_isolate);
+		}
+		to->resolvePromise(promise, arg);
+		}
+		break;
+	case kInvokeExport: {
+		Message message;
+		message._type = static_cast<MessageType>(packetType);
+		message._sender = from->_id;
+		message._recipient = to->_id;
+		message._data.insert(message._data.end(), begin + sizeof(promiseid_t) + sizeof(export_t), begin + length);
+		std::memcpy(&message._promise, begin, sizeof(promiseid_t));
+		std::memcpy(&message._export, begin + sizeof(promiseid_t), sizeof(export_t));
+		startInvoke(message);
+		}
+		break;
+	case kReleaseExport:
+		assert(length == sizeof(export_t));
+		export_t exportId;
+		memcpy(&exportId, begin, sizeof(exportId));
+		to->_exports[exportId]->_persistent.Reset();
+		delete to->_exports[exportId];
+		to->_exports.erase(exportId);
+		break;
+	}
+
 }

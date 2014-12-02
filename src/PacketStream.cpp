@@ -1,16 +1,13 @@
 #include "PacketStream.h"
 
 #include <cstring>
-#include <iostream>
 
 PacketStream::PacketStream()
 :	_onReceive(0),
 	_onReceiveUserData(0) {
-	std::cout << "+ " << this << "\n";
 }
 
 PacketStream::~PacketStream() {
-	std::cout << "- " << this << "\n";
 	_onReceive = 0;
 	_onReceiveUserData = 0;
 	if (!uv_is_closing(reinterpret_cast<uv_handle_t*>(&_stream))) {
