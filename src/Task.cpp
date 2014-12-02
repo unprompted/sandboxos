@@ -847,5 +847,4 @@ void Task::releaseExport(taskid_t taskId, export_t exportId) {
 
 void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
 	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
-	_isolate->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
 }

@@ -233,7 +233,6 @@ void Socket::release() {
 		std::cout << "SETWEAK " << this << "\n";
 		_object.SetWeak(this, onRelease);
 	}
-	_task->getIsolate()->RequestGarbageCollectionForTesting(v8::Isolate::kFullGarbageCollection);
 }
 
 void Socket::onRelease(const v8::WeakCallbackData<v8::Object, Socket>& data) {
