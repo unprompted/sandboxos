@@ -20,7 +20,7 @@ struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
 
 typedef int taskid_t;
 typedef int promiseid_t;
-typedef int export_t;
+typedef int exportid_t;
 
 enum MessageType {
 	kSendMessage,
@@ -52,10 +52,10 @@ public:
 	static Task* get(taskid_t id);
 	static Task* get(v8::Isolate* isolate);
 
-	export_t exportFunction(v8::Handle<v8::Function> function);
+	exportid_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
-	void addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId);
-	void releaseExport(taskid_t taskId, export_t exportId);
+	void addImport(v8::Handle<v8::Function> function, exportid_t exportId, taskid_t taskId);
+	void releaseExport(taskid_t taskId, exportid_t exportId);
 
 private:
 	static int _count;
@@ -73,8 +73,8 @@ private:
 	uv_loop_t* _loop;
 	uv_thread_t _thread;
 
-	std::map<export_t, ExportRecord*> _exports;
-	export_t _nextExport;
+	std::map<exportid_t, ExportRecord*> _exports;
+	exportid_t _nextExport;
 
 	std::vector<ImportRecord*> _imports;
 
@@ -104,7 +104,7 @@ private:
 	static void getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static v8::Handle<v8::Value> invokeOnMessage(Task* from, Task* to, const std::vector<char>& buffer);
-	static v8::Handle<v8::Value> invokeExport(Task* from, Task* to, export_t exportId, const std::vector<char>& buffer);
+	static v8::Handle<v8::Value> invokeExport(Task* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
 	static void sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handle<v8::Value> result);
 
 	static void sleepCallback(uv_timer_t* timer);
@@ -114,7 +114,7 @@ private:
 	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
 
 	static void sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
-	static void sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promiseId, export_t exportId, v8::Handle<v8::Value> result);
+	static void sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promiseId, exportid_t exportId, v8::Handle<v8::Value> result);
 	static PacketStream& getPacketStream(Task* from, Task* to);
 
 	v8::Handle<v8::Object> makeTaskObject(taskid_t id);

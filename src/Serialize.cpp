@@ -101,7 +101,7 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 		}
 	} else if (value->IsFunction()) {
 		writeInt32(buffer, kFunction);
-		export_t exportId = task->exportFunction(v8::Handle<v8::Function>::Cast(value));
+		exportid_t exportId = task->exportFunction(v8::Handle<v8::Function>::Cast(value));
 		writeInt32(buffer, exportId);
 	} else if (value->IsObject()) {
 		writeInt32(buffer, kObject);
@@ -174,7 +174,7 @@ v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std:
 			break;
 		case kFunction:
 			{
-				export_t exportId = readInt32(buffer, offset);
+				exportid_t exportId = readInt32(buffer, offset);
 				v8::Local<v8::Object> data = v8::Object::New(task->getIsolate());
 				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "export"), v8::Int32::New(task->getIsolate(), exportId));
 				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "task"), v8::Int32::New(task->getIsolate(), from->getId()));

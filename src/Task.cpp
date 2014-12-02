@@ -46,12 +46,12 @@ struct ExportRecord {
 
 struct ImportRecord {
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
-	export_t _export;
+	exportid_t _export;
 	taskid_t _task;
 	Task* _owner;
 	int _useCount;
 
-	ImportRecord(v8::Isolate* isolate, v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId, Task* owner)
+	ImportRecord(v8::Isolate* isolate, v8::Handle<v8::Function> function, exportid_t exportId, taskid_t taskId, Task* owner)
 	:	_persistent(isolate, function),
 		_export(exportId),
 		_task(taskId),
@@ -316,7 +316,7 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* sender = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	TaskTryCatch tryCatch(sender);
 	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
-	export_t exportId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "export"))->Int32Value();
+	exportid_t exportId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "export"))->Int32Value();
 	taskid_t recipientId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value();
 
 	for (size_t i = 0; i < sender->_imports.size(); ++i) {
@@ -346,7 +346,7 @@ v8::Handle<v8::Value> Task::invokeOnMessage(Task* from, Task* to, const std::vec
 	return function->Call(context->Global(), 2, &args[0]);
 }
 
-v8::Handle<v8::Value> Task::invokeExport(Task* from, Task* to, export_t exportId, const std::vector<char>& buffer) {
+v8::Handle<v8::Value> Task::invokeExport(Task* from, Task* to, exportid_t exportId, const std::vector<char>& buffer) {
 	v8::Handle<v8::Value> result;
 	v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
 	std::vector<v8::Handle<v8::Value> > array;
@@ -397,7 +397,7 @@ void Task::sendPromiseMessage(Task* from, Task* to, MessageType messageType, pro
 	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
 }
 
-void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, export_t exportId, v8::Handle<v8::Value> result) {
+void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, exportid_t exportId, v8::Handle<v8::Value> result) {
 	std::vector<char> buffer;
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
@@ -517,10 +517,10 @@ void Task::memoryAllocationCallback(v8::ObjectSpace objectSpace, v8::AllocationA
 	}
 }
 
-export_t Task::exportFunction(v8::Handle<v8::Function> function) {
+exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
 	bool found = false;
-	export_t exportId = -1;
-	typedef std::map<export_t, ExportRecord*> ExportMap;
+	exportid_t exportId = -1;
+	typedef std::map<exportid_t, ExportRecord*> ExportMap;
 	for (ExportMap::iterator it = _exports.begin(); it != _exports.end(); ++it) {
 		if (it->second->_persistent == function) {
 			found = true;
@@ -538,7 +538,7 @@ export_t Task::exportFunction(v8::Handle<v8::Function> function) {
 	return exportId;
 }
 
-void Task::releaseExport(taskid_t taskId, export_t exportId) {
+void Task::releaseExport(taskid_t taskId, exportid_t exportId) {
 	if (Task* task = Task::get(taskId)) {
 		std::vector<char> buffer;
 		buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
@@ -546,7 +546,7 @@ void Task::releaseExport(taskid_t taskId, export_t exportId) {
 	}
 }
 
-void Task::addImport(v8::Handle<v8::Function> function, export_t exportId, taskid_t taskId) {
+void Task::addImport(v8::Handle<v8::Function> function, exportid_t exportId, taskid_t taskId) {
 	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
 }
 
@@ -568,10 +568,10 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		break;
 	case kInvokeExport: {
 		promiseid_t promise;
-		export_t exportId;
+		exportid_t exportId;
 		std::memcpy(&promise, begin, sizeof(promise));
 		std::memcpy(&exportId, begin + sizeof(promise), sizeof(exportId));
-		v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(export_t), begin + length));
+		v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(exportid_t), begin + length));
 		sendInvokeResult(to, from, promise, result);
 		}
 		break;
@@ -589,8 +589,8 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kReleaseExport:
-		assert(length == sizeof(export_t));
-		export_t exportId;
+		assert(length == sizeof(exportid_t));
+		exportid_t exportId;
 		memcpy(&exportId, begin, sizeof(exportId));
 		to->_exports[exportId]->_persistent.Reset();
 		delete to->_exports[exportId];
