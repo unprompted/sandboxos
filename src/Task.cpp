@@ -1,5 +1,6 @@
 #include "Task.h"
 
+#include "File.h"
 #include "Serialize.h"
 #include "Socket.h"
 
@@ -12,13 +13,6 @@
 #include <uv.h>
 #include <v8.h>
 #include <v8-platform.h>
-
-#ifdef WIN32
-#include <windows.h>
-#else
-#include <dirent.h>
-#include <unistd.h>
-#endif
 
 extern v8::Platform* gPlatform;
 std::map<taskid_t, Task*> gTasks;
@@ -149,14 +143,9 @@ void Task::run() {
 		if (_trusted) {
 			global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
 			global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
-			global->Set(v8::String::NewFromUtf8(_isolate, "readLine"), v8::FunctionTemplate::New(_isolate, readLine));
-			global->Set(v8::String::NewFromUtf8(_isolate, "readFile"), v8::FunctionTemplate::New(_isolate, readFile));
-			global->Set(v8::String::NewFromUtf8(_isolate, "readDirectory"), v8::FunctionTemplate::New(_isolate, readDirectory));
-			global->Set(v8::String::NewFromUtf8(_isolate, "makeDirectory"), v8::FunctionTemplate::New(_isolate, makeDirectory));
-			global->Set(v8::String::NewFromUtf8(_isolate, "writeFile"), v8::FunctionTemplate::New(_isolate, writeFile));
-			global->Set(v8::String::NewFromUtf8(_isolate, "renameFile"), v8::FunctionTemplate::New(_isolate, renameFile));
-			global->Set(v8::String::NewFromUtf8(_isolate, "unlinkFile"), v8::FunctionTemplate::New(_isolate, unlinkFile));
 			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
+
+			File::configure(_isolate, global);
 		}
 
 		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
@@ -585,109 +574,6 @@ void Task::getStatistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), v8::Integer::New(args.GetIsolate(), task->_exports.size()));
 	result->Set(v8::String::NewFromUtf8(args.GetIsolate(), "imports"), v8::Integer::New(args.GetIsolate(), task->_imports.size()));
 	args.GetReturnValue().Set(result);
-}
-
-void Task::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::HandleScope scope(args.GetIsolate());
-	v8::Handle<v8::String> fileName = args[0]->ToString();
-
-	v8::String::Utf8Value utf8FileName(fileName);
-	std::ifstream file(*utf8FileName, std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
-	std::streampos fileSize = file.tellg();
-	if (fileSize >= 0 && fileSize < 4 * 1024 * 1024) {
-		file.seekg(0, std::ios_base::beg);
-		char* buffer = new char[fileSize];
-		file.read(buffer, fileSize);
-		std::string contents(buffer, buffer + fileSize);
-		args.GetReturnValue().Set(v8::String::NewFromOneByte(args.GetIsolate(), reinterpret_cast<const uint8_t*>(buffer), v8::String::kNormalString, fileSize));
-		delete[] buffer;
-	}
-}
-
-void Task::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::HandleScope scope(args.GetIsolate());
-	v8::Handle<v8::String> fileName = args[0]->ToString();
-	v8::Handle<v8::String> contents = args[1]->ToString();
-
-	v8::String::Utf8Value utf8FileName(fileName);
-	std::ofstream file(*utf8FileName, std::ios_base::out | std::ios_base::binary);
-
-	v8::String::Utf8Value utf8Contents(contents);
-	if (!file.write(*utf8Contents, utf8Contents.length())) {
-		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
-	}
-}
-
-void Task::renameFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::HandleScope scope(args.GetIsolate());
-
-	v8::String::Utf8Value oldName(args[0]->ToString());
-	v8::String::Utf8Value newName(args[1]->ToString());
-
-	uv_fs_t req;
-	int result = uv_fs_rename(task->_loop, &req, *oldName, *newName, 0);
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), result));
-}
-
-void Task::unlinkFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::HandleScope scope(args.GetIsolate());
-
-	v8::String::Utf8Value fileName(args[0]->ToString());
-
-	uv_fs_t req;
-	int result = uv_fs_unlink(task->_loop, &req, *fileName, 0);
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), result));
-}
-
-void Task::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::HandleScope scope(args.GetIsolate());
-	v8::Handle<v8::String> directory = args[0]->ToString();
-
-	v8::Handle<v8::Array> array = v8::Array::New(args.GetIsolate(), 0);
-
-#ifdef WIN32
-	WIN32_FIND_DATA find;
-	std::string pattern = *v8::String::Utf8Value(directory);
-	pattern += "\\*";
-	HANDLE handle = FindFirstFile(pattern.c_str(), &find);
-	if (handle != INVALID_HANDLE_VALUE) {
-		int index = 0;
-		do {
-			array->Set(v8::Integer::New(args.GetIsolate(), index++), v8::String::NewFromUtf8(args.GetIsolate(), find.cFileName));
-		} while (FindNextFile(handle, &find) != 0);
-		FindClose(handle);
-	}
-#else
-	if (DIR* dir = opendir(*v8::String::Utf8Value(directory))) {
-		int index = 0;
-		while (struct dirent* entry = readdir(dir)) {
-			array->Set(v8::Integer::New(args.GetIsolate(), index++), v8::String::NewFromUtf8(args.GetIsolate(), entry->d_name));
-		}
-		closedir(dir);
-	}
-#endif
-
-	args.GetReturnValue().Set(array);
-}
-
-void Task::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	v8::HandleScope scope(args.GetIsolate());
-	v8::Handle<v8::String> directory = args[0]->ToString();
-
-#ifdef WIN32
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), CreateDirectory(*v8::String::Utf8Value(directory), 0) == 0 ? -1 : 0));
-#else
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), mkdir(*v8::String::Utf8Value(directory), 0777)));
-#endif
-}
-
-void Task::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	std::string line;
-	if (std::getline(std::cin, line)) {
-		args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), line.c_str()));
-	}
 }
 
 const char* toString(const v8::String::Utf8Value& value) {
