@@ -38,21 +38,80 @@ function decodeForm(encoded) {
 	return result;
 }
 
+function wikiToHtmlLine(line) {
+	return line
+		.replace(/[<>&]/g, function(c) {	return {'<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; })
+		.replace(/'''(.*)'''/, "<b>$1</b>")
+		.replace(/''(.*)''/, "<em>$1</em>")
+		.replace(/\[(\S+) ([^\]]+)\]/g, '<a href="$1">$2</a>')
+		.replace(/~~([^~]+)~~/g, "<strike>$1</strike>");
+}
+
+function wikiToHtml(text) {
+	var lines = text.split(/\r?\n/);
+	var result = [];
+	result.push("<p>");
+	var justStartedNewParagraph = true;
+	var inList = false;
+	var inBlock = false;
+	for (var i in lines) {
+		var line = lines[i];
+		if (line.trim().length == 0) {
+			if (!justStartedNewParagraph) {
+				result.push("</p>");
+				result.push("<p>");
+				justStartedNewParagraph = true;
+			}
+		} else {
+			justStartedNewParagraph = false;
+			if (line.substring(0, 3) == " * ") {
+				if (!inList) {
+					result.push("<ul>");
+					inList = true;
+				}
+				result.push("<li>" + wikiToHtmlLine(line.substring(3)) + "</li>");
+			} else {
+				if (inList) {
+					result.push("</ul>");
+					inList = false;
+				}
+				var match;
+				if (match = new RegExp(/^(=+) (.*) \1$/).exec(line)) {
+					var level = (1 + match[1].length).toString();
+					result.push("<h" + level + ">" + match[2] + "</h" + level + ">");
+				} else if (line == "----") {
+					result.push("<hr>");
+				} else if (line == "{{{") {
+					inBlock = true;
+					result.push("<blockquote>");
+				} else if (inBlock && line == "}}}") {
+					inBlock = false;
+					result.push("</blockquote>");
+				} else {
+					result.push(wikiToHtmlLine(line));
+				}
+			}
+		}
+	}
+	return result.join("\n");
+}
+
 function render(response, fileName, isEdit) {
-	parent.invoke({
-		to: "system",
-			action: "getData",
-			fileName: fileName,
-	}).then(function(data) {
+	Promise.all([
 		parent.invoke({
 			to: "system",
 				action: "get",
 				fileName: isEdit ? "edit.html" : "index.html",
-		}).then(function(html) {
-			html = html.replace(/\$\(CONTENTS\)/g, data).replace(/\$\(PAGE\)/g, fileName);
-			response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
-			response.end(html);
-		});
+		}),
+		parent.invoke({
+		to: "system",
+			action: "getData",
+			fileName: fileName,
+		}),
+	]).then(function(data) {
+		var html = data[0].replace(/\$\(CONTENTS\)/g, isEdit ? data[1] : wikiToHtml(data[1])).replace(/\$\(PAGE\)/g, fileName);
+		response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
+		response.end(html);
 	});
 }
 
