@@ -4,19 +4,6 @@
 
 #include <cstring>
 
-enum Types {
-	kUndefined,
-	kNull,
-	kBoolean,
-	kInt32,
-	kUint32,
-	kNumber,
-	kString,
-	kArray,
-	kObject,
-	kFunction,
-};
-
 void Serialize::writeInt8(std::vector<char>& buffer, int8_t value) {
 	buffer.insert(buffer.end(), value);
 }
@@ -175,12 +162,7 @@ v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std:
 		case kFunction:
 			{
 				exportid_t exportId = readInt32(buffer, offset);
-				v8::Local<v8::Object> data = v8::Object::New(task->getIsolate());
-				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "export"), v8::Int32::New(task->getIsolate(), exportId));
-				data->Set(v8::String::NewFromUtf8(task->getIsolate(), "task"), v8::Int32::New(task->getIsolate(), from->getId()));
-				v8::Local<v8::Function> function = v8::Function::New(task->getIsolate(), Task::invokeExport, data);
-				result = function;
-				task->addImport(function, exportId, from->getId());
+				result = task->addImport(from->getId(), exportId);
 			}
 			break;
 		case kObject:

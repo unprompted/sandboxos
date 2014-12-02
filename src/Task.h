@@ -54,7 +54,7 @@ public:
 
 	exportid_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
-	void addImport(v8::Handle<v8::Function> function, exportid_t exportId, taskid_t taskId);
+	v8::Handle<v8::Function> addImport(taskid_t taskId, exportid_t exportId);
 	void releaseExport(taskid_t taskId, exportid_t exportId);
 
 private:

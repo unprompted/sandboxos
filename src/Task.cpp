@@ -472,8 +472,13 @@ void Task::releaseExport(taskid_t taskId, exportid_t exportId) {
 	}
 }
 
-void Task::addImport(v8::Handle<v8::Function> function, exportid_t exportId, taskid_t taskId) {
+v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
+	v8::Local<v8::Object> data = v8::Object::New(_isolate);
+	data->Set(v8::String::NewFromUtf8(_isolate, "export"), v8::Int32::New(_isolate, exportId));
+	data->Set(v8::String::NewFromUtf8(_isolate, "task"), v8::Int32::New(_isolate, taskId));
+	v8::Local<v8::Function> function = v8::Function::New(_isolate, Task::invokeExport, data);
 	_imports.push_back(new ImportRecord(_isolate, function, exportId, taskId, this));
+	return function;
 }
 
 void Task::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {

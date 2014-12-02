@@ -24,6 +24,19 @@ private:
 	static int32_t readInt32(const std::vector<char>& buffer, int& offset);
 	static uint32_t readUint32(const std::vector<char>& buffer, int& offset);
 	static double readDouble(const std::vector<char>& buffer, int& offset);
+
+	enum Types {
+		kUndefined,
+		kNull,
+		kBoolean,
+		kInt32,
+		kUint32,
+		kNumber,
+		kString,
+		kArray,
+		kObject,
+		kFunction,
+	};
 };
 
 #endif
