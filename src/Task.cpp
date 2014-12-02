@@ -253,7 +253,7 @@ void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::kill() {
-	if (!_killed) {
+	if (!_killed && _isolate) {
 		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
 		uv_async_send(_asyncMessage);

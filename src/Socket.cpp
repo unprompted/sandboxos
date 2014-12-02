@@ -29,20 +29,15 @@ Socket::Socket(Task* task)
 	uv_tcp_init(task->getLoop(), &_socket);
 	_socket.data = this;
 	_task = task;
-	_open = true;
 	_promise = -1;
 }
 
 Socket::~Socket() {
-	_socket.data = 0;
-	close();
 	--_count;
 }
 
 void Socket::close() {
-	if (_open) {
-		_open = false;
-
+	if (!uv_is_closing(reinterpret_cast<uv_handle_t*>(&_socket))) {
 		if (!_onRead.IsEmpty()) {
 			uv_read_stop(reinterpret_cast<uv_stream_t*>(&_socket));
 			_onRead.Reset();
@@ -222,7 +217,6 @@ Socket* Socket::get(v8::Handle<v8::Object> socketObject) {
 
 void Socket::ref() {
 	if (++_refCount == 1) {
-		std::cout << "CLEARWEAK " << this << "\n";
 		_object.ClearWeak();
 	}
 }
@@ -230,17 +224,11 @@ void Socket::ref() {
 void Socket::release() {
 	assert(_refCount >= 1);
 	if (--_refCount == 0) {
-		std::cout << "SETWEAK " << this << "\n";
 		_object.SetWeak(this, onRelease);
 	}
 }
 
 void Socket::onRelease(const v8::WeakCallbackData<v8::Object, Socket>& data) {
-	std::cout << "ONRELEASE " << data.GetParameter() << "\n";
 	data.GetParameter()->_object.Reset();
-	if (data.GetParameter()->_open) {
-		data.GetParameter()->close();
-	} else {
-		delete data.GetParameter();
-	}
+	data.GetParameter()->close();
 }

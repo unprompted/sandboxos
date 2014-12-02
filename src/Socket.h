@@ -30,7 +30,6 @@ private:
 	Task* _task;
 	uv_tcp_t _socket;
 	promiseid_t _promise;
-	bool _open;
 	socketid_t _id;
 	int _refCount;
 
