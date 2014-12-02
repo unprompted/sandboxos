@@ -1,7 +1,22 @@
 var gHandlers = [];
 
+function addHandler(handler) {
+	var added = false;
+	for (var i in gHandlers) {
+		if (gHandlers[i].method == handler.method && gHandlers[i].path == handler.path) {
+			gHandlers[i] = handler;
+			added = true;
+			break;
+		}
+	}
+	if (!added) {
+		gHandlers.push(handler);
+		added = true;
+	}
+}
+
 function get(prefix, handler) {
-	gHandlers.push({
+	addHandler({
 		method: "GET",
 		path: prefix,
 		invoke: handler,
@@ -9,7 +24,7 @@ function get(prefix, handler) {
 }
 
 function all(prefix, handler) {
-	gHandlers.push({
+	addHandler({
 		path: prefix,
 		invoke: handler,
 	});

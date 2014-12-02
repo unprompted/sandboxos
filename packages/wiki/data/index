@@ -37,14 +37,11 @@
 </div>
 </ul>
 
-<h2>Too Many Cooks</h2>
-<iframe width="560" height="315" src="//www.youtube.com/embed/QrGrOK8oZG8" frameborder="0" allowfullscreen></iframe>
-
 <h2>TODO</h2>
 <div>In no particular order:</div>
 <ul>
 <li>Make this wiki actually use some sort of wiki syntax.  HTML is too 90s.</li>
-<li>The C++ program needs to use separate processes for each task in order to prevent OOM situations in one task from taking down the whole process.</li>
+<li><strike>The C++ program needs to use separate processes for each task in order to prevent OOM situations in one task from taking down the whole process.</strike></li>
 <li><strike>The C++ program needs to build and run on Windows.</strike>  It needs to do so as transparently in the background as possible while still being trivial to acquire and start (Windows service / system tray icon).</li>
 <li>Need to implement a real security model.  I was thinking once this has an authentication task, everything can use that to enforce that nobody but administrators changed the core tasks and that anonymous and untrusted users don't do anything too malicious.</li>
 <li>Set limits for everything.  n anonymous users can each make m tasks with p MB of storage and can make q HTTP request per second.</li>
@@ -52,7 +49,7 @@
 <li><strike>Be able to marshal functions across task boundaries so that the httpd task can return a request object that has the same API as node.js.  I think this will greatly simplify the client code for webapps.</strike></li>
 <li>Establish some conventions for non-webapp tasks.  Maybe make a shell that lets you run code from any task that exposes it.</li>
 <li>Establish some conventions for HTML fragments.  Include a persistent HTML header in every page or something like that.</li>
-<li>Need to implement something like proper javascript requires() and package dependencies for code sharing.</li>
+<li><strike>Need to implement something like proper javascript requires() and package dependencies for code sharing.</strike></li>
 <li>Make an app store.  Not too important until we have multiple installs, but pretty important.</li>
 <li>Lots of the API exposed from C++ isn't async but should be.</li>
 <li>Pick a name for this thing.</li>

@@ -1,5 +1,6 @@
 {
 	"name": "helloworld",
 	"start": "hello.js",
-	"imports": ["httpd"]
+	"imports": ["httpd"],
+	"href": "/helloworld"
 }

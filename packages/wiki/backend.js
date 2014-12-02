@@ -56,7 +56,7 @@ function render(response, fileName, isEdit) {
 	});
 }
 
-function get(request, response) {
+function handler(request, response) {
 	var found = false;
 	for (var i in kStaticFiles) {
 		if (kStaticFiles[i].uri == request.uri) {
@@ -105,4 +105,4 @@ function get(request, response) {
 	return true;
 }
 
-imports.httpd.get('/wiki', get);
+imports.httpd.all('/wiki', handler);

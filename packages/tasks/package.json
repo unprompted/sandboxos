@@ -2,5 +2,6 @@
 	"name": "tasks",
 	"start": "backend.js",
 	"trusted": true,
-	"imports": ["httpd"]
+	"imports": ["httpd"],
+	"href": "/tasks"
 }

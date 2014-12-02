@@ -2,5 +2,6 @@
 	"name": "editor",
 	"start": "editor.js",
 	"trusted": true,
-	"imports": ["httpd"]
+	"imports": ["httpd"],
+	"href": "/tasks"
 }

@@ -67,10 +67,9 @@ function handleNewData(data) {
 		var td = document.createElement("td");
 		if (data.tasks[package]
 			&& data.tasks[package].manifest
-			&& data.tasks[package].manifest.httpd
-			&& data.tasks[package].manifest.httpd.root) {
+			&& data.tasks[package].manifest.href) {
 			var a = document.createElement("a");
-			$(a).attr("href", data.tasks[package].manifest.httpd.root);
+			$(a).attr("href", data.tasks[package].manifest.href);
 			$(a).text(package);
 			$(td).append(a);
 		} else {

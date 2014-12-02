@@ -1,5 +1,6 @@
 {
 	"name": "auth",
 	"start": "auth.js",
-	"imports": ["httpd"]
+	"imports": ["httpd"],
+	"href": "/login"
 }
