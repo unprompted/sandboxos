@@ -27,6 +27,15 @@ function startTask(packageName) {
 		task.manifest = manifest;
 		task.task = new Task();
 		task.task.trusted = true;
+		task.task.onExit = function(exitCode, terminationSignal) {
+			if (terminationSignal) {
+				print("Task " + packageName + " terminated with signal " + terminationSignal + ".");
+			} else {
+				print("Task " + packageName + " returned " + exitCode + ".");
+			}
+			delete tasks[packageName];
+			broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"stopped"});
+		};
 		task.task.execute(packageFilePath(packageName, manifest.start));
 		tasks[packageName] = task
 		broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"started"});

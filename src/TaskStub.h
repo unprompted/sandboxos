@@ -31,12 +31,17 @@ private:
 	taskid_t _id = -1;
 	uv_process_t _process = {0};
 
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onExit;
+
 	TaskStub(v8::Isolate* isolate, v8::Handle<v8::Object> taskObject);
 
 	static TaskStub* get(v8::Handle<v8::Object> object);
 
 	static void getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
+
+	static void getOnExit(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
+	static void setOnExit(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
 
 	static void execute(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);

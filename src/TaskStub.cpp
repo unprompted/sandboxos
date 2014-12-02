@@ -51,6 +51,7 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(args.GetIsolate());
 	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "trusted"), getTrusted, setTrusted);
+	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "onExit"), getOnExit, setOnExit);
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "invoke"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::invoke));
@@ -148,6 +149,15 @@ void TaskStub::onPipeClose(uv_handle_t* handle) {
 void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminationSignal) {
 	TaskStub* stub = reinterpret_cast<TaskStub*>(process->data);
 	std::cout << "PROCESS " << stub->_id << " EXITED: " << status << " " << terminationSignal << "\n";
+	if (!stub->_onExit.IsEmpty()) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(stub->_owner->_isolate);
+		v8::Handle<v8::Function> callback = v8::Local<v8::Function>::New(stub->_owner->_isolate, stub->_onExit);
+		v8::Handle<v8::Value> args[2];
+		args[0] = v8::Integer::New(stub->_owner->_isolate, status);
+		args[1] = v8::Integer::New(stub->_owner->_isolate, terminationSignal);
+		callback->Call(callback, 2, &args[0]);
+	}
 	uv_close(reinterpret_cast<uv_handle_t*>(process), 0);
 }
 
@@ -163,6 +173,19 @@ void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> v
 		bool trusted = value->BooleanValue();
 		stub->_stream.send(kSetTrusted, reinterpret_cast<char*>(&trusted), sizeof(trusted));
 	}
+}
+
+void TaskStub::getOnExit(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	TaskTryCatch tryCatch(TaskStub::get(args.This())->_owner);
+	v8::HandleScope scope(args.GetIsolate());
+	args.GetReturnValue().Set(v8::Local<v8::Function>::New(args.GetIsolate(), TaskStub::get(args.This())->_onExit));
+}
+
+void TaskStub::setOnExit(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
+	TaskTryCatch tryCatch(TaskStub::get(args.This())->_owner);
+	v8::HandleScope scope(args.GetIsolate());
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), v8::Handle<v8::Function>::Cast(value));
+	TaskStub::get(args.This())->_onExit = function;
 }
 
 TaskStub* TaskStub::get(v8::Handle<v8::Object> object) {
