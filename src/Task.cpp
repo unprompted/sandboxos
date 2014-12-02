@@ -102,10 +102,9 @@ v8::Handle<v8::ObjectTemplate> Task::createGlobal() {
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
 	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
+	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 
 	if (_trusted) {
-		global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
-
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
 		File::configure(_isolate, global);
@@ -148,7 +147,7 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::Handle<v8::Function> stringify = v8::Handle<v8::Function>::Cast(json->Get(v8::String::NewFromUtf8(args.GetIsolate(), "stringify")));
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	TaskTryCatch tryCatch(task);
-	std::cout << "Task[" << task->_id << ':' << task->_scriptName << "]>";
+	std::cout << "Task[" << task << ':' << task->_scriptName << "]>";
 	for (int i = 0; i < args.Length(); i++) {
 		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
@@ -159,31 +158,13 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	if (task) {
-		task->kill();
-	}
-}
-
-void Task::start() {
-	run();
-	//uv_thread_create(&_thread, run, this);
-}
-
-void Task::wait() {
-	//uv_thread_join(&_thread);
-}
-
-void Task::run(void* data) {
-	//Task* task = reinterpret_cast<Task*>(data);
-	//task->run();
+	::exit(args[0]->Int32Value());
 }
 
 void Task::kill() {
 	if (!_killed && _isolate) {
-		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
-		//uv_thread_join(&_thread);
+		v8::V8::TerminateExecution(_isolate);
 	}
 }
 
@@ -231,7 +212,7 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		array->Set(i, args[i]);
 	}
 
-	TaskStub* recipient = sender->_children[recipientId];
+	TaskStub* recipient = sender->get(recipientId);
 	promiseid_t promise = sender->allocatePromise();
 	sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
 	args.GetReturnValue().Set(sender->getPromise(promise));
@@ -244,9 +225,7 @@ v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std:
 	args[0] = from->getTaskObject();
 	args[1] = Serialize::load(to, from, buffer);
 	v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(to->_isolate, "onMessage")));
-	std::cout << "Running invoke in " << to->_scriptName << "\n";
 	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
-	std::cout << "call over\n";
 	return result;
 }
 
@@ -259,7 +238,7 @@ v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t ex
 	}
 	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(to->_isolate, to->_exports[exportId]->_persistent);
 	if (function.IsEmpty()) {
-		std::cout << "I COULD NOT FIND THE FUNCTION " << exportId << " ON " << to->_id << " (" << to->_exports.size() << ") " << to->_exports[exportId]->_persistent.IsEmpty() << "\n";
+		std::cout << "I COULD NOT FIND THE FUNCTION " << exportId << " ON " << to->_scriptName << " (" << to->_exports.size() << ") " << to->_exports[exportId]->_persistent.IsEmpty() << "\n";
 		result = v8::Undefined(to->_isolate);
 	} else {
 		result = function->Call(function, array.size(), &*array.begin());
@@ -423,7 +402,6 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 
 	switch (static_cast<MessageType>(packetType)) {
 	case kSendMessage: {
-		std::cout << to->_scriptName << " <- kSendMessage\n";
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promise));
 		v8::Handle<v8::Value> result = invokeOnMessage(from, to, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
@@ -431,7 +409,6 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kInvokeExport: {
-		std::cout << to->_scriptName << " <- kInvokeExport\n";
 		promiseid_t promise;
 		exportid_t exportId;
 		std::memcpy(&promise, begin, sizeof(promise));
@@ -441,7 +418,6 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kResolvePromise: {
-		std::cout << to->_scriptName << " <- kResolvePromise\n";
 		v8::Handle<v8::Value> arg;
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
@@ -454,7 +430,6 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kReleaseExport:
-		std::cout << to->_scriptName << " <- kReleaseExport\n";
 		assert(length == sizeof(exportid_t));
 		exportid_t exportId;
 		memcpy(&exportId, begin, sizeof(exportId));
@@ -462,16 +437,17 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		delete to->_exports[exportId];
 		to->_exports.erase(exportId);
 		break;
-	case kSetTrusted:
-		std::cout << to->_scriptName << " <- kSetTrusted\n";
-		// XXX
+	case kSetTrusted: {
+		assert(length == sizeof(bool));
+		bool trusted = false;
+		memcpy(&trusted, begin, sizeof(bool));
+		to->_trusted = trusted;
+		}
 		break;
 	case kExecute:
-		std::cout << to->_scriptName << " <- kExecute\n";
 		to->execute(std::string(begin, begin + length).c_str());
 		break;
 	case kKill:
-		std::cout << to->_scriptName << " <- kKill\n";
 		to->kill();
 		break;
 	}
@@ -492,16 +468,13 @@ void Task::configureFromStdin() {
 }
 
 void Task::onPipeAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer) {
-	std::cout << "onPipeAllocate\n";
 	buffer->base = new char[suggestedSize];
 	buffer->len = suggestedSize;
 }
 
 void Task::onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer) {
 	Task* task = reinterpret_cast<Task*>(handle->data);
-	std::cout << "onPipeRead\n";
 	if (uv_pipe_pending_count(reinterpret_cast<uv_pipe_t*>(handle)) != 0) {
-		std::cout << "pipe pending\n";
 		task->_parent = TaskStub::createParent(task, handle);
 
 		uv_read_stop(handle);

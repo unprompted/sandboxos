@@ -37,7 +37,6 @@ public:
 	Task();
 	~Task();
 
-	int getId() const { return _id; }
 	const std::string& getName() const { return _scriptName; }
 	v8::Isolate* getIsolate() { return _isolate; }
 	uv_loop_t* getLoop() { return _loop; }
@@ -51,8 +50,7 @@ public:
 	void configureFromStdin();
 	void setTrusted(bool trusted) { _trusted = trusted; }
 	void execute(const char* fileName);
-	void start();
-	void wait();
+	void run();
 
 	static int getCount() { return _count; }
 	static Task* get(v8::Isolate* isolate);
@@ -68,7 +66,6 @@ private:
 
 	TaskStub* _stub = 0;
 	TaskStub* _parent = 0;
-	taskid_t _id = -1;
 	taskid_t _nextTask = 1;
 	static const taskid_t kParentId = 0;
 	std::map<taskid_t, TaskStub*> _children;
@@ -94,14 +91,11 @@ private:
 
 	v8::Handle<v8::ObjectTemplate> createGlobal();
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
-	void run();
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-	static void run(void* data);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 

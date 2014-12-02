@@ -28,7 +28,6 @@ function startTask(packageName) {
 		task.task = new Task();
 		task.task.trusted = true;
 		task.task.execute(packageFilePath(packageName, manifest.start));
-		task.task.start();
 		tasks[packageName] = task
 		broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"started"});
 		broadcast(null, {action: "taskStarted", taskName: packageName});
@@ -49,7 +48,7 @@ function packageFilePath(packageName, fileName) {
 function getTaskName(task) {
 	var name;
 	for (var taskName in tasks) {
-		if (tasks[taskName].task.id == task.id) {
+		if (tasks[taskName].task == task) {
 			name = taskName;
 		}
 	}
@@ -162,7 +161,7 @@ function onMessage(from, message) {
 					return finalList;
 				}
 			} else {
-				print("PERMISSION DENIED");
+				print("PERMISSION DENIED for: " + fromName);
 			}
 		} else if (message.to) {
 			return tasks[message.to].task.invoke(message);

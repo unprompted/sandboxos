@@ -38,6 +38,7 @@ TaskStub* TaskStub::createParent(Task* task, uv_stream_t* handle) {
 	TaskStub* parentStub = new TaskStub(task->_isolate, v8::Local<v8::Object>::New(task->_isolate, parentObject));
 	parentObject->SetInternalField(0, v8::External::New(task->_isolate, parentStub));
 	parentStub->_owner = task;
+	parentStub->_id = Task::kParentId;
 
 	parentStub->_stream.setOnReceive(Task::onReceivePacket, parentStub);
 	parentStub->_stream.accept(handle);
@@ -50,7 +51,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(args.GetIsolate());
 	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "trusted"), getTrusted, setTrusted);
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "start"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::start));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "invoke"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::invoke));
@@ -60,8 +60,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskStub* stub = new TaskStub(args.GetIsolate(), taskObject);
 	taskObject->SetInternalField(0, v8::External::New(args.GetIsolate(), stub));
 	stub->_owner = parent;
-	//stub->_task = new Task();
-	//stub->_task->_stub = stub;
 
 
 	taskid_t id = 0;
@@ -75,7 +73,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		parent->_children[id] = stub;
 	}
 	stub->_id = id;
-	//stub->_task->_id = id;
 
 	uv_os_sock_t sock[2];
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sock) != 0) {
@@ -139,14 +136,17 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::onPipeWrite(uv_write_t* request, int status) {
-	std::cout << "onPipeWrite " << status << "\n";
-	uv_close(reinterpret_cast<uv_handle_t*>(request->handle), 0);
-	delete reinterpret_cast<uv_pipe_t*>(request->handle);
+	uv_close(reinterpret_cast<uv_handle_t*>(request->handle), onPipeClose);
 	delete reinterpret_cast<char*>(request);
 }
 
+void TaskStub::onPipeClose(uv_handle_t* handle) {
+	delete reinterpret_cast<uv_pipe_t*>(handle);
+}
+
 void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminationSignal) {
-	std::cout << "PROCESS EXITED: " << status << " " << terminationSignal << "\n";
+	TaskStub* stub = reinterpret_cast<TaskStub*>(process->data);
+	std::cout << "PROCESS " << stub->_id << " EXITED: " << status << " " << terminationSignal << "\n";
 	uv_close(reinterpret_cast<uv_handle_t*>(process), 0);
 }
 
@@ -172,11 +172,6 @@ v8::Handle<v8::Object> TaskStub::getTaskObject() {
 	return v8::Local<v8::Object>::New(_owner->getIsolate(), _taskObject);
 }
 
-void TaskStub::start(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	//TaskStub* stub = TaskStub::get(args.This());
-	//stub->_task->start();
-}
-
 void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskStub* stub = TaskStub::get(args.This());
 	TaskTryCatch tryCatch(stub->_owner);
@@ -186,17 +181,9 @@ void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	std::cout << "kill called\n";
-	/*
-	Task* self = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	taskid_t taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
-
-	if (TaskStub* task = self->get(taskId)) {
-		task->kill();
-	} else {
-		std::cout << "Could not find task!\n";
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		Task::getPacketStream(stub->_owner, stub).send(kKill, 0, 0);
 	}
-	*/
 }
 
 void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {

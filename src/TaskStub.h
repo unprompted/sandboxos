@@ -38,7 +38,6 @@ private:
 	static void getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
 
-	static void start(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void execute(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -47,6 +46,7 @@ private:
 
 	static void onProcessExit(uv_process_t* process, int64_t status, int terminationSignal);
 	static void onPipeWrite(uv_write_t* request, int status);
+	static void onPipeClose(uv_handle_t* handle);
 };
 
 #endif

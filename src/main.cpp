@@ -1,6 +1,8 @@
 #include <cstring>
 #include <libplatform/libplatform.h>
+#include <unistd.h>
 #include <uv.h>
+#include <sys/prctl.h>
 #include <v8.h>
 #include <v8-platform.h>
 
@@ -25,16 +27,16 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (isChild) {
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
 		Task task;
 		task.configureFromStdin();
-		task.start();
-		task.wait();
+		task.run();
 	} else {
+		setpgid(0, 0);
 		Task task;
 		task.setTrusted(true);
-		task.execute("test.js");
-		task.start();
-		task.wait();
+		task.execute("packages/system/system.js");
+		task.run();
 	}
 
 	v8::V8::Dispose();
