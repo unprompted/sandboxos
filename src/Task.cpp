@@ -116,9 +116,7 @@ void Task::run() {
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
-		std::cout << "Starting running: " << _scriptName << "\n";
 		uv_run(_loop, UV_RUN_DEFAULT);
-		std::cout << "Done running: " << _scriptName << "\n";
 	}
 	_promises.clear();
 	_exports.clear();
@@ -187,7 +185,7 @@ void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
 	if (!script.IsEmpty()) {
 		v8::Handle<v8::Value> result = script->Run();
 		v8::String::Utf8Value stringResult(result);
-		std::cout << "Script returned: " << *stringResult << '\n';
+		std::cout << "Script " << *v8::String::Utf8Value(name) << " returned: " << *stringResult << '\n';
 	} else {
 		std::cerr << "Failed to compile script.\n";
 	}
@@ -267,17 +265,13 @@ void Task::sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::H
 	}
 }
 
-PacketStream& Task::getPacketStream(Task* from, TaskStub* to) {
-	return to->getStream();
-}
-
 void Task::sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
 	std::vector<char> buffer;
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
 	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
 		Serialize::store(from, buffer, result);
 	}
-	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
+	to->getStream().send(messageType, &*buffer.begin(), buffer.size());
 }
 
 void Task::sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, exportid_t exportId, v8::Handle<v8::Value> result) {
@@ -287,7 +281,7 @@ void Task::sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messag
 	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
 		Serialize::store(from, buffer, result);
 	}
-	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
+	to->getStream().send(messageType, &*buffer.begin(), buffer.size());
 }
 
 TaskStub* Task::get(taskid_t taskId) {
@@ -379,7 +373,7 @@ void Task::releaseExport(taskid_t taskId, exportid_t exportId) {
 	if (TaskStub* task = get(taskId)) {
 		std::vector<char> buffer;
 		buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
-		getPacketStream(this, task).send(kReleaseExport, &*buffer.begin(), buffer.size());
+		task->getStream().send(kReleaseExport, &*buffer.begin(), buffer.size());
 	}
 }
 

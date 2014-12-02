@@ -20,8 +20,6 @@ void PacketStream::accept(uv_stream_t* stream) {
 	uv_tcp_init(stream->loop, &_stream);
 	if (uv_accept(stream, reinterpret_cast<uv_stream_t*>(&_stream)) != 0) {
 		std::cerr << "uv_accept failed\n";
-	} else {
-		std::cout << "accepted connection\n";
 	}
 	_stream.data = this;
 	uv_read_start(reinterpret_cast<uv_stream_t*>(&_stream), onAllocate, onRead);

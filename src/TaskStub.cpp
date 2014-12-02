@@ -160,7 +160,7 @@ void TaskStub::getTrusted(v8::Local<v8::String> property, const v8::PropertyCall
 void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
 	if (TaskStub* stub = TaskStub::get(args.This())) {
 		bool trusted = value->BooleanValue();
-		Task::getPacketStream(stub->_owner, stub).send(kSetTrusted, reinterpret_cast<char*>(&trusted), sizeof(trusted));
+		stub->_stream.send(kSetTrusted, reinterpret_cast<char*>(&trusted), sizeof(trusted));
 	}
 }
 
@@ -182,7 +182,7 @@ void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (TaskStub* stub = TaskStub::get(args.This())) {
-		Task::getPacketStream(stub->_owner, stub).send(kKill, 0, 0);
+		stub->_stream.send(kKill, 0, 0);
 	}
 }
 

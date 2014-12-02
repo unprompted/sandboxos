@@ -107,7 +107,6 @@ private:
 
 	static void sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
 	static void sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promiseId, exportid_t exportId, v8::Handle<v8::Value> result);
-	static PacketStream& getPacketStream(Task* from, TaskStub* to);
 
 	static void onPipeAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer);
 	static void onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer);
