@@ -24,8 +24,11 @@ function startTask(packageName) {
 
 	if (manifest) {
 		task = {}
-		task.task = startScript(packageFilePath(packageName, manifest.start), manifest.trusted);
 		task.manifest = manifest;
+		task.task = new Task();
+		task.task.trusted = true;
+		task.task.execute(packageFilePath(packageName, manifest.start));
+		task.task.start();
 		tasks[packageName] = task
 		broadcast(null, {action:"updateTaskStatus", taskName:packageName, state:"started"});
 		broadcast(null, {action: "taskStarted", taskName: packageName});

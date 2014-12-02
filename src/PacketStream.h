@@ -9,6 +9,7 @@ public:
 	PacketStream();
 	~PacketStream();
 
+	void accept(uv_stream_t* stream);
 	void createFrom(uv_loop_t* loop, uv_os_sock_t sock);
 
 	typedef void (OnReceive)(int packetType, const char* begin, size_t length, void* userData);

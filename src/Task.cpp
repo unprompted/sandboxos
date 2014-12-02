@@ -3,6 +3,7 @@
 #include "File.h"
 #include "Serialize.h"
 #include "Socket.h"
+#include "TaskStub.h"
 #include "TaskTryCatch.h"
 
 #include <algorithm>
@@ -13,18 +14,17 @@
 #include <libplatform/libplatform.h>
 #include <map>
 #include <sys/types.h>
+#include <unistd.h>
 #include <uv.h>
 #include <v8.h>
 #include <v8-platform.h>
 
 extern v8::Platform* gPlatform;
-std::map<taskid_t, Task*> gTasks;
 int gNextTaskId = 1;
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
 
 int Task::_count;
-Mutex Task::_mutex;
 
 struct ExportRecord {
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
@@ -83,75 +83,47 @@ struct ImportRecord {
 	}
 };
 
-Task::Task(const char* scriptName)
-:	_trusted(false),
-	_killed(false),
-	_parent(0),
-	_isolate(0),
-	_nextPromise(0),
-	_nextExport(0),
-	_memoryAllocated(0),
-	_memoryLimit(64 * 1024 * 1024) {
-
-	{
-		Lock lock(_mutex);
-		do {
-			_id = gNextTaskId++;
-		} while (gTasks.find(_id) != gTasks.end());
-		gTasks[_id] = this;
-	}
-
+Task::Task() {
 	_loop = uv_loop_new();
-
 	++_count;
-	if (scriptName) {
-		_scriptName = scriptName;
-	}
+	_isolate = v8::Isolate::New();
+	_isolate->SetData(0, this);
 }
 
 Task::~Task() {
-	Lock lock(_mutex);
+	_isolate->Dispose();
+	_isolate = 0;
+
 	uv_loop_delete(_loop);
-	{
-		gTasks.erase(gTasks.find(_id));
-		--_count;
+	--_count;
+}
+
+v8::Handle<v8::ObjectTemplate> Task::createGlobal() {
+	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
+
+	if (_trusted && (!_stub || !_stub->getTask() || !_stub->getTask()->_parent)) {
+		global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
+
+		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
+		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
+		File::configure(_isolate, global);
 	}
+	return global;
 }
 
 void Task::run() {
-	_isolate = v8::Isolate::New();
-	_isolate->SetData(0, this);
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
-
-		v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
-		global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
-		global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
-
-		if (_trusted) {
-			global->Set(v8::String::NewFromUtf8(_isolate, "startScript"), v8::FunctionTemplate::New(_isolate, startScript));
-			global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
-
-			global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
-			File::configure(_isolate, global);
-		}
-
-		v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, global);
-		v8::Context::Scope contextScope(context);
-		v8::Handle<v8::String> script = loadFile(_isolate, _scriptName.c_str());
-		std::cout << "Running script " << _scriptName << "\n";
-		if (!script.IsEmpty()) {
-			execute(script, v8::String::NewFromUtf8(_isolate, _scriptName.c_str()));
-		}
-
+		std::cout << "Starting running: " << _scriptName << "\n";
 		uv_run(_loop, UV_RUN_DEFAULT);
+		std::cout << "Done running: " << _scriptName << "\n";
 	}
 	_promises.clear();
 	_exports.clear();
 	_imports.clear();
-	_isolate->Dispose();
-	_isolate = 0;
 }
 
 v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
@@ -193,47 +165,26 @@ void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-void Task::startScript(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* parent = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	v8::HandleScope scope(args.GetIsolate());
-	Task* task = new Task();
-	task->_parent = parent->_id;
-	task->_scriptName = *v8::String::Utf8Value(args[0]);
-	task->_trusted = parent->_trusted && !args[1].IsEmpty() && args[1]->BooleanValue();
-	uv_thread_create(&task->_thread, run, task);
+void Task::start() {
+	run();
+	//uv_thread_create(&_thread, run, this);
+}
 
-	uv_os_sock_t sock[2];
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sock) != 0) {
-		perror("socketpair");
-	}
-	task->_parentStreamData[0] = task;
-	task->_parentStreamData[1] = parent;
-	task->_parentStream.setOnReceive(onReceivePacket, task->_parentStreamData);
-	task->_parentStream.createFrom(parent->_loop, sock[0]);
-	task->_childStreamData[0] = parent;
-	task->_childStreamData[1] = task;
-	task->_childStream.setOnReceive(onReceivePacket, task->_childStreamData);
-	task->_childStream.createFrom(task->_loop, sock[1]);
-
-	args.GetReturnValue().Set(parent->makeTaskObject(task->_id));
+void Task::wait() {
+	//uv_thread_join(&_thread);
 }
 
 void Task::run(void* data) {
-	Task* task = reinterpret_cast<Task*>(data);
-	task->run();
-	delete task;
+	//Task* task = reinterpret_cast<Task*>(data);
+	//task->run();
 }
 
 void Task::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* self = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	int taskId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
 
-	if (Task* task = Task::get(taskId)) {
-		if (task->_parent == self->_id) {
-			task->kill();
-		} else {
-			std::cerr << task << " is not a child of " << self << "\n";
-		}
+	if (Task* task = self->_children[taskId]->getTask()) {
+		task->kill();
 	} else {
 		std::cout << "Could not find task!\n";
 	}
@@ -244,6 +195,19 @@ void Task::kill() {
 		v8::V8::TerminateExecution(_isolate);
 		_killed = true;
 		//uv_thread_join(&_thread);
+	}
+}
+
+void Task::execute(const char* fileName) {
+	v8::Isolate::Scope isolateScope(_isolate);
+	v8::HandleScope handleScope(_isolate);
+	v8::Local<v8::Context> context = v8::Context::New(_isolate, 0, createGlobal());
+	context->Enter();
+	v8::Handle<v8::String> script = loadFile(_isolate, fileName);
+	std::cout << "Running script " << fileName << "\n";
+	_scriptName = fileName;
+	if (!script.IsEmpty()) {
+		execute(script, v8::String::NewFromUtf8(_isolate, fileName));
 	}
 }
 
@@ -259,22 +223,8 @@ void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
 	}
 }
 
-void Task::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	TaskTryCatch tryCatch(task);
-	v8::HandleScope scope(args.GetIsolate());
-
-	promiseid_t promise = task->allocatePromise();
-	taskid_t recipientId = args.This().As<v8::Object>()->GetInternalField(0).As<v8::Integer>()->Value();
-
-	if (Task* recipient = Task::get(recipientId)) {
-		sendPromiseMessage(task, recipient, kSendMessage, promise, args[0]);
-		args.GetReturnValue().Set(task->getPromise(promise));
-	}
-}
-
 void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	Task* sender = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	Task* sender = Task::get(args.GetIsolate());
 	TaskTryCatch tryCatch(sender);
 	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
 	exportid_t exportId = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "export"))->Int32Value();
@@ -292,22 +242,26 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		array->Set(i, args[i]);
 	}
 
-	Task* recipient = Task::get(recipientId);
+	TaskStub* recipient = sender->_children[recipientId];
 	promiseid_t promise = sender->allocatePromise();
 	sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
 	args.GetReturnValue().Set(sender->getPromise(promise));
 }
 
-v8::Handle<v8::Value> Task::invokeOnMessage(Task* from, Task* to, const std::vector<char>& buffer) {
+v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer) {
+	TaskTryCatch tryCatch(to);
 	v8::Local<v8::Context> context = to->_isolate->GetCurrentContext();
 	v8::Handle<v8::Value> args[2];
-	args[0] = to->makeTaskObject(from->_id);
+	args[0] = from->getTaskObject();
 	args[1] = Serialize::load(to, from, buffer);
 	v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(to->_isolate, "onMessage")));
-	return function->Call(context->Global(), 2, &args[0]);
+	std::cout << "Running invoke in " << to->_scriptName << "\n";
+	v8::Handle<v8::Value> result = function->Call(context->Global(), 2, &args[0]);
+	std::cout << "call over\n";
+	return result;
 }
 
-v8::Handle<v8::Value> Task::invokeExport(Task* from, Task* to, exportid_t exportId, const std::vector<char>& buffer) {
+v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer) {
 	v8::Handle<v8::Value> result;
 	v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
 	std::vector<v8::Handle<v8::Value> > array;
@@ -322,20 +276,20 @@ v8::Handle<v8::Value> Task::invokeExport(Task* from, Task* to, exportid_t export
 		result = function->Call(function, array.size(), &*array.begin());
 	}
 
-	for (size_t i = 0; i < from->_imports.size(); ++i) {
+	/* XXX for (size_t i = 0; i < from->_imports.size(); ++i) {
 		if (from->_imports[i]->_task == to->_id && from->_imports[i]->_export == exportId) {
 			from->_imports[i]->release();
 			break;
 		}
-	}
+	}*/
 	return result;
 }
 
-void Task::sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handle<v8::Value> result) {
+void Task::sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result) {
 	if (!result.IsEmpty() && result->IsPromise()) {
 		// We're not going to serialize/deserialize a promise...
 		v8::Handle<v8::Object> data = v8::Object::New(from->_isolate);
-		data->Set(v8::String::NewFromUtf8(from->_isolate, "task"), v8::Int32::New(from->_isolate, to->_id));
+		data->Set(v8::String::NewFromUtf8(from->_isolate, "task"), v8::Int32::New(from->_isolate, to->getId()));
 		data->Set(v8::String::NewFromUtf8(from->_isolate, "promise"), v8::Int32::New(from->_isolate, promise));
 		v8::Handle<v8::Function> then = v8::Function::New(from->_isolate, invokeThen, data);
 		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
@@ -345,11 +299,11 @@ void Task::sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handl
 	}
 }
 
-PacketStream& Task::getPacketStream(Task* from, Task* to) {
-	return to->_parent ? to->_parentStream : from->_childStream;
+PacketStream& Task::getPacketStream(Task* from, TaskStub* to) {
+	return to == from->_parent ? from->_stub->getStream() : to->getStream();
 }
 
-void Task::sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
+void Task::sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
 	std::vector<char> buffer;
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
 	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
@@ -358,7 +312,7 @@ void Task::sendPromiseMessage(Task* from, Task* to, MessageType messageType, pro
 	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
 }
 
-void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, exportid_t exportId, v8::Handle<v8::Value> result) {
+void Task::sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, exportid_t exportId, v8::Handle<v8::Value> result) {
 	std::vector<char> buffer;
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
 	buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
@@ -368,36 +322,25 @@ void Task::sendPromiseExportMessage(Task* from, Task* to, MessageType messageTyp
 	getPacketStream(from, to).send(messageType, &*buffer.begin(), buffer.size());
 }
 
+TaskStub* Task::get(taskid_t taskId) {
+	return taskId == kParentId ? _parent : _children[taskId];
+}
+
 void Task::invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* from = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
-	Task* to = Task::get(data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value());
+	TaskStub* to = from->get(data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value());
 	promiseid_t promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
 	sendPromiseMessage(from, to, kResolvePromise, promise, args[0]);
 }
 
 void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
-	args.GetReturnValue().Set(task->makeTaskObject(task->_parent));
-}
-
-v8::Handle<v8::Object> Task::makeTaskObject(taskid_t id) {
-	v8::Handle<v8::Object> taskObject;
-	if (Task::get(id)) {
-		v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(_isolate);
-		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "kill"), v8::FunctionTemplate::New(_isolate, Task::kill));
-		taskTemplate->Set(v8::String::NewFromUtf8(_isolate, "invoke"), v8::FunctionTemplate::New(_isolate, Task::invoke));
-		taskTemplate->SetInternalFieldCount(1);
-		taskObject = taskTemplate->NewInstance();
-		taskObject->SetInternalField(0, v8::Integer::New(_isolate, id));
-		taskObject->Set(v8::String::NewFromUtf8(_isolate, "id"), v8::Integer::New(_isolate, id));
+	if (task->_parent) {
+		args.GetReturnValue().Set(task->_parent->getTaskObject());
+	} else {
+		args.GetReturnValue().Set(v8::Undefined(task->_isolate));
 	}
-	return taskObject;
-}
-
-Task* Task::get(taskid_t id) {
-	Lock lock(_mutex);
-	return gTasks[id];
 }
 
 Task* Task::get(v8::Isolate* isolate) {
@@ -465,7 +408,7 @@ exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
 }
 
 void Task::releaseExport(taskid_t taskId, exportid_t exportId) {
-	if (Task* task = Task::get(taskId)) {
+	if (TaskStub* task = get(taskId)) {
 		std::vector<char> buffer;
 		buffer.insert(buffer.end(), reinterpret_cast<char*>(&exportId), reinterpret_cast<char*>(&exportId) + sizeof(exportId));
 		getPacketStream(this, task).send(kReleaseExport, &*buffer.begin(), buffer.size());
@@ -482,12 +425,14 @@ v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
 }
 
 void Task::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {
-	Task** tasks = reinterpret_cast<Task**>(userData);
-	Task* from = tasks[0];
-	Task* to = tasks[1];
+	TaskStub* stub = reinterpret_cast<TaskStub*>(userData);
+	TaskStub* from = stub;
+	Task* to = stub->getTask();
 
 	TaskTryCatch tryCatch(to);
 	v8::HandleScope scope(to->_isolate);
+
+	std::cout << "Received " << packetType << " packet from " << stub->getId() << "\n";
 
 	switch (static_cast<MessageType>(packetType)) {
 	case kSendMessage: {
@@ -526,5 +471,43 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		delete to->_exports[exportId];
 		to->_exports.erase(exportId);
 		break;
+	case kSetTrusted:
+		// XXX
+		break;
 	}
+}
+
+void Task::configureFromStdin() {
+	uv_pipe_t* pipe = new uv_pipe_t;
+	pipe->data = this;
+	if (uv_pipe_init(_loop, pipe, 1) != 0) {
+		std::cerr << "uv_pipe_init failed\n";
+	}
+	if (uv_pipe_open(pipe, STDIN_FILENO) != 0) {
+		std::cerr << "uv_pipe_open failed\n";
+	}
+	if (uv_read_start(reinterpret_cast<uv_stream_t*>(pipe), onPipeAllocate, onPipeRead) != 0) {
+		std::cerr << "uv_read_start failed\n";
+	}
+}
+
+void Task::onPipeAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer) {
+	std::cout << "onPipeAllocate\n";
+	buffer->base = new char[suggestedSize];
+	buffer->len = suggestedSize;
+}
+
+void Task::onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer) {
+	Task* task = reinterpret_cast<Task*>(handle->data);
+	std::cout << "onPipeRead\n";
+	if (uv_pipe_pending_count(reinterpret_cast<uv_pipe_t*>(handle)) != 0) {
+		std::cout << "pipe pending\n";
+		task->_stream.setOnReceive(Task::onReceivePacket, task->_parent);
+		task->_stream.accept(handle);
+
+		uv_read_stop(handle);
+		uv_close(reinterpret_cast<uv_handle_t*>(handle), 0);
+		delete reinterpret_cast<uv_pipe_t*>(handle);
+	}
+	delete buffer->base;
 }

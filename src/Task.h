@@ -1,7 +1,6 @@
 #ifndef INCLUDED_Task
 #define INCLUDED_Task
 
-#include "Mutex.h"
 #include "PacketStream.h"
 
 #include <iostream>
@@ -15,6 +14,7 @@
 struct ExportRecord;
 struct ImportRecord;
 class Task;
+class TaskStub;
 
 struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
 
@@ -27,13 +27,13 @@ enum MessageType {
 	kResolvePromise,
 	kInvokeExport,
 	kReleaseExport,
+	kSetTrusted,
 };
 
 class Task {
 public:
-	Task(const char* scriptName = 0);
+	Task();
 	~Task();
-	void run();
 
 	int getId() const { return _id; }
 	const std::string& getName() const { return _scriptName; }
@@ -46,11 +46,15 @@ public:
 	void resolvePromise(promiseid_t promise, v8::Handle<v8::Value> value);
 	void rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value);
 
+	void configureFromStdin();
 	void setTrusted(bool trusted) { _trusted = trusted; }
+	void execute(const char* fileName);
+	void start();
+	void wait();
 
 	static int getCount() { return _count; }
-	static Task* get(taskid_t id);
 	static Task* get(v8::Isolate* isolate);
+	TaskStub* get(taskid_t taskId);
 
 	exportid_t exportFunction(v8::Handle<v8::Function> function);
 	static void invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -59,39 +63,41 @@ public:
 
 private:
 	static int _count;
-	static Mutex _mutex;
 
-	bool _trusted;
-	bool _killed;
-	taskid_t _id;
-	taskid_t _parent;
+	TaskStub* _stub = 0;
+	TaskStub* _parent = 0;
+	taskid_t _id = -1;
+	taskid_t _nextTask = 1;
+	static const taskid_t kParentId = 0;
+	std::map<taskid_t, TaskStub*> _children;
+
+	bool _trusted = false;
+	bool _killed = false;
 	std::string _scriptName;
-	v8::Isolate* _isolate;
+	v8::Isolate* _isolate = 0;
+	v8::Persistent<v8::Context> _context;
 
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
-	promiseid_t _nextPromise;
-	uv_loop_t* _loop;
+	promiseid_t _nextPromise = 0;
+	uv_loop_t* _loop = 0;
 	uv_thread_t _thread;
 
 	std::map<exportid_t, ExportRecord*> _exports;
-	exportid_t _nextExport;
+	exportid_t _nextExport = 0;
 
 	std::vector<ImportRecord*> _imports;
 
-	int64_t _memoryAllocated;
-	int64_t _memoryLimit;
+	int64_t _memoryAllocated = 0;
+	int64_t _memoryLimit = 64 * 1024 * 1024;
 
-	PacketStream _parentStream;
-	Task* _parentStreamData[2];
-	PacketStream _childStream;
-	Task* _childStreamData[2];
+	PacketStream _stream;
 
+	v8::Handle<v8::ObjectTemplate> createGlobal();
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
+	void run();
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void startScript(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -101,19 +107,21 @@ private:
 
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-	static v8::Handle<v8::Value> invokeOnMessage(Task* from, Task* to, const std::vector<char>& buffer);
-	static v8::Handle<v8::Value> invokeExport(Task* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
-	static void sendInvokeResult(Task* from, Task* to, promiseid_t promise, v8::Handle<v8::Value> result);
+	static v8::Handle<v8::Value> invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer);
+	static v8::Handle<v8::Value> invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
+	static void sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result);
 
 	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
 
-	static void sendPromiseMessage(Task* from, Task* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
-	static void sendPromiseExportMessage(Task* from, Task* to, MessageType messageType, promiseid_t promiseId, exportid_t exportId, v8::Handle<v8::Value> result);
-	static PacketStream& getPacketStream(Task* from, Task* to);
+	static void sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
+	static void sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promiseId, exportid_t exportId, v8::Handle<v8::Value> result);
+	static PacketStream& getPacketStream(Task* from, TaskStub* to);
 
-	v8::Handle<v8::Object> makeTaskObject(taskid_t id);
+	static void onPipeAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer);
+	static void onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer);
 
 	friend struct ImportRecord;
+	friend class TaskStub;
 };
 
 #endif

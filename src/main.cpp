@@ -1,3 +1,4 @@
+#include <cstring>
 #include <libplatform/libplatform.h>
 #include <uv.h>
 #include <v8.h>
@@ -15,10 +16,25 @@ int main(int argc, char* argv[]) {
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
-	{
-		Task task("packages/system/system.js");
+	bool isChild = false;
+
+	for (int i = 1; i < argc; ++i) {
+		if (!std::strcmp(argv[i], "--child")) {
+			isChild = true;
+		}
+	}
+
+	if (isChild) {
+		Task task;
+		task.configureFromStdin();
+		task.start();
+		task.wait();
+	} else {
+		Task task;
 		task.setTrusted(true);
-		task.run();
+		task.execute("test.js");
+		task.start();
+		task.wait();
 	}
 
 	v8::V8::Dispose();

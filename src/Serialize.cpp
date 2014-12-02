@@ -1,6 +1,7 @@
 #include "Serialize.h"
 
 #include "Task.h"
+#include "TaskStub.h"
 
 #include <cstring>
 
@@ -110,12 +111,12 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 	return true;
 }
 
-v8::Handle<v8::Value> Serialize::load(Task* task, Task* from, const std::vector<char>& buffer) {
+v8::Handle<v8::Value> Serialize::load(Task* task, TaskStub* from, const std::vector<char>& buffer) {
 	int offset = 0;
 	return loadInternal(task, from, buffer, offset, 0);
 }
 
-v8::Handle<v8::Value> Serialize::loadInternal(Task* task, Task* from, const std::vector<char>& buffer, int& offset, int depth) {
+v8::Handle<v8::Value> Serialize::loadInternal(Task* task, TaskStub* from, const std::vector<char>& buffer, int& offset, int depth) {
 	if (static_cast<size_t>(offset) >= buffer.size()) {
 		return v8::Undefined(task->getIsolate());
 	} else {
