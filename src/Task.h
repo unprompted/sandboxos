@@ -27,9 +27,11 @@ enum MessageType {
 	kResolvePromise,
 	kInvokeExport,
 	kReleaseExport,
+	kReleaseImport,
 	kSetTrusted,
 	kExecute,
 	kKill,
+	kStatistics,
 };
 
 class Task {
@@ -91,6 +93,8 @@ private:
 
 	v8::Handle<v8::ObjectTemplate> createGlobal();
 	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
+
+	v8::Handle<v8::Object> getStatistics();
 
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -145,8 +145,22 @@ function onMessage(from, message) {
 					print(getPackageList());
 					return getPackageList();
 				} else if (message.action == "getTasks") {
-					print(tasks);
-					return tasks;
+					var taskNames = [];
+					var promises = [];
+					for (var i in tasks) {
+						if (tasks[i].task.statistics) {
+							taskNames.push(i);
+							promises.push(tasks[i].task.statistics());
+						}
+					}
+					return Promise.all(promises).then(function(statistics) {
+						print("STATISTICS: " + JSON.stringify(statistics));
+						var result = {};
+						for (var i in taskNames) {
+							result[taskNames[i]] = {statistics: statistics[i]};
+						}
+						return result;
+					});
 				} else if (message.action == "getManifest") {
 					return tasks[message.taskName].manifest;
 				} else if (message.action == "list") {

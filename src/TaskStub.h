@@ -41,6 +41,7 @@ private:
 	static void execute(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void kill(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void statistics(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data);
 

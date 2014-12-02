@@ -54,6 +54,7 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "invoke"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::invoke));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "statistics"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::statistics));
 	taskTemplate->SetInternalFieldCount(1);
 
 	v8::Handle<v8::Object> taskObject = taskTemplate->NewInstance();
@@ -193,5 +194,15 @@ void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	promiseid_t promise = stub->_owner->allocatePromise();
 	Task::sendPromiseMessage(stub->_owner, stub, kSendMessage, promise, args[0]);
+	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+}
+
+void TaskStub::statistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	TaskStub* stub = TaskStub::get(args.This());
+	TaskTryCatch tryCatch(stub->_owner);
+	v8::HandleScope scope(args.GetIsolate());
+
+	promiseid_t promise = stub->_owner->allocatePromise();
+	Task::sendPromiseMessage(stub->_owner, stub, kStatistics, promise, v8::Undefined(args.GetIsolate()));
 	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
 }

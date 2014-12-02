@@ -242,12 +242,7 @@ v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t ex
 		result = function->Call(function, array.size(), &*array.begin());
 	}
 
-	/* XXX for (size_t i = 0; i < from->_imports.size(); ++i) {
-		if (from->_imports[i]->_task == to->_id && from->_imports[i]->_export == exportId) {
-			from->_imports[i]->release();
-			break;
-		}
-	}*/
+	from->getStream().send(kReleaseImport, reinterpret_cast<char*>(&exportId), sizeof(exportId));
 	return result;
 }
 
@@ -386,6 +381,15 @@ v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
 	return function;
 }
 
+v8::Handle<v8::Object> Task::getStatistics() {
+	v8::Handle<v8::Object> result = v8::Object::New(_isolate);
+	result->Set(v8::String::NewFromUtf8(_isolate, "sockets"), v8::Integer::New(_isolate, Socket::getCount()));
+	result->Set(v8::String::NewFromUtf8(_isolate, "promises"), v8::Integer::New(_isolate, _promises.size()));
+	result->Set(v8::String::NewFromUtf8(_isolate, "exports"), v8::Integer::New(_isolate, _exports.size()));
+	result->Set(v8::String::NewFromUtf8(_isolate, "imports"), v8::Integer::New(_isolate, _imports.size()));
+	return result;
+}
+
 void Task::onReceivePacket(int packetType, const char* begin, size_t length, void* userData) {
 	TaskStub* stub = reinterpret_cast<TaskStub*>(userData);
 	TaskStub* from = stub;
@@ -399,6 +403,13 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promise));
 		v8::Handle<v8::Value> result = invokeOnMessage(from, to, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+		sendInvokeResult(to, from, promise, result);
+		}
+		break;
+	case kStatistics: {
+		promiseid_t promise;
+		std::memcpy(&promise, begin, sizeof(promise));
+		v8::Handle<v8::Value> result = to->getStatistics();
 		sendInvokeResult(to, from, promise, result);
 		}
 		break;
@@ -430,6 +441,18 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		to->_exports[exportId]->_persistent.Reset();
 		delete to->_exports[exportId];
 		to->_exports.erase(exportId);
+		break;
+	case kReleaseImport: {
+		assert(length == sizeof(exportid_t));
+		exportid_t exportId;
+		memcpy(&exportId, begin, sizeof(exportId));
+		for (size_t i = 0; i < to->_imports.size(); ++i) {
+			if (to->_imports[i]->_task == from->getId() && to->_imports[i]->_export == exportId) {
+				to->_imports[i]->release();
+				break;
+			}
+		}
+		}
 		break;
 	case kSetTrusted: {
 		assert(length == sizeof(bool));
