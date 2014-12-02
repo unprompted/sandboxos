@@ -14,7 +14,6 @@
 #endif
 
 void File::configure(v8::Isolate* isolate, v8::Handle<v8::ObjectTemplate> global) {
-	global->Set(v8::String::NewFromUtf8(isolate, "readLine"), v8::FunctionTemplate::New(isolate, readLine));
 	global->Set(v8::String::NewFromUtf8(isolate, "readFile"), v8::FunctionTemplate::New(isolate, readFile));
 	global->Set(v8::String::NewFromUtf8(isolate, "readDirectory"), v8::FunctionTemplate::New(isolate, readDirectory));
 	global->Set(v8::String::NewFromUtf8(isolate, "makeDirectory"), v8::FunctionTemplate::New(isolate, makeDirectory));
@@ -117,11 +116,4 @@ void File::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 #else
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), mkdir(*v8::String::Utf8Value(directory), 0777)));
 #endif
-}
-
-void File::readLine(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	std::string line;
-	if (std::getline(std::cin, line)) {
-		args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), line.c_str()));
-	}
 }

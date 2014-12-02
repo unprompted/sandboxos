@@ -8,7 +8,6 @@ public:
 	static void configure(v8::Isolate* isolate, v8::Handle<v8::ObjectTemplate> global);
 
 private:
-	static void readLine(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void readFile(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void writeFile(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args);

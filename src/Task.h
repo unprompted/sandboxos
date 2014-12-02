@@ -13,12 +13,10 @@
 
 struct ExportRecord;
 struct ImportRecord;
-class Socket;
 class Task;
 
 struct uv_async_s; typedef struct uv_async_s uv_async_t;
 struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
-struct uv_work_s; typedef struct uv_work_s uv_work_t;
 
 typedef int taskid_t;
 typedef int promiseid_t;
