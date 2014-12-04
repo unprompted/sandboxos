@@ -59,6 +59,20 @@ function gatherImports(task) {
 	});
 }
 
+function updateDependentTasks(taskName) {
+	for (var i in tasks) {
+		var dependent = false;
+		for (var j in tasks[i].manifest.imports) {
+			if (taskName == tasks[i].manifest.imports[j]) {
+				dependent = true;
+			}
+		}
+		if (dependent && tasks[i].started) {
+			gatherImports(tasks[i]);
+		}
+	}
+}
+
 function startTask(packageName) {
 	var manifest;
 	var task;
@@ -92,8 +106,9 @@ function startTask(packageName) {
 			gatherImports(task).then(function() {
 				task.task.execute(packageFilePath(packageName, manifest.start)).then(function() {
 					task.started = true;
-					broadcast(null, {action: "updateTaskStatus", taskName:packageName, state: "started"});
+					broadcast(null, {action: "updateTaskStatus", taskName: packageName, state: "started"});
 					broadcast(null, {action: "taskStarted", taskName: packageName});
+					updateDependentTasks(packageName);
 					updatePendingTasks();
 				});
 			});

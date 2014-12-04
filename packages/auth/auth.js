@@ -1,3 +1,4 @@
+var gAccounts = {};
 var gSessions = {};
 
 function getCookies(headers) {
@@ -16,6 +17,38 @@ function getCookies(headers) {
 	return cookies;
 }
 
+function decode(encoded) {
+	var result = "";
+	for (var i = 0; i < encoded.length; i++) {
+		var c = encoded[i];
+		if (c == "+") {
+			result += " ";
+		} else if (c == '%') {
+			result += String.fromCharCode(parseInt(encoded.slice(i + 1, i + 3), 16));
+			i += 2;
+		} else {
+			result += c;
+		}
+	}
+	return result;
+}
+
+function decodeForm(encoded) {
+	var result = {};
+	if (encoded) {
+		encoded = encoded.trim();
+		var items = encoded.split('&');
+		for (var i = 0; i < items.length; i++) {
+			var item = items[i];
+			var equals = item.indexOf('=');
+			var key = decode(item.slice(0, equals));
+			var value = decode(item.slice(equals + 1));
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
 function newSession() {
 	var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 	var result = "";
@@ -29,20 +62,39 @@ function handler(request, response) {
 	var session = getCookies(request.headers).session;
 	if (request.uri == "/login") {
 		var sessionIsNew = false;
+		var loginError;
 
 		if (request.method == "POST") {
 			// XXX: Assume a post is a new login attempt.
 			session = newSession();
 			sessionIsNew = true;
-			gSessions[session] = {name: request.body.substring(request.body.indexOf("=") + 1)};
+			var form = decodeForm(request.body);
+			if (form.register == "1") {
+				if (!gAccounts[form.name] &&
+					form.password == form.confirm) {
+					gAccounts[form.name] = {password: form.password};
+					gSessions[session] = {name: form.name};
+					parent.invoke({to: "system", action: "putData", fileName: "accounts.json", contents: JSON.stringify(gAccounts)});
+				} else {
+					loginError = "Error registering account.";
+				}
+			} else {
+				if (gAccounts[form.name] &&
+					gAccounts[form.name].password == form.password) {
+					gSessions[session] = {name: form.name};
+				} else {
+					loginError = "Invalid username or password.";
+				}
+			}
 		}
+
+		var queryForm = decodeForm(request.query);
 
 		var cookie = "session=" + session + "; path=/; Max-Age=604800";
 		if (session
 			&& gSessions[session]
-			&& request.query
-			&& request.query.substring(0, 7) == "return=") {
-			response.writeHead(303, {"Location": request.query.substring(7), "Connection": "close", "Set-Cookie": cookie});
+			&& queryForm.return) {
+			response.writeHead(303, {"Location": queryForm.return, "Connection": "close", "Set-Cookie": cookie});
 			response.end();
 		} else {
 			response.writeHead(200, {"Content-Type": "text/html", "Connection": "close", "Set-Cookie": cookie});
@@ -51,16 +103,22 @@ function handler(request, response) {
 
 				if (session && gSessions[session]) {
 					if (sessionIsNew) {
-						contents += '<div>I made you a new session, ' + gSessions[session].name + '.</div>\n';
-					} else {
 						contents += '<div>Welcome back, ' + gSessions[session].name + '.</div>\n';
+					} else {
+						contents += '<div>You are already logged in, ' + gSessions[session].name + '.</div>\n';
 					}
 					contents += '<div><a href="/login/logout">Logout</a></div>\n';
 				} else {
 					contents += '<form method="POST">\n';
-					contents += '<div>Maybe you would like to log in?</div>\n'
+					if (loginError) {
+						contents += "<p>" + loginError + "</p>\n";
+					}
+					contents += '<p><b>Halt.  Who goes there?</b></p>\n'
 					contents += '<div><label for="name">Name:</label> <input type="text" id="name" name="name" value=""></input></div>\n';
-					contents += '<div><input type="submit" value="Submit"></input></div>\n';
+					contents += '<div><label for="password">Password:</label> <input type="password" id="password" name="password" value=""></input></div>\n';
+					contents += '<div id="confirmPassword" style="display: none"><label for="confirm">Confirm:</label> <input type="password" id="confirm" name="confirm" value=""></input></div>\n';
+					contents += '<div><input type="checkbox" id="register" name="register" value="1" onchange="showHideConfirm()"></input> <label for="register">Register a new account</label></div>\n';
+					contents += '<div><input type="submit" value="Login"></input></div>\n';
 					contents += '</form>';
 				}
 				response.end(html.replace("$(SESSION)", contents));
@@ -83,6 +141,10 @@ function query(headers) {
 		return {session: gSessions[session]};
 	}
 }
+
+parent.invoke({to: "system", action: "getData", fileName: "accounts.json"}).then(function(data) {
+	gAccounts = JSON.parse(data);
+});
 
 imports.httpd.all("/login", handler);
 
