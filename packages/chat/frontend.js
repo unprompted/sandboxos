@@ -24,6 +24,8 @@ function print(message) {
 		document.getElementById("chat").value += "\n";
 	}
 	document.getElementById("chat").value += message;
+	var textarea = $(document.getElementById("chat"));
+	textarea.scrollTop(textarea[0].scrollHeight - textarea.height());
 }
 function send() {
 	var value = document.getElementById("input").value;

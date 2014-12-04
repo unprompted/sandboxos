@@ -28,7 +28,7 @@ The source is [http://www.unprompted.com/projects/browser/projects/sandboxos/tru
 
 = Known Issues =
  * Feedback is really bad or missing.  If you break a task, it might just stop responding to web requests.  I have the benefit of being able to see console output, but that's really noisy and bad.  There might be times where it is necessary to restart the whole process.  Ultimately there should be a way to see feedback when you've broken something, and things should be hardened so that you can't take down the whole system without abusing administrative rights.
- * Inter-task messaging is really awkward to type.  And the way you need to respond to httpd requests is even weirder.  I will work on this.  It should be possible to get most things close to being first-class function calls, except asynchronous.
+ * ~~Inter-task messaging is really awkward to type.  And the way you need to respond to httpd requests is even weirder.  I will work on this.  It should be possible to get most things close to being first-class function calls, except asynchronous.~~
  * The security here is abysmal at the moment.  I'm essentially trusting you to please don't do bad things.  I have a general plan to improve that situation once things get further along.
 
 = TODO =

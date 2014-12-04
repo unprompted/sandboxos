@@ -42,7 +42,6 @@ Socket::~Socket() {
 void Socket::close() {
 	if (!uv_is_closing(reinterpret_cast<uv_handle_t*>(&_socket))) {
 		if (!_onRead.IsEmpty()) {
-			uv_read_stop(reinterpret_cast<uv_stream_t*>(&_socket));
 			_onRead.Reset();
 		}
 
