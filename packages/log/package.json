@@ -1,6 +1,4 @@
 {
 	"name": "log",
-	"start": "log.js",
-	"imports": ["httpd"],
-	"href": "/log"
+	"start": "log.js"
 }

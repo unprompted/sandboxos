@@ -1,0 +1,6 @@
+{
+	"name": "log",
+	"start": "logviewer.js",
+	"imports": ["httpd", "log"],
+	"href": "/log"
+}

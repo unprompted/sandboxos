@@ -1,5 +1,6 @@
 {
 	"name": "httpd",
 	"start": "httpd.js",
-	"trusted": true
+	"trusted": true,
+	"imports": ["log"]
 }
