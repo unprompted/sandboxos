@@ -1,4 +1,5 @@
 var tasks = {};
+var gStatusWatchers = [];
 
 function start() {
 	for (var i in tasks) {
@@ -20,7 +21,9 @@ function importsReady(task) {
 			if (!tasks[task.manifest.imports[i]]
 			 || !tasks[task.manifest.imports[i]].task
 			 || !tasks[task.manifest.imports[i]].started) {
-				ready = false;
+				if (task.manifest.imports[i] != "system") {
+					ready = false;
+				}
 			}
 		}
 	}
@@ -43,17 +46,25 @@ function nameExports(name) {
 
 function gatherImports(task) {
 	var promises = [];
+	var wantSystem = false;
 	if (task.manifest.imports) {
 		for (var i in task.manifest.imports) {
 			var name = task.manifest.imports[i];
-			var other = tasks[name];
-			promises.push(other.task.getExports().then(nameExports(name)));
+			if (name == "system") {
+				wantSystem = true;
+			} else {
+				var other = tasks[name];
+				promises.push(other.task.getExports().then(nameExports(name)));
+			}
 		}
 	}
 	return Promise.all(promises).then(function(imports) {
 		var result = {};
 		for (var i in imports) {
 			result[imports[i].name] = imports[i].imports;
+		}
+		if (wantSystem) {
+			result["system"] = exports;
 		}
 		return task.task.setImports(result);
 	});
@@ -90,7 +101,7 @@ function startTask(packageName) {
 		tasks[packageName] = task
 
 		if (!task.pending) {
-			broadcast(null, {action: "updateTaskStatus", taskName: packageName, state: "starting"});
+			notifyTaskStatusChanged(packageName, "starting");
 			task.task = new Task();
 			task.task.trusted = true;
 			task.task.onExit = function(exitCode, terminationSignal) {
@@ -100,14 +111,13 @@ function startTask(packageName) {
 					print("Task " + packageName + " returned " + exitCode + ".");
 				}
 				delete tasks[packageName];
-				broadcast(null, {action: "updateTaskStatus", taskName:packageName, state: "stopped"});
+				notifyTaskStatusChanged(packageName, "stopped");
 			};
 			task.task.activate();
 			gatherImports(task).then(function() {
 				task.task.execute(packageFilePath(packageName, manifest.start)).then(function() {
 					task.started = true;
-					broadcast(null, {action: "updateTaskStatus", taskName: packageName, state: "started"});
-					broadcast(null, {action: "taskStarted", taskName: packageName});
+					notifyTaskStatusChanged(packageName, "started");
 					updateDependentTasks(packageName);
 					updatePendingTasks();
 				});
@@ -159,6 +169,18 @@ function broadcast(from, message) {
 	}
 }
 
+function notifyTaskStatusChanged(taskName, taskStatus) {
+	for (var i in gStatusWatchers) {
+		if (gStatusWatchers[i]) {
+			try {
+				gStatusWatchers[i](taskName, taskStatus);
+			} catch (e) {
+				gStatusWatchers[i] = null;
+			}
+		}
+	}
+}
+
 function onMessage(from, message) {
 	try {
 		print("system onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
@@ -183,7 +205,7 @@ function onMessage(from, message) {
 					print("killing " + message.taskName);
 					tasks[message.taskName].task.kill();
 					delete tasks[message.taskName];
-					broadcast(null, {action:"updateTaskStatus", taskName:message.taskName, state:"stopped"});
+					notifyTaskStatusChanged(message.taskName, "stopped");
 				} else if (message.action == "startTask") {
 					startTask(message.taskName);
 				} else if (message.action == "restartTask" && tasks[message.taskName]) {
@@ -268,4 +290,12 @@ function onMessage(from, message) {
 	}
 }
 
+function registerTaskStatusChanged(callback) {
+	gStatusWatchers.push(callback);
+}
+
 start();
+
+exports = {
+	registerTaskStatusChanged: registerTaskStatusChanged,
+};

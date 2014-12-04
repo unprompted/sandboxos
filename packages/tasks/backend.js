@@ -90,7 +90,7 @@ function handle(request, response) {
 				action: "startTask",
 				taskName: form.taskName,
 			}).then(function(data) {
-				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});
 		} else if (request.uri == "/tasks/restart") {
@@ -100,7 +100,7 @@ function handle(request, response) {
 				action: "restartTask",
 				taskName: form.taskName,
 			}).then(function(data) {
-				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});
 		} else if (request.uri == "/tasks/stop") {
@@ -110,7 +110,7 @@ function handle(request, response) {
 				action: "stopTask",
 				taskName: form.taskName,
 			}).then(function(data) {
-				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
+				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});
 		} else if (request.uri == "/tasks/changes") {
@@ -122,14 +122,11 @@ function handle(request, response) {
 	}
 }
 
-function onMessage(from, message) {
-	if (message.request) {
-	} else if (message.action == "taskStarted" || message.action == "updateTaskStatus") {
-		for (var i in gWatchers) {
-			sendLatestStatus(gWatchers[i]);
-		}
-		gWatchers.length = 0;
+imports.system.registerTaskStatusChanged(function(taskName, taskStatus) {
+	for (var i in gWatchers) {
+		sendLatestStatus(gWatchers[i]);
 	}
-}
+	gWatchers.length = 0;
+});
 
 imports.httpd.get('/tasks', handle);
