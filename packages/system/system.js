@@ -196,7 +196,7 @@ function onMessage(from, message) {
 				makeDirectory(packageFilePath(fromName, "data"));
 				var fileName = packageFilePath(fromName, "data/" + message.fileName);
 				if (fileName) {
-					print("writeFile(" + fileName + ") => " + writeFile(fileName, message.contents));
+					writeFile(fileName, message.contents);
 				}
 			// some task management stuff
 			} else if (tasks[fromName] && tasks[fromName].manifest.trusted
@@ -210,7 +210,6 @@ function onMessage(from, message) {
 					startTask(message.taskName);
 				} else if (message.action == "restartTask" && tasks[message.taskName]) {
 					print("killing " + message.taskName);
-					print(tasks[message.taskName]);
 					var previousOnExit = tasks[message.taskName].task.onExit;
 					tasks[message.taskName].task.onExit = function() {
 						previousOnExit();
@@ -219,9 +218,8 @@ function onMessage(from, message) {
 					tasks[message.taskName].task.kill();
 				} else if (message.action == "put") {
 					var fileName = packageFilePath(message.taskName, message.fileName);
-					print("fileName = " + fileName);
 					if (fileName) {
-						print("write => " + writeFile(fileName, message.contents));
+						writeFile(fileName, message.contents);
 					}
 				} else if (message.action == "get") {
 					var fileName = packageFilePath(message.taskName || fromName, message.fileName);
@@ -257,15 +255,12 @@ function onMessage(from, message) {
 						}
 					}
 					return Promise.all(promises).then(function(statistics) {
-						print("STATISTICS: " + JSON.stringify(statistics));
 						var result = {};
 						for (var i in taskNames) {
 							result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
 						}
 						return result;
 					});
-				} else if (message.action == "getManifest") {
-					return tasks[message.taskName].manifest;
 				} else if (message.action == "list") {
 					var list = readDirectory(packageFilePath(message.taskName, ""));
 					list.sort();

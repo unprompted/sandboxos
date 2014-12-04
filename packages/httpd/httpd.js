@@ -114,7 +114,6 @@ function handleRequest(request, response) {
 }
 
 function handleConnection(client) {
-	print("New connection.");
 	var inputBuffer = "";
 	var request;
 	var headers = {};
@@ -160,7 +159,6 @@ function handleConnection(client) {
 	client.read(function(data) {
 		if (!data) {
 			client.close();
-			print("Connection closed.");
 		} else {
 			inputBuffer += data;
 			var more = true;
@@ -208,4 +206,3 @@ exports = {
 	all: all,
 	get: get,
 };
-print(exports);
