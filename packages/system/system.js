@@ -6,10 +6,10 @@ function start() {
 		tasks[i].task.kill();
 		delete tasks[i];
 	}
-	var packages = getPackageList();
+	var packages = getPackageListInternal();
 	for (var i in packages) {
 		if (packages[i] != "system") {
-			startTask(packages[i]);
+			startTaskInternal(packages[i]);
 		}
 	}
 }
@@ -33,7 +33,7 @@ function importsReady(task) {
 function updatePendingTasks() {
 	for (var i in tasks) {
 		if (tasks[i].pending && importsReady(tasks[i])) {
-			startTask(i);
+			startTaskInternal(i);
 		}
 	}
 }
@@ -89,7 +89,7 @@ function updateDependentTasks(taskName) {
 	}
 }
 
-function startTask(packageName) {
+function startTaskInternal(packageName) {
 	var manifest;
 	var task;
 
@@ -135,21 +135,36 @@ function startTask(packageName) {
 	return task;
 }
 
+function startTask(packageName) {
+	if (taskIsTrusted(this.taskName)) {
+	} else {
+		throw new Error("Permission denied.");
+	}
+}
+
 function stopTask(taskName) {
-	print("killing " + taskName);
-	tasks[taskName].task.kill();
-	delete tasks[taskName];
-	notifyTaskStatusChanged(taskName, "stopped");
+	if (taskIsTrusted(this.taskName)) {
+		print("killing " + taskName);
+		tasks[taskName].task.kill();
+		delete tasks[taskName];
+		notifyTaskStatusChanged(taskName, "stopped");
+	} else {
+		throw new Error("Permission denied.");
+	}
 }
 
 function restartTask(taskName) {
-	print("killing " + taskName);
-	var previousOnExit = tasks[taskName].task.onExit;
-	tasks[taskName].task.onExit = function() {
-		previousOnExit();
-		startTask(taskName);
+	if (taskIsTrusted(this.taskName)) {
+		print("killing " + taskName);
+		var previousOnExit = tasks[taskName].task.onExit;
+		tasks[taskName].task.onExit = function() {
+			previousOnExit();
+			startTask(taskName);
+		}
+		tasks[taskName].task.kill();
+	} else {
+		throw new Error("Permission denied.");
 	}
-	tasks[taskName].task.kill();
 }
 
 function packageFilePath(packageName, fileName) {
@@ -160,17 +175,7 @@ function packageFilePath(packageName, fileName) {
 	}
 }
 
-function getTaskName(task) {
-	var name;
-	for (var taskName in tasks) {
-		if (tasks[taskName].task == task) {
-			name = taskName;
-		}
-	}
-	return name;
-}
-
-function getPackageList() {
+function getPackageListInternal() {
 	var list = readDirectory("packages/");
 	list.sort();
 	var finalList = [];
@@ -182,29 +187,33 @@ function getPackageList() {
 	return finalList;
 }
 
-function getTasks() {
-	var taskNames = [];
-	var promises = [];
-	for (var i in tasks) {
-		if (tasks[i].task.statistics) {
-			taskNames.push(i);
-			promises.push(tasks[i].task.statistics());
-		}
+function getPackageList() {
+	if (taskIsTrusted(this.taskName)) {
+		return getPackageListInternal();
+	} else {
+		throw new Error("Permission denied.");
 	}
-	return Promise.all(promises).then(function(statistics) {
-		var result = {};
-		for (var i in taskNames) {
-			result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
-		}
-		return result;
-	});
 }
 
-function broadcast(from, message) {
-	for (var taskName in tasks) {
-		if (from != tasks[taskName] && tasks[taskName].task) {
-			tasks[taskName].task.invoke(message);
+function getTasks() {
+	if (taskIsTrusted(this.taskName)) {
+		var taskNames = [];
+		var promises = [];
+		for (var i in tasks) {
+			if (tasks[i].task.statistics) {
+				taskNames.push(i);
+				promises.push(tasks[i].task.statistics());
+			}
 		}
+		return Promise.all(promises).then(function(statistics) {
+			var result = {};
+			for (var i in taskNames) {
+				result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
+			}
+			return result;
+		});
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
@@ -218,6 +227,20 @@ function notifyTaskStatusChanged(taskName, taskStatus) {
 			}
 		}
 	}
+}
+
+function taskIsTrusted(taskName) {
+	return tasks[taskName] && tasks[taskName].manifest.trusted;
+}
+
+function accessRead(taskName, packageName) {
+	return !packageName
+		|| packageName == taskName
+		|| tasks[taskName] && tasks[taskName].manifest.trusted;
+}
+
+function accessWrite(taskName, packageName) {
+	return taskIsTrusted(taskName);
 }
 
 function getData(fileName) {
@@ -236,52 +259,76 @@ function putData(fileName, contents) {
 }
 
 function getPackageFile(fileName, packageName) {
-	var finalPath = packageFilePath(packageName || this.taskName, fileName);
-	if (finalPath) {
-		return readFile(finalPath);
+	if (accessRead(this.taskName, packageName)) {
+		var finalPath = packageFilePath(packageName || this.taskName, fileName);
+		if (finalPath) {
+			return readFile(finalPath);
+		}
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
 function putPackageFile(fileName, contents, packageName) {
-	var finalPath = packageFilePath(packageName || this.taskName, fileName);
-	if (finalPath) {
-		return writeFile(finalPath, contents);
+	if (accessWrite(this.taskName, packageName)) {
+		var finalPath = packageFilePath(packageName || this.taskName, fileName);
+		if (finalPath) {
+			return writeFile(finalPath, contents);
+		}
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
 function renamePackageFile(fromName, toName, packageName) {
-	var oldName = packageFilePath(packageName || this.taskName, fromName);
-	var newName = packageFilePath(packageName || this.taskName, toName);
-	if (oldName && newName) {
-		return renameFile(oldName, newName);
+	if (accessWrite(this.taskName, packageName)) {
+		var oldName = packageFilePath(packageName || this.taskName, fromName);
+		var newName = packageFilePath(packageName || this.taskName, toName);
+		if (oldName && newName) {
+			return renameFile(oldName, newName);
+		}
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
 function unlinkPackageFile(fileName, packageName) {
-	var finalName = packageFilePath(packageName || this.taskName, fileName);
-	if (finalName) {
-		return unlinkFile(finalName);
+	if (accessWrite(this.taskName, packageName)) {
+		var finalName = packageFilePath(packageName || this.taskName, fileName);
+		if (finalName) {
+			return unlinkFile(finalName);
+		}
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
 function createPackage(packageName) {
-	var path = packageFilePath(packageName, "");
-	if (path) {
-		makeDirectory(path);
-		return path;
+	if (accessWrite(this.taskName, packageName)) {
+		var path = packageFilePath(packageName, "");
+		if (path) {
+			makeDirectory(path);
+			return path;
+		}
+	} else {
+		throw new Error("Permission denied.");
 	}
 }
 
 function listPackageFiles(packageName) {
-	var list = readDirectory(packageFilePath(packageName || this.taskName, ""));
-	list.sort();
-	var finalList = [];
-	for (var i in list) {
-		if (list[i][0] != ".") {
-			finalList.push(list[i]);
+	if (accessRead(this.taskName, packageName)) {
+		var list = readDirectory(packageFilePath(packageName || this.taskName, ""));
+		list.sort();
+		var finalList = [];
+		for (var i in list) {
+			if (list[i][0] != ".") {
+				finalList.push(list[i]);
+			}
 		}
+		return finalList;
+	} else {
+		throw new Error("Permission denied.");
 	}
-	return finalList;
 }
 
 function registerTaskStatusChanged(callback) {
