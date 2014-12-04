@@ -9,11 +9,7 @@ function handleStatic(request, response) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			parent.invoke({
-				to: "system",
-				action: "get",
-				fileName: file.path,
-			}).then(function(data) {
+			imports.system.getPackageFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});

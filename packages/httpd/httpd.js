@@ -17,6 +17,7 @@ function addHandler(handler) {
 
 function get(prefix, handler) {
 	addHandler({
+		owner: this,
 		method: "GET",
 		path: prefix,
 		invoke: handler,
@@ -25,6 +26,7 @@ function get(prefix, handler) {
 
 function all(prefix, handler) {
 	addHandler({
+		owner: this,
 		path: prefix,
 		invoke: handler,
 	});

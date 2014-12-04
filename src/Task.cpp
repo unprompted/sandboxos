@@ -224,9 +224,10 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		}
 	}
 
-	v8::Local<v8::Array> array = v8::Array::New(args.GetIsolate(), args.Length());
+	v8::Local<v8::Array> array = v8::Array::New(args.GetIsolate(), args.Length() + 1);
+	array->Set(0, args.This());
 	for (int i = 0; i < args.Length(); ++i) {
-		array->Set(i, args[i]);
+		array->Set(i + 1, args[i]);
 	}
 
 	if (TaskStub* recipient = sender->get(recipientId)) {
@@ -238,31 +239,16 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer) {
-	TaskTryCatch tryCatch(to);
-	v8::Context::Scope contextScope(v8::Local<v8::Context>::New(to->_isolate, to->_context));
-	v8::Handle<v8::Context> context = to->_isolate->GetCurrentContext();
-	v8::Handle<v8::Value> args[2];
-	args[0] = from->getTaskObject();
-	args[1] = Serialize::load(to, from, buffer);
-	v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(context->Global()->Get(v8::String::NewFromUtf8(to->_isolate, "onMessage")));
-	v8::Handle<v8::Value> result;
-	if (!function.IsEmpty() && function->IsFunction()) {
-		result = function->Call(context->Global(), 2, &args[0]);
-	}
-	return result;
-}
-
 v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer) {
 	v8::Handle<v8::Value> result;
 	if (to->_exports[exportId]) {
 		v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
 		std::vector<v8::Handle<v8::Value> > array;
-		for (size_t i = 0; i < arguments->Length(); ++i) {
+		for (size_t i = 1; i < arguments->Length(); ++i) {
 			array.push_back(arguments->Get(i));
 		}
 		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(to->_isolate, to->_exports[exportId]->_persistent);
-		result = function->Call(function, array.size(), &*array.begin());
+		result = function->Call(v8::Handle<v8::Object>::Cast(arguments->Get(0)), array.size(), &*array.begin());
 	} else {
 		std::cout << "That's not an export we have\n";
 	}
@@ -435,13 +421,6 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 	v8::HandleScope scope(to->_isolate);
 
 	switch (static_cast<MessageType>(packetType)) {
-	case kSendMessage: {
-		promiseid_t promise;
-		std::memcpy(&promise, begin, sizeof(promise));
-		v8::Handle<v8::Value> result = invokeOnMessage(from, to, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
-		sendInvokeResult(to, from, promise, result);
-		}
-		break;
 	case kStatistics: {
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promise));

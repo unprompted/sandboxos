@@ -1,6 +1,6 @@
 {
 	"name": "chat",
 	"start": "backend.js",
-	"imports": ["auth", "httpd"],
+	"imports": ["auth", "httpd", "system"],
 	"href": "/chat"
 }

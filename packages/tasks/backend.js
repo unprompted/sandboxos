@@ -38,14 +38,8 @@ function decodeForm(encoded) {
 }
 
 function sendLatestStatus(response) {
-	parent.invoke({
-		to: "system",
-		action: "getPackageList",
-	}).then(function(packages) {
-		parent.invoke({
-			to: "system",
-			action: "getTasks",
-		}).then(function(tasks) {
+	imports.system.getPackageList().then(function(packages) {
+		imports.system.getTasks().then(function(tasks) {
 			response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 			response.end(JSON.stringify({tasks: tasks, packages: packages}));
 		});
@@ -69,11 +63,7 @@ function handle(request, response) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			parent.invoke({
-				to: "system",
-				action: "get",
-				fileName: file.path,
-			}).then(function(data) {
+			imports.system.getPackageFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});
@@ -85,31 +75,19 @@ function handle(request, response) {
 			sendLatestStatus(response);
 		} else if (request.uri == "/tasks/start") {
 			form = decodeForm(request.query);
-			parent.invoke({
-				to: "system",
-				action: "startTask",
-				taskName: form.taskName,
-			}).then(function(data) {
+			imports.system.startTask(form.taskName).then(function(data) {
 				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});
 		} else if (request.uri == "/tasks/restart") {
 			form = decodeForm(request.query);
-			parent.invoke({
-				to: "system",
-				action: "restartTask",
-				taskName: form.taskName,
-			}).then(function(data) {
+			imports.system.restartTask(form.taskName).then(function(data) {
 				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});
 		} else if (request.uri == "/tasks/stop") {
 			form = decodeForm(request.query);
-			parent.invoke({
-				to: "system",
-				action: "stopTask",
-				taskName: form.taskName,
-			}).then(function(data) {
+			imports.system.stopTask(form.taskName).then(function(data) {
 				response.writeHead(200, {"Content-Type": "text", "Connection": "close"});
 				response.end("OK");
 			});

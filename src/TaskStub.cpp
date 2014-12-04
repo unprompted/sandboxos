@@ -32,7 +32,6 @@ TaskStub* TaskStub::createParent(Task* task, uv_stream_t* handle) {
 	context->Enter();
 
 	v8::Handle<v8::ObjectTemplate> parentTemplate = v8::ObjectTemplate::New(task->_isolate);
-	parentTemplate->Set(v8::String::NewFromUtf8(task->_isolate, "invoke"), v8::FunctionTemplate::New(task->_isolate, TaskStub::invoke));
 	parentTemplate->SetInternalFieldCount(1);
 
 	v8::Handle<v8::Object> parentObject = parentTemplate->NewInstance();
@@ -58,7 +57,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "activate"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::activate));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "invoke"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::invoke));
 	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "statistics"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::statistics));
 	taskTemplate->SetInternalFieldCount(1);
 
@@ -242,19 +240,6 @@ void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (TaskStub* stub = TaskStub::get(args.This())) {
 		stub->_stream.send(kKill, 0, 0);
-	}
-}
-
-void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
-		TaskTryCatch tryCatch(stub->_owner);
-		v8::HandleScope scope(args.GetIsolate());
-
-		promiseid_t promise = stub->_owner->allocatePromise();
-		Task::sendPromiseMessage(stub->_owner, stub, kSendMessage, promise, args[0]);
-		args.GetReturnValue().Set(stub->_owner->getPromise(promise));
-	} else {
-		std::cerr << "No task for invoke\n";
 	}
 }
 

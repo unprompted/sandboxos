@@ -1,6 +1,6 @@
 {
 	"name": "wiki",
 	"start": "backend.js",
-	"imports": ["httpd"],
+	"imports": ["httpd", "system"],
 	"href": "/wiki"
 }

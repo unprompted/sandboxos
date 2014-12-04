@@ -23,7 +23,6 @@ typedef int promiseid_t;
 typedef int exportid_t;
 
 enum MessageType {
-	kSendMessage,
 	kResolvePromise,
 	kInvokeExport,
 	kReleaseExport,
@@ -115,7 +114,6 @@ private:
 	static void getExports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void setExports(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
 
-	static v8::Handle<v8::Value> invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer);
 	static v8::Handle<v8::Value> invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
 	static void sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result);
 

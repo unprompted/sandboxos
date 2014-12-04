@@ -98,16 +98,8 @@ function wikiToHtml(text) {
 
 function render(response, fileName, isEdit) {
 	Promise.all([
-		parent.invoke({
-			to: "system",
-				action: "get",
-				fileName: isEdit ? "edit.html" : "index.html",
-		}),
-		parent.invoke({
-		to: "system",
-			action: "getData",
-			fileName: fileName,
-		}),
+		imports.system.getPackageFile(isEdit ? "edit.html" : "index.html"),
+		imports.system.getData(fileName),
 	]).then(function(data) {
 		var html = data[0].replace(/\$\(CONTENTS\)/g, isEdit ? data[1] : wikiToHtml(data[1])).replace(/\$\(PAGE\)/g, fileName);
 		response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
@@ -121,11 +113,7 @@ function handler(request, response) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			parent.invoke({
-				to: "system",
-				action: "get",
-				fileName: file.path,
-			}).then(function(data) {
+			imports.system.getPackageFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});
@@ -148,12 +136,7 @@ function handler(request, response) {
 
 		if (request.method == "POST") {
 			var form = decodeForm(request.body);
-			parent.invoke({
-			to: "system",
-				action: "putData",
-				fileName: fileName,
-				contents: form.contents,
-			}).then(function() {
+			imports.system.putData(fileName, form.contents).then(function() {
 				response.writeHead(303, {"Content-Type": "text/plain", "Connection": "close", "Location": "/wiki/" + fileName});
 				response.end("");
 			});

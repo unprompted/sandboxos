@@ -48,10 +48,8 @@ var kStaticFiles = [
 ];
 
 function copyFile(oldPackage, newPackage, fileName) {
-	return new Promise(function(resolve, reject) {
-		parent.invoke({to: "system", action: "get", taskName: oldPackage, fileName: fileName}).then(function(result) {
-			parent.invoke({to: "system", action: "put", taskName: newPackage, fileName: fileName, contents: result}).then(resolve).catch(reject);
-		}).catch(reject);
+	return imports.system.getPackageFile(fileName, oldPackage).then(function(result) {
+		return imports.system.putPackageFile(fileName, result, newPackage);
 	});
 }
 
@@ -68,8 +66,7 @@ function handler(request, response) {
 		match = {path: "package.html", type: "text/html"};
 	}
 	if (match) {
-		print("RESPONDING TO " + JSON.stringify(match));
-		parent.invoke({to: "system", action: "get", taskName: "editor", fileName: match.path}).then(function(contents) {
+		imports.system.getPackageFile(match.path).then(function(contents) {
 			response.writeHead(200, {"Content-Type": match.type, "Connection": "close", "Content-Length": contents.length});
 			response.end(contents);
 		});
@@ -79,37 +76,32 @@ function handler(request, response) {
 		var regex = new RegExp("^/editor/([^/]+)/(.*)$");
 		match = regex.exec(request.uri);
 		if (match) {
-			var package = match[1];
+			var packageName = match[1];
 			var action = match[2];
 			handled = true;
 			if (action == "get") {
 				var form = decodeForm(request.query);
-				parent.invoke({to: "system", action: "get", taskName: package, fileName: form.fileName}).then(function(result) {
+				imports.system.getPackageFile(form.fileName, packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(result);
 				});
-			} else if (action == "getPackageList") {
-				parent.invoke({to: "system", action: "getPackageList"}).then(function(result) {
-					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(JSON.stringify(result));
-				});
 			} else if (action == "list") {
 				var form = decodeForm(request.query);
-				parent.invoke({to: "system", action: "list", taskName: package}).then(function(result) {
+				imports.system.listPackageFiles(packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				});
 			} else if (action == "put") {
 				var form = decodeForm(request.body);
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-				response.end("updated");
-
-				parent.invoke({to: "system", action: "put", taskName: package, fileName: form.fileName, contents: JSON.parse(form.contents)}).then(function(result) {
-					parent.invoke({to: "system", action: "restartTask", taskName: package});
+				imports.system.putPackageFile(form.fileName, JSON.parse(form.contents), packageName).then(function(result) {
+					return imports.system.restartTask(packageName);
+				}).then(function() {
+					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end("updated");
 				});
 			} else if (action == "new") {
 				var form = decodeForm(request.query);
-				parent.invoke({to: "system", action: "newPackage", taskName: package}).then(function(result) {
+				imports.system.createPackage(packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
@@ -118,7 +110,7 @@ function handler(request, response) {
 				});
 			} else if (action == "unlink") {
 				var form = decodeForm(request.query);
-				parent.invoke({to: "system", action: "unlink", taskName: package, fileName: form.fileName}).then(function(result) {
+				imports.system.unlinkPackageFile(form.fileName, packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
@@ -127,7 +119,7 @@ function handler(request, response) {
 				});
 			} else if (action == "rename") {
 				var form = decodeForm(request.query);
-				parent.invoke({to: "system", action: "rename", taskName: package, fileName: form.oldName, newName: form.newName}).then(function(result) {
+				imports.system.renamePackageFile(form.oldName, form.newName, packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
@@ -136,19 +128,19 @@ function handler(request, response) {
 				});
 			} else if (action == "clone") {
 				var form = decodeForm(request.query);
-				var oldName = package;
+				var oldName = packageName;
 				var newName = form.newName;
-				parent.invoke({to: "system", action: "newPackage", taskName: newName}).then(function(result) {
-					parent.invoke({to: "system", action: "list", taskName: oldName}).then(function(oldPackageContents) {
+				imports.system.createPackage(newName).then(function() {
+					imports.system.listPackageFiles(oldName).then(function(oldPackageContents) {
 						promises = [];
 						for (var i in oldPackageContents) {
 							promises.push(copyFile(oldName, newName, oldPackageContents[i]));
 						}
-						Promise.all(promises).then(function(data) {
-							response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-							response.end("cloned");
-						});
+						return Promise.all(promises);
 					});
+				}).then(function(data) {
+					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end("cloned");
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(error);
@@ -159,7 +151,6 @@ function handler(request, response) {
 		}
 	}
 	if (!handled) {
-		print("NOT HANDLED?");
 		response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close"});
 		response.end("404 Not found");
 	}

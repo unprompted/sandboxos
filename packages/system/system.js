@@ -61,10 +61,15 @@ function gatherImports(task) {
 	return Promise.all(promises).then(function(imports) {
 		var result = {};
 		for (var i in imports) {
-			result[imports[i].name] = imports[i].imports;
+			result[imports[i].name] = Object.create(imports[i].imports);
 		}
 		if (wantSystem) {
-			result["system"] = exports;
+			result["system"] = Object.create(exports);
+		}
+		for (var i in result) {
+			for (var j in result[i]) {
+				result[i][j] = result[i][j].bind({taskName: task.manifest.name});
+			}
 		}
 		return task.task.setImports(result);
 	});
@@ -103,6 +108,7 @@ function startTask(packageName) {
 		if (!task.pending) {
 			notifyTaskStatusChanged(packageName, "starting");
 			task.task = new Task();
+			task.task.packageName = packageName;
 			task.task.trusted = true;
 			task.task.onExit = function(exitCode, terminationSignal) {
 				if (terminationSignal) {
@@ -127,6 +133,23 @@ function startTask(packageName) {
 		print("Package " + packageName + " has no package.json.");
 	}
 	return task;
+}
+
+function stopTask(taskName) {
+	print("killing " + taskName);
+	tasks[taskName].task.kill();
+	delete tasks[taskName];
+	notifyTaskStatusChanged(taskName, "stopped");
+}
+
+function restartTask(taskName) {
+	print("killing " + taskName);
+	var previousOnExit = tasks[taskName].task.onExit;
+	tasks[taskName].task.onExit = function() {
+		previousOnExit();
+		startTask(taskName);
+	}
+	tasks[taskName].task.kill();
 }
 
 function packageFilePath(packageName, fileName) {
@@ -159,7 +182,23 @@ function getPackageList() {
 	return finalList;
 }
 
-var exports = {};
+function getTasks() {
+	var taskNames = [];
+	var promises = [];
+	for (var i in tasks) {
+		if (tasks[i].task.statistics) {
+			taskNames.push(i);
+			promises.push(tasks[i].task.statistics());
+		}
+	}
+	return Promise.all(promises).then(function(statistics) {
+		var result = {};
+		for (var i in taskNames) {
+			result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
+		}
+		return result;
+	});
+}
 
 function broadcast(from, message) {
 	for (var taskName in tasks) {
@@ -181,108 +220,68 @@ function notifyTaskStatusChanged(taskName, taskStatus) {
 	}
 }
 
-function onMessage(from, message) {
-	try {
-		print("system onMessage: " + JSON.stringify(from) + ", " + JSON.stringify(message));
-		if (message.to == "system") {
-			var fromName = getTaskName(from);
-
-			if (message.action == "getData") {
-				var fileName = packageFilePath(fromName, "data/" + message.fileName);
-				if (fileName) {
-					return readFile(fileName);
-				}
-			} else if (message.action == "putData") {
-				makeDirectory(packageFilePath(fromName, "data"));
-				var fileName = packageFilePath(fromName, "data/" + message.fileName);
-				if (fileName) {
-					writeFile(fileName, message.contents);
-				}
-			// some task management stuff
-			} else if (tasks[fromName] && tasks[fromName].manifest.trusted
-				|| (!message.taskName && message.action == "get")) {
-				if (message.action == "stopTask") {
-					print("killing " + message.taskName);
-					tasks[message.taskName].task.kill();
-					delete tasks[message.taskName];
-					notifyTaskStatusChanged(message.taskName, "stopped");
-				} else if (message.action == "startTask") {
-					startTask(message.taskName);
-				} else if (message.action == "restartTask" && tasks[message.taskName]) {
-					print("killing " + message.taskName);
-					var previousOnExit = tasks[message.taskName].task.onExit;
-					tasks[message.taskName].task.onExit = function() {
-						previousOnExit();
-						startTask(message.taskName);
-					}
-					tasks[message.taskName].task.kill();
-				} else if (message.action == "put") {
-					var fileName = packageFilePath(message.taskName, message.fileName);
-					if (fileName) {
-						writeFile(fileName, message.contents);
-					}
-				} else if (message.action == "get") {
-					var fileName = packageFilePath(message.taskName || fromName, message.fileName);
-					if (fileName) {
-						return readFile(fileName);
-					}
-				} else if (message.action == "rename") {
-					var oldName = packageFilePath(message.taskName || fromName, message.fileName);
-					var newName = packageFilePath(message.taskName || fromName, message.newName);
-					if (oldName && newName) {
-						return renameFile(oldName, newName);
-					}
-				} else if (message.action == "unlink") {
-					var fileName = packageFilePath(message.taskName || fromName, message.fileName);
-					if (fileName) {
-						return unlinkFile(fileName);
-					}
-				} else if (message.action == "newPackage") {
-					var path = packageFilePath(message.taskName, "");
-					if (path) {
-						makeDirectory(path);
-					}
-					return path;
-				} else if (message.action == "getPackageList") {
-					return getPackageList();
-				} else if (message.action == "getTasks") {
-					var taskNames = [];
-					var promises = [];
-					for (var i in tasks) {
-						if (tasks[i].task.statistics) {
-							taskNames.push(i);
-							promises.push(tasks[i].task.statistics());
-						}
-					}
-					return Promise.all(promises).then(function(statistics) {
-						var result = {};
-						for (var i in taskNames) {
-							result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
-						}
-						return result;
-					});
-				} else if (message.action == "list") {
-					var list = readDirectory(packageFilePath(message.taskName, ""));
-					list.sort();
-					var finalList = [];
-					for (var i in list) {
-						if (list[i][0] != ".") {
-							finalList.push(list[i]);
-						}
-					}
-					return finalList;
-				}
-			} else {
-				print("PERMISSION DENIED for: " + fromName);
-			}
-		} else if (message.to) {
-			return tasks[message.to].task.invoke(message);
-		} else {
-			broadcast(tasks[fromName], message);
-		}
-	} catch (error) {
-		return "ERROR: " + error.message;
+function getData(fileName) {
+	var finalPath = packageFilePath(this.taskName, "data/" + fileName);
+	if (finalPath) {
+		return readFile(finalPath);
 	}
+}
+
+function putData(fileName, contents) {
+	makeDirectory(packageFilePath(this.taskName, "data"));
+	var finalPath = packageFilePath(this.taskName, "data/" + fileName);
+	if (finalPath) {
+		return writeFile(finalPath, contents);
+	}
+}
+
+function getPackageFile(fileName, packageName) {
+	var finalPath = packageFilePath(packageName || this.taskName, fileName);
+	if (finalPath) {
+		return readFile(finalPath);
+	}
+}
+
+function putPackageFile(fileName, contents, packageName) {
+	var finalPath = packageFilePath(packageName || this.taskName, fileName);
+	if (finalPath) {
+		return writeFile(finalPath, contents);
+	}
+}
+
+function renamePackageFile(fromName, toName, packageName) {
+	var oldName = packageFilePath(packageName || this.taskName, fromName);
+	var newName = packageFilePath(packageName || this.taskName, toName);
+	if (oldName && newName) {
+		return renameFile(oldName, newName);
+	}
+}
+
+function unlinkPackageFile(fileName, packageName) {
+	var finalName = packageFilePath(packageName || this.taskName, fileName);
+	if (finalName) {
+		return unlinkFile(finalName);
+	}
+}
+
+function createPackage(packageName) {
+	var path = packageFilePath(packageName, "");
+	if (path) {
+		makeDirectory(path);
+		return path;
+	}
+}
+
+function listPackageFiles(packageName) {
+	var list = readDirectory(packageFilePath(packageName || this.taskName, ""));
+	list.sort();
+	var finalList = [];
+	for (var i in list) {
+		if (list[i][0] != ".") {
+			finalList.push(list[i]);
+		}
+	}
+	return finalList;
 }
 
 function registerTaskStatusChanged(callback) {
@@ -293,4 +292,14 @@ start();
 
 exports = {
 	registerTaskStatusChanged: registerTaskStatusChanged,
+	getData: getData,
+	putData: putData,
+	getPackageFile: getPackageFile,
+	putPackageFile: putPackageFile,
+	renamePackageFile: renamePackageFile,
+	unlinkPackageFile: unlinkPackageFile,
+	createPackage: createPackage,
+	listPackageFiles: listPackageFiles,
+	getPackageList: getPackageList,
+	getTasks: getTasks,
 };
