@@ -137,8 +137,9 @@ function startTaskInternal(packageName) {
 
 function startTask(packageName) {
 	if (taskIsTrusted(this.taskName)) {
+		startTaskInternal(packageName);
 	} else {
-		throw new Error("Permission denied.");
+		throw new Error("Permission denied to start task " + packageName + " from " + this.taskName + ".");
 	}
 }
 
@@ -159,7 +160,7 @@ function restartTask(taskName) {
 		var previousOnExit = tasks[taskName].task.onExit;
 		tasks[taskName].task.onExit = function() {
 			previousOnExit();
-			startTask(taskName);
+			startTaskInternal(taskName);
 		}
 		tasks[taskName].task.kill();
 	} else {
@@ -349,4 +350,7 @@ exports = {
 	listPackageFiles: listPackageFiles,
 	getPackageList: getPackageList,
 	getTasks: getTasks,
+	startTask: startTask,
+	stopTask: stopTask,
+	restartTask: restartTask,
 };

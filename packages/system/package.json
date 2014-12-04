@@ -1,0 +1,5 @@
+{
+	"name": "system",
+	"start": "system.js",
+	"trusted": true
+}

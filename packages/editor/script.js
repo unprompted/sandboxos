@@ -9,6 +9,8 @@ function saveFile() {
 			url: "put",
 			data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
 			dataType: "text",
+		}).fail(function(xhr, status, error) {
+			alert("Unable to save " + currentFileName + ".\n\n" + JSON.parse(xhr.responseText));
 		});
 	}
 }
@@ -36,21 +38,6 @@ function setText(text) {
 	}
 }
 
-function newPackage() {
-	var package = prompt("Name of new package:");
-	if (package) {
-		$.ajax({
-			url: "new",
-			data: {taskName: package},
-		}).then(function(data) {
-			alert("Package '" + package + "' created successfully.");
-			window.location.href = "/editor/" + package + "/";
-		}).fail(function(xhr, status, error) {
-			alert("Error: " + error);
-		});
-	}
-}
-
 function clonePackage() {
 	var newPackage = prompt("Name of new package:");
 	if (newPackage) {
@@ -61,7 +48,7 @@ function clonePackage() {
 			alert("Package '" + newPackage + "' created successfully.");
 			window.location.href = "/editor/" + newPackage + "/";
 		}).fail(function(xhr, status, error) {
-			alert("Error: " + error);
+			alert("Unable to clone package to " + newPackage + ".\n\n" + JSON.parse(xhr.responseText));
 		});
 	}
 }
@@ -85,7 +72,9 @@ function renameFile() {
 			url: "rename",
 			data: {oldName: currentFileName, newName: fileName},
 			dataType: "text",
-		}).then(refreshPackage);
+		}).then(refreshPackage).fail(function(xhr, status, error) {
+			alert("Unable to rename " + currentFileName + " to " + fileName + ".\n\n" + JSON.parse(xhr.responseText));
+		});
 	}
 }
 

@@ -1,4 +1,5 @@
 var gAccounts = {};
+var gPermissions = {};
 var gSessions = {};
 
 function getCookies(headers) {
@@ -56,6 +57,19 @@ function newSession() {
 		result += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
 	}
 	return result;
+}
+
+function getPermissions(session) {
+	var permissions = {};
+	if (session && gSessions[session]) {
+		permissions.authenticated = true;
+		if (gPermissions[gSessions[session].name]) {
+			for (var i in gPermissions[gSessions[session].name]) {
+				permissions[gPermissions[gSessions[session].name][i]] = true;
+			}
+		}
+	}
+	return permissions;
 }
 
 function handler(request, response) {
@@ -137,12 +151,15 @@ function handler(request, response) {
 function query(headers) {
 	var session = getCookies(headers).session;
 	if (session && gSessions[session]) {
-		return {session: gSessions[session]};
+		return {session: gSessions[session], permissions: getPermissions(session)};
 	}
 }
 
 imports.system.getData("accounts.json").then(function(data) {
 	gAccounts = JSON.parse(data);
+});
+imports.system.getData("permissions.json").then(function(data) {
+	gPermissions = JSON.parse(data);
 });
 
 imports.httpd.all("/login", handler);

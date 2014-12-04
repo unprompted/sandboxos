@@ -54,6 +54,35 @@ function copyFile(oldPackage, newPackage, fileName) {
 }
 
 function handler(request, response) {
+	imports.auth.query(request.headers).then(function(auth) {
+		if (auth) {
+			sessionHandler(request, response, auth);
+		} else {
+			response.writeHead(303, {"Location": "/login?return=" + request.uri, "Connection": "close"});
+			response.end();
+		}
+	});
+}
+
+function validateCanWrite(auth, packageName) {
+	return new Promise(function(resolve, reject) {
+		if (auth.permissions.administrator) {
+			resolve(true);
+		} else {
+			imports.system.getPackageFile("package.json", packageName).then(function(packageFile) {
+				var data = JSON.parse(packageFile);
+				if (data.trusted) {
+					throw new Error("Permission denied.");
+				}
+				resolve(true);
+			}).catch(function(e) {
+				reject(e);
+			});
+		}
+	});
+}
+
+function sessionHandler(request, response, auth) {
 	var handled = false;
 	var match;
 	for (var i in kStaticFiles) {
@@ -90,15 +119,28 @@ function handler(request, response) {
 				imports.system.listPackageFiles(packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
-				});
+				}).catch(function(error) {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(error);
+				});;
 			} else if (action == "put") {
 				var form = decodeForm(request.body);
-				imports.system.putPackageFile(form.fileName, JSON.parse(form.contents), packageName).then(function(result) {
+				validateCanWrite(auth, packageName).then(function() {
+					if (form.fileName == "package.json"
+						&& JSON.parse(JSON.parse(form.contents)).trusted
+						&& !auth.permissions.administrator) {
+						throw new Error("Permission denied.");
+					}
+					return imports.system.putPackageFile(form.fileName, JSON.parse(form.contents), packageName);
+				}).then(function(result) {
 					return imports.system.restartTask(packageName);
 				}).then(function() {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end("updated");
-				});
+				}).catch(function(error) {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(JSON.stringify(error.toString()));
+				});;
 			} else if (action == "new") {
 				var form = decodeForm(request.query);
 				imports.system.createPackage(packageName).then(function(result) {
@@ -106,44 +148,53 @@ function handler(request, response) {
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(error);
+					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "unlink") {
 				var form = decodeForm(request.query);
-				imports.system.unlinkPackageFile(form.fileName, packageName).then(function(result) {
+				validateCanWrite(auth, packageName).then(function() {
+					return imports.system.unlinkPackageFile(form.fileName, packageName);
+				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(error);
+					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "rename") {
 				var form = decodeForm(request.query);
-				imports.system.renamePackageFile(form.oldName, form.newName, packageName).then(function(result) {
+				validateCanWrite(auth, packageName).then(function() {
+					if (form.newName == "package.json" || form.oldName == "package.json") {
+						throw new Error("Renaming to/from package.json is not allowed.");
+					}
+					return imports.system.renamePackageFile(form.oldName, form.newName, packageName);
+				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(error);
+					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "clone") {
 				var form = decodeForm(request.query);
 				var oldName = packageName;
 				var newName = form.newName;
-				imports.system.createPackage(newName).then(function() {
-					imports.system.listPackageFiles(oldName).then(function(oldPackageContents) {
-						promises = [];
-						for (var i in oldPackageContents) {
-							promises.push(copyFile(oldName, newName, oldPackageContents[i]));
-						}
-						return Promise.all(promises);
-					});
+				validateCanWrite(auth, packageName).then(function() {
+					return imports.system.createPackage(newName);
+				}).then(function() {
+					return imports.system.listPackageFiles(oldName);
+				}).then(function(oldPackageContents) {
+					promises = [];
+					for (var i in oldPackageContents) {
+						promises.push(copyFile(oldName, newName, oldPackageContents[i]));
+					}
+					return Promise.all(promises);
 				}).then(function(data) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end("cloned");
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(error);
+					response.end(JSON.stringify(error.toString()));
 				});
 			} else {
 				handled = false;
