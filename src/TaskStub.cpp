@@ -161,6 +161,7 @@ void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminat
 		args[1] = v8::Integer::New(stub->_owner->_isolate, terminationSignal);
 		callback->Call(callback, 2, &args[0]);
 	}
+	stub->_owner->_children.erase(stub->_id);
 	uv_close(reinterpret_cast<uv_handle_t*>(process), 0);
 }
 
@@ -219,21 +220,23 @@ v8::Handle<v8::Object> TaskStub::getTaskObject() {
 }
 
 void TaskStub::activate(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	TaskStub* stub = TaskStub::get(args.This());
-	TaskTryCatch tryCatch(stub->_owner);
-	v8::HandleScope scope(args.GetIsolate());
-	v8::String::Utf8Value fileName(args[0]->ToString(args.GetIsolate()));
-	stub->_stream.send(kActivate, 0, 0);
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(args.GetIsolate());
+		v8::String::Utf8Value fileName(args[0]->ToString(args.GetIsolate()));
+		stub->_stream.send(kActivate, 0, 0);
+	}
 }
 
 void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	TaskStub* stub = TaskStub::get(args.This());
-	TaskTryCatch tryCatch(stub->_owner);
-	v8::HandleScope scope(args.GetIsolate());
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(args.GetIsolate());
 
-	promiseid_t promise = stub->_owner->allocatePromise();
-	Task::sendPromiseMessage(stub->_owner, stub, kExecute, promise, args[0]);
-	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+		promiseid_t promise = stub->_owner->allocatePromise();
+		Task::sendPromiseMessage(stub->_owner, stub, kExecute, promise, args[0]);
+		args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+	}
 }
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -243,21 +246,25 @@ void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::invoke(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	TaskStub* stub = TaskStub::get(args.This());
-	TaskTryCatch tryCatch(stub->_owner);
-	v8::HandleScope scope(args.GetIsolate());
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(args.GetIsolate());
 
-	promiseid_t promise = stub->_owner->allocatePromise();
-	Task::sendPromiseMessage(stub->_owner, stub, kSendMessage, promise, args[0]);
-	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+		promiseid_t promise = stub->_owner->allocatePromise();
+		Task::sendPromiseMessage(stub->_owner, stub, kSendMessage, promise, args[0]);
+		args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+	} else {
+		std::cerr << "No task for invoke\n";
+	}
 }
 
 void TaskStub::statistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	TaskStub* stub = TaskStub::get(args.This());
-	TaskTryCatch tryCatch(stub->_owner);
-	v8::HandleScope scope(args.GetIsolate());
+	if (TaskStub* stub = TaskStub::get(args.This())) {
+		TaskTryCatch tryCatch(stub->_owner);
+		v8::HandleScope scope(args.GetIsolate());
 
-	promiseid_t promise = stub->_owner->allocatePromise();
-	Task::sendPromiseMessage(stub->_owner, stub, kStatistics, promise, v8::Undefined(args.GetIsolate()));
-	args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+		promiseid_t promise = stub->_owner->allocatePromise();
+		Task::sendPromiseMessage(stub->_owner, stub, kStatistics, promise, v8::Undefined(args.GetIsolate()));
+		args.GetReturnValue().Set(stub->_owner->getPromise(promise));
+	}
 }

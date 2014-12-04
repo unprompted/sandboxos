@@ -229,10 +229,13 @@ void Task::invokeExport(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		array->Set(i, args[i]);
 	}
 
-	TaskStub* recipient = sender->get(recipientId);
-	promiseid_t promise = sender->allocatePromise();
-	sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
-	args.GetReturnValue().Set(sender->getPromise(promise));
+	if (TaskStub* recipient = sender->get(recipientId)) {
+		promiseid_t promise = sender->allocatePromise();
+		sendPromiseExportMessage(sender, recipient, kInvokeExport, promise, exportId, array);
+		args.GetReturnValue().Set(sender->getPromise(promise));
+	} else {
+		args.GetReturnValue().Set(args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "Invoking a function on a nonexistant task."))));
+	}
 }
 
 v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std::vector<char>& buffer) {
@@ -252,19 +255,17 @@ v8::Handle<v8::Value> Task::invokeOnMessage(TaskStub* from, Task* to, const std:
 
 v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer) {
 	v8::Handle<v8::Value> result;
-	v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
-	std::vector<v8::Handle<v8::Value> > array;
-	for (size_t i = 0; i < arguments->Length(); ++i) {
-		array.push_back(arguments->Get(i));
-	}
-	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(to->_isolate, to->_exports[exportId]->_persistent);
-	if (function.IsEmpty()) {
-		std::cout << "I COULD NOT FIND THE FUNCTION " << exportId << " ON " << to->_scriptName << " (" << to->_exports.size() << ") " << to->_exports[exportId]->_persistent.IsEmpty() << "\n";
-		result = v8::Undefined(to->_isolate);
-	} else {
+	if (to->_exports[exportId]) {
+		v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
+		std::vector<v8::Handle<v8::Value> > array;
+		for (size_t i = 0; i < arguments->Length(); ++i) {
+			array.push_back(arguments->Get(i));
+		}
+		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(to->_isolate, to->_exports[exportId]->_persistent);
 		result = function->Call(function, array.size(), &*array.begin());
+	} else {
+		std::cout << "That's not an export we have\n";
 	}
-
 	from->getStream().send(kReleaseImport, reinterpret_cast<char*>(&exportId), sizeof(exportId));
 	return result;
 }
@@ -510,7 +511,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		}
 		break;
 	case kKill:
-		to->kill();
+		::exit(1);
 		break;
 	case kSetImports: {
 		v8::Handle<v8::Object> result = v8::Handle<v8::Object>::Cast(Serialize::load(to, from, std::vector<char>(begin, begin + length)));
