@@ -370,7 +370,9 @@ exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
 	exportid_t exportId = -1;
 	typedef std::map<exportid_t, ExportRecord*> ExportMap;
 	for (ExportMap::iterator it = _exports.begin(); it != _exports.end(); ++it) {
-		if (it->second->_persistent == function) {
+		if (it->second
+			&& !it->second->_persistent.IsEmpty()
+			&& it->second->_persistent == function) {
 			found = true;
 			exportId = it->first;
 			break;
@@ -406,6 +408,7 @@ v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
 v8::Handle<v8::Object> Task::getStatistics() {
 	v8::Handle<v8::Object> result = v8::Object::New(_isolate);
 	result->Set(v8::String::NewFromUtf8(_isolate, "sockets"), v8::Integer::New(_isolate, Socket::getCount()));
+	result->Set(v8::String::NewFromUtf8(_isolate, "openSockets"), v8::Integer::New(_isolate, Socket::getOpenCount()));
 	result->Set(v8::String::NewFromUtf8(_isolate, "promises"), v8::Integer::New(_isolate, _promises.size()));
 	result->Set(v8::String::NewFromUtf8(_isolate, "exports"), v8::Integer::New(_isolate, _exports.size()));
 	result->Set(v8::String::NewFromUtf8(_isolate, "imports"), v8::Integer::New(_isolate, _imports.size()));
@@ -453,9 +456,11 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		assert(length == sizeof(exportid_t));
 		exportid_t exportId;
 		memcpy(&exportId, begin, sizeof(exportId));
-		to->_exports[exportId]->_persistent.Reset();
-		delete to->_exports[exportId];
-		to->_exports.erase(exportId);
+		if (to->_exports[exportId]) {
+			to->_exports[exportId]->_persistent.Reset();
+			delete to->_exports[exportId];
+			to->_exports.erase(exportId);
+		}
 		break;
 	case kReleaseImport: {
 		assert(length == sizeof(exportid_t));

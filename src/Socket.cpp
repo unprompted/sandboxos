@@ -7,6 +7,7 @@
 #include <uv.h>
 
 int Socket::_count = 0;
+int Socket::_openCount = 0;
 
 Socket::Socket(Task* task)
 :	_refCount(1),
@@ -30,6 +31,7 @@ Socket::Socket(Task* task)
 	_object = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(task->getIsolate(), socketObject);
 
 	uv_tcp_init(task->getLoop(), &_socket);
+	++_openCount;
 	_socket.data = this;
 	_task = task;
 	_promise = -1;
@@ -96,6 +98,8 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		client->release();
 		if (uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&client->_socket)) == 0) {
 			client->_connected = true;
+		} else {
+			std::cerr << "uv_accept failed\n";
 		}
 	}
 }
@@ -111,7 +115,9 @@ void Socket::read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
 		socket->_onRead = callback;
-		uv_read_start(reinterpret_cast<uv_stream_t*>(&socket->_socket), allocateBuffer, onRead);
+		if (uv_read_start(reinterpret_cast<uv_stream_t*>(&socket->_socket), allocateBuffer, onRead) != 0) {
+			std::cerr << "uv_read_start failed\n";
+		}
 	}
 }
 
@@ -156,7 +162,9 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 			buffer.len = valueLength;
 
 			request->data = reinterpret_cast<void*>(promise);
-			uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &buffer, 1, onWrite);
+			if (uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &buffer, 1, onWrite) != 0) {
+				std::cerr << "uv_write failed\n";
+			}
 		} else {
 			socket->_task->rejectPromise(socket->_promise, v8::Integer::New(args.GetIsolate(), -2));
 		}
@@ -183,6 +191,7 @@ v8::Handle<v8::Promise::Resolver> Socket::makePromise() {
 }
 
 void Socket::onClose(uv_handle_t* handle) {
+	--_openCount;
 	if (Socket* socket = reinterpret_cast<Socket*>(handle->data)) {
 		if (socket->_promise != -1) {
 			v8::HandleScope scope(socket->_task->getIsolate());

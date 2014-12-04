@@ -1,5 +1,6 @@
 var kStaticFiles = [
 	{uri: '/wiki/frontend.js', path: 'frontend.js', type: 'text/javascript'},
+	{uri: '/wiki/style.css', path: 'style.css', type: 'text/css'},
 ];
 
 function startsWith(string, start) {
@@ -54,11 +55,23 @@ function wikiToHtml(text) {
 	var justStartedNewParagraph = true;
 	var inList = false;
 	var inBlock = false;
+	var shebang = false;
+	var inRawHtml = false;
 	for (var i in lines) {
 		var line = lines[i];
-		if (line.trim().length == 0) {
+		if (inBlock && !shebang) {
+			shebang = true;
+			inRawHtml = line == "#!html";
+			if (inRawHtml) {
+				result.push("<p>\n");
+			} else {
+				result.push("<blockquote>\n");
+			}
+		} else if (inBlock && inRawHtml && line != "}}}") {
+			result.push(line);
+		} else if (line.trim().length == 0) {
 			if (!justStartedNewParagraph) {
-				result.push("</p>");
+				result.push("</p>\n");
 				result.push("<p>");
 				justStartedNewParagraph = true;
 			}
@@ -66,34 +79,39 @@ function wikiToHtml(text) {
 			justStartedNewParagraph = false;
 			if (line.substring(0, 3) == " * ") {
 				if (!inList) {
-					result.push("<ul>");
+					result.push("\n<ul>\n");
 					inList = true;
 				}
-				result.push("<li>" + wikiToHtmlLine(line.substring(3)) + "</li>");
+				result.push("\t<li>" + wikiToHtmlLine(line.substring(3)) + "</li>\n");
 			} else {
 				if (inList) {
-					result.push("</ul>");
+					result.push("\n</ul>\n");
 					inList = false;
 				}
 				var match;
 				if (match = new RegExp(/^(=+) (.*) \1$/).exec(line)) {
 					var level = (1 + match[1].length).toString();
-					result.push("<h" + level + ">" + match[2] + "</h" + level + ">");
+					result.push("<h" + level + ">" + match[2] + "</h" + level + ">\n");
 				} else if (line == "----") {
-					result.push("<hr>");
+					result.push("<hr>\n");
 				} else if (line == "{{{") {
 					inBlock = true;
-					result.push("<blockquote>");
+					shebang = false;
 				} else if (inBlock && line == "}}}") {
 					inBlock = false;
-					result.push("</blockquote>");
+					if (inRawHtml) {
+						result.push("</p>\n");
+						inRawHtml = false;
+					} else {
+						result.push("</blockquote>\n");
+					}
 				} else {
 					result.push(wikiToHtmlLine(line));
 				}
 			}
 		}
 	}
-	return result.join("\n");
+	return result.join("");
 }
 
 function render(response, fileName, isEdit) {

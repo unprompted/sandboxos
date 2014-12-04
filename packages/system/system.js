@@ -1,5 +1,5 @@
 var tasks = {};
-var gStatusWatchers = [];
+var gStatusWatchers = {};
 
 function start() {
 	for (var i in tasks) {
@@ -224,7 +224,7 @@ function notifyTaskStatusChanged(taskName, taskStatus) {
 			try {
 				gStatusWatchers[i](taskName, taskStatus);
 			} catch (e) {
-				gStatusWatchers[i] = null;
+				delete gStatusWatchers[i];
 			}
 		}
 	}
@@ -333,7 +333,7 @@ function listPackageFiles(packageName) {
 }
 
 function registerTaskStatusChanged(callback) {
-	gStatusWatchers.push(callback);
+	gStatusWatchers[this.taskName] = callback;
 }
 
 start();

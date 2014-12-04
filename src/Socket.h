@@ -23,6 +23,7 @@ public:
 	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 	static int getCount() { return _count; }
+	static int getOpenCount() { return _openCount; }
 
 private:
 	Socket(Task* task);
@@ -36,6 +37,7 @@ private:
 	bool _connected;
 
 	static int _count;
+	static int _openCount;
 
 	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _object;
 
