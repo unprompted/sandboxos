@@ -42,8 +42,8 @@ function decodeForm(encoded) {
 function wikiToHtmlLine(line) {
 	return line
 		.replace(/[<>&]/g, function(c) {	return {'<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; })
-		.replace(/'''(.*)'''/, "<b>$1</b>")
-		.replace(/''(.*)''/, "<em>$1</em>")
+		.replace(/'''(.*?)'''/, "<b>$1</b>")
+		.replace(/''(.*?)''/, "<em>$1</em>")
 		.replace(/\[(\S+) ([^\]]+)\]/g, '<a href="$1">$2</a>')
 		.replace(/~~([^~]+)~~/g, "<strike>$1</strike>");
 }

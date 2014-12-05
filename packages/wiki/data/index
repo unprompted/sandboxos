@@ -1,46 +1,46 @@
 = Building an Operating System for the Web =
 
-I embedded a JavaScript engine in a C++ application and used it to make some webapps.  I made a wiki with it.  That is what you are looking at.  It's not especially good, but the interesting part is that you, as a random visitor to this web site, have the power to rewrite the wiki webapp itself into something better.
+I embedded a JavaScript engine in a C++ application and used it to make some webapps.  I made a wiki with it.  That is what you are looking at.  It's not especially good, but the interesting part is that you, as a visitor to this web site, have the power to rewrite the wiki webapp itself into something better.
 
 {{{
 #!html
 <div style="width: 300px; float: left; padding: 1em">
 	<h1>Security +</h1>
-	<p>An easy-to-understand security model built on top of well-trusted technology.</p>
-	<p>Each task runs in its own process just like tabs in the Google Chrome web browser.</p>
-	<p>Each task declares what resources it needs access to just like apps on a mobile device.</p>
+	<p>Webapps here are built out of smaller tasks.</p>
+	<p>Each task runs in its own process just like tabs in the <a href="http://www.chromium.org/developers/design-documents/sandbox">Google Chrome</a> web browser.</p>
+	<p>Each task declares and is granted access to only what resources it needs just like <a href="http://www.veracode.com/resources/android-ios-security">apps on a mobile device</a>.</p>
 	<p>Sensible limits on access to resources will prevent any one task from negatively affecting others.</p>
 </div>
 <div style="width: 300px; float: left; padding: 1em">
 	<h1>Sharing</h1>
-	<p>The web is for sharing.</p>
 	<p>This is open source.  Browse or branch it <a href="http://www.unprompted.com/projects/browser/projects/sandboxos/trunk">from here</a>.</p>
-	<p>All tasks are yours to improve.  Clone any task, make it better, and then share what you made, all from a browser.</p>
+	<p>All tasks are yours to improve.  Clone any task on this server or your own, make it better, and then share what you made, all from a browser.</p>
 	<p>Let's get many instances of this all talking to each other just like popular social networks don't.</p>
 </div>
 <div style="width: 300px; float: left; padding: 1em">
-	<h1>= Power</h1>
-	<p>This can become an extension of your web browser, but since it's a separate application under your control, it can have extra access to system resources and can benefit any browser.  (What if there was a YouTube alternative that played videos from my own computer or mobile device?)</p>
-	<p></p>
+	<h1>= Power?</h1>
+	<p>This is another experimental approach at executing on the <a href="http://en.wikipedia.org/wiki/Unix_philosophy">UNIX philosophy</a>.</p>
+	<p>This can become an extension of your web browser, but since it's a separate application under your control, it can have extra access to system resources while still benefitting your browser(s) of choice.</p>
+	<p>Make the web browser the next terminal.</p>
 </div>
 <div style="width: 300px; float: left; padding: 1em">
 	<h1>// The Architecture</h1>
 	<table border="0">
 		<tr>
-			<td colspan="5">Web Browsers</td>
+			<td colspan="5">Web Browsers (Chrome, Firefox, ...)</td>
 		</tr>
 		<tr>
-			<td>httpd</td>
-			<td>auth</td>
-			<td>wiki</td>
-			<td>chat</td>
-			<td>...<div><small>(more JavaScript tasks)</small></div></td>
+			<td style="background-color: #ccf">httpd</td>
+			<td style="background-color: #ccf">auth</td>
+			<td style="background-color: #ccf">wiki</td>
+			<td style="background-color: #ccf">chat</td>
+			<td style="background-color: #ccf">...<div><small>(more JavaScript tasks)</small></div></td>
 		</tr>
 		<tr>
-			<td colspan="5">system.js<div><small>(core task)</small></div></td>
+			<td colspan="5" style="background-color: #ccf">system.js<div><small>(core task)</small></div></td>
 		</tr>
 		<tr>
-			<td colspan="5">sandboxos<div><small>(working title, small C++ program that mediates tasks running JavaScript code with the layers below)</small></div></td>
+			<td colspan="5" style="background-color: #ccf">sandboxos<div><small>(working title, small C++ program that mediates tasks running JavaScript code with the layers below)</small></div></td>
 		</tr>
 		<tr>
 			<td colspan="5"><a href="https://code.google.com/p/v8/">V8</a><div><small>(Google's open source JavaScript engine)</small></div></td>
@@ -53,7 +53,7 @@ I embedded a JavaScript engine in a C++ application and used it to make some web
 			<td>Windows</td>
 			<td>OS X</td>
 			<td>Android</td>
-			<td>iOS</td>
+			<td>iOS<div><small>(jailbroken only?)</small></div></td>
 		</tr>
 		<tr>
 			<td colspan="3">PC</td>
@@ -70,17 +70,19 @@ I embedded a JavaScript engine in a C++ application and used it to make some web
 #!html
 <ol>
 <li>Visit the <a href="/tasks">/tasks</a> page.</li>
-<li>Pick a task.  Click edit.  You will probably have to log in at this point.</li>
+<li>Pick a task (hint: consider <b>helloworld</b>, <b>wiki</b>, or <b>chat</b>).  Click edit.  You will probably have to log in at this point.</li>
 <li>Clone it.</li>
-<li>Make modifications to the server-side and client-side resources.</li>
+<li>Make modifications.</li>
 <li>Visit the task's frontend in a web browser and refresh it to see your changes.</li>
 <li>Ask questions.  Either stick them here on the wiki somewhere, or email me at <a href="mailto:sandbox@unprompted.com">sandbox@unprompted.com</a>.</li>
 </ol>
 }}}
 
-It should be difficult to do anything too disruptive, and there are numerous backups if you do, so don't worry about breaking things.
+It should be difficult to do anything too disruptive, and there are backups if you do.  '''Don't worry about breaking things.'''
 
-That said, there are probably ways to do bad things if you try hard.  Please don't be mean.
+It's easy to make things fail silently.  I will be working on improving that.  '''Use the log task.'''
+
+There are probably ways to do bad things if you try hard.  '''Please don't be mean.'''
 
 = TODO =
 In no particular order:
@@ -88,7 +90,7 @@ In no particular order:
  * Make some sort of TODO / bug tracker to replace this task list.
  * Establish some conventions for non-webapp tasks.  Maybe make a shell that lets you run code from any task that exposes it.
  * Establish some conventions for HTML fragments.  Include a persistent HTML header in every page or something like that.
- * Make an app store.  Not too important until we have multiple installs, but pretty important.
+ * Make an app store.  Not too important until we have multiple installs but pretty important.
  * Lots of the API exposed from C++ isn't async but should be.
  * Pick a name for this thing.
  * Set up an automated build.
