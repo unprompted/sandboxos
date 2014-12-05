@@ -24,6 +24,7 @@ typedef int exportid_t;
 
 enum MessageType {
 	kResolvePromise,
+	kRejectPromise,
 	kInvokeExport,
 	kReleaseExport,
 	kReleaseImport,
@@ -98,8 +99,6 @@ private:
 	int64_t _memoryAllocated = 0;
 	int64_t _memoryLimit = 64 * 1024 * 1024;
 
-	void execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name);
-
 	v8::Handle<v8::Object> getStatistics();
 
 	static void activate(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -107,6 +106,7 @@ private:
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void invokeCatch(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
@@ -115,7 +115,8 @@ private:
 	static void setExports(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);
 
 	static v8::Handle<v8::Value> invokeExport(TaskStub* from, Task* to, exportid_t exportId, const std::vector<char>& buffer);
-	static void sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result);
+	static void sendPromiseResolve(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result);
+	static void sendPromiseReject(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result);
 
 	static void onReceivePacket(int packetType, const char* begin, size_t length, void* userData);
 

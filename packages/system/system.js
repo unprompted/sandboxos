@@ -126,6 +126,9 @@ function startTaskInternal(packageName) {
 					notifyTaskStatusChanged(packageName, "started");
 					updateDependentTasks(packageName);
 					updatePendingTasks();
+				}).catch(function(error) {
+					task.error = error;
+					notifyTaskStatusChanged(packageName, "error");
 				});
 			});
 		}
@@ -201,7 +204,7 @@ function getTasks() {
 		var taskNames = [];
 		var promises = [];
 		for (var i in tasks) {
-			if (tasks[i].task.statistics) {
+			if (tasks[i].task && tasks[i].task.statistics) {
 				taskNames.push(i);
 				promises.push(tasks[i].task.statistics());
 			}
@@ -209,7 +212,12 @@ function getTasks() {
 		return Promise.all(promises).then(function(statistics) {
 			var result = {};
 			for (var i in taskNames) {
-				result[taskNames[i]] = {statistics: statistics[i], manifest: tasks[taskNames[i]].manifest};
+				result[taskNames[i]] = {
+					statistics: statistics[i],
+					manifest: tasks[taskNames[i]].manifest,
+					status: tasks[taskNames[i]].status,
+					error: tasks[taskNames[i]].error,
+				};
 			}
 			return result;
 		});
@@ -219,6 +227,9 @@ function getTasks() {
 }
 
 function notifyTaskStatusChanged(taskName, taskStatus) {
+	if (tasks[taskName]) {
+		tasks[taskName].status = taskStatus;
+	}
 	for (var i in gStatusWatchers) {
 		if (gStatusWatchers[i]) {
 			try {

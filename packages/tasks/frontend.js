@@ -38,26 +38,23 @@ function watchForChanges() {
 	});
 }
 
+function showError(error) {
+	return function() {
+		alert(error.stackTrace + "\n\n" + error.fileName + ":" + error.lineNumber + ":\n" + error.sourceLine);
+	}
+}
+
 function handleNewData(data) {
+	console.debug(data);
 	$("#tasks").empty();
+
 	var tr = document.createElement("tr");
-
-	var th = document.createElement("th");
-	$(th).text("Package");
-	$(tr).append(th);
-
-	th = document.createElement("th");
-	$(th).text("Status");
-	$(tr).append(th);
-
-	th = document.createElement("th");
-	$(th).text("Actions");
-	$(tr).append(th);
-
-	th = document.createElement("th");
-	$(th).text("Edit");
-	$(tr).append(th);
-
+	var columns = ["Package", "Status", "Actions", "Statistics"];
+	for (var i in columns) {
+		var th = document.createElement("th");
+		$(th).text(columns[i]);
+		$(tr).append(th);
+	}
 	$("#tasks").append(tr);
 
 	for (var i in data.packages) {
@@ -81,16 +78,28 @@ function handleNewData(data) {
 			var td = document.createElement("td");
 			$(td).text("always running");
 			$(tr).append(td);
-
-			var td = document.createElement("td");
-			$(tr).append(td);
 		} else if (data.tasks[package]) {
 			var td = document.createElement("td");
-			$(td).text("running ");
-			$(td).append(JSON.stringify(data.tasks[package].statistics));
+			$(td).text(data.tasks[package].status);
+			if (data.tasks[package].error) {
+				$(td).click(showError(data.tasks[package].error));
+				$(td).css({color: "red", cursor: "pointer"});
+			}
 			$(tr).append(td);
-
+		} else {
 			var td = document.createElement("td");
+			$(td).text("not running");
+			$(tr).append(td);
+		}
+
+		// Actions
+		var td = document.createElement("td");
+		var a = document.createElement("a");
+		$(a).text("edit");
+		$(a).attr("href", "/editor/" + package + "/");
+		$(td).append(a);
+		$(td).append(" ");
+		if (data.tasks[package]) {
 			var stop = document.createElement("input");
 			$(stop).attr("type", "button");
 			$(stop).attr("value", "Stop");
@@ -104,27 +113,20 @@ function handleNewData(data) {
 			$(restart).data("taskName", package);
 			$(restart).click(restartTask);
 			$(td).append(restart);
-			$(tr).append(td);
 		} else {
-			var td = document.createElement("td");
-			$(td).text("not running");
-			$(tr).append(td);
-
-			var td = document.createElement("td");
 			var start = document.createElement("input");
 			$(start).attr("type", "button");
 			$(start).attr("value", "Start");
 			$(start).data("taskName", package);
 			$(start).click(startTask);
 			$(td).append(start);
-			$(tr).append(td);
 		}
+		$(tr).append(td);
 
 		var td = document.createElement("td");
-		var a = document.createElement("a");
-		$(a).text("edit");
-		$(a).attr("href", "/editor/" + package + "/");
-		$(td).append(a);
+		if (data.tasks[package]) {
+			$(td).append(JSON.stringify(data.tasks[package].statistics));
+		}
 		$(tr).append(td);
 
 		$("#tasks").append(tr);

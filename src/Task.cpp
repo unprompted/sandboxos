@@ -190,23 +190,19 @@ void Task::execute(const char* fileName) {
 	v8::HandleScope handleScope(_isolate);
 	v8::Context::Scope contextScope(v8::Local<v8::Context>::New(_isolate, _context));
 
-	v8::Handle<v8::String> script = loadFile(_isolate, fileName);
+	v8::Handle<v8::String> name = v8::String::NewFromUtf8(_isolate, fileName);
+
+	v8::Handle<v8::String> source = loadFile(_isolate, fileName);
 	std::cout << "Running script " << fileName << "\n";
 	_scriptName = fileName;
-	if (!script.IsEmpty()) {
-		execute(script, v8::String::NewFromUtf8(_isolate, fileName));
-	}
-}
-
-void Task::execute(v8::Handle<v8::String> source, v8::Handle<v8::String> name) {
-	TaskTryCatch tryCatch(this);
-	v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
-	if (!script.IsEmpty()) {
-		v8::Handle<v8::Value> result = script->Run();
-		v8::String::Utf8Value stringResult(result);
-		std::cout << "Script " << *v8::String::Utf8Value(name) << " returned: " << *stringResult << '\n';
-	} else {
-		std::cerr << "Failed to compile script.\n";
+	if (!source.IsEmpty()) {
+		v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
+		if (!script.IsEmpty()) {
+			script->Run();
+			std::cout << "Script " << fileName << " completed\n";
+		} else {
+			std::cerr << "Failed to compile script.\n";
+		}
 	}
 }
 
@@ -256,7 +252,7 @@ v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t ex
 	return result;
 }
 
-void Task::sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result) {
+void Task::sendPromiseResolve(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result) {
 	if (!result.IsEmpty() && result->IsPromise()) {
 		// We're not going to serialize/deserialize a promise...
 		v8::Handle<v8::Object> data = v8::Object::New(from->_isolate);
@@ -267,6 +263,20 @@ void Task::sendInvokeResult(Task* from, TaskStub* to, promiseid_t promise, v8::H
 		promise->Then(then);
 	} else {
 		sendPromiseMessage(from, to, kResolvePromise, promise, result);
+	}
+}
+
+void Task::sendPromiseReject(Task* from, TaskStub* to, promiseid_t promise, v8::Handle<v8::Value> result) {
+	if (!result.IsEmpty() && result->IsPromise()) {
+		// We're not going to serialize/deserialize a promise...
+		v8::Handle<v8::Object> data = v8::Object::New(from->_isolate);
+		data->Set(v8::String::NewFromUtf8(from->_isolate, "task"), v8::Int32::New(from->_isolate, to->getId()));
+		data->Set(v8::String::NewFromUtf8(from->_isolate, "promise"), v8::Int32::New(from->_isolate, promise));
+		v8::Handle<v8::Function> catchCallback = v8::Function::New(from->_isolate, invokeCatch, data);
+		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
+		promise->Catch(catchCallback);
+	} else {
+		sendPromiseMessage(from, to, kRejectPromise, promise, result);
 	}
 }
 
@@ -299,6 +309,14 @@ void Task::invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	TaskStub* to = from->get(data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value());
 	promiseid_t promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
 	sendPromiseMessage(from, to, kResolvePromise, promise, args[0]);
+}
+
+void Task::invokeCatch(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* from = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	v8::Handle<v8::Object> data = v8::Handle<v8::Object>::Cast(args.Data());
+	TaskStub* to = from->get(data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "task"))->Int32Value());
+	promiseid_t promise = data->Get(v8::String::NewFromUtf8(args.GetIsolate(), "promise"))->Int32Value();
+	sendPromiseMessage(from, to, kRejectPromise, promise, args[0]);
 }
 
 void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
@@ -428,7 +446,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promise));
 		v8::Handle<v8::Value> result = to->getStatistics();
-		sendInvokeResult(to, from, promise, result);
+		sendPromiseResolve(to, from, promise, result);
 		}
 		break;
 	case kInvokeExport: {
@@ -437,10 +455,11 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		std::memcpy(&promise, begin, sizeof(promise));
 		std::memcpy(&exportId, begin + sizeof(promise), sizeof(exportId));
 		v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(exportid_t), begin + length));
-		sendInvokeResult(to, from, promise, result);
+		sendPromiseResolve(to, from, promise, result);
 		}
 		break;
-	case kResolvePromise: {
+	case kResolvePromise:
+	case kRejectPromise: {
 		v8::Handle<v8::Value> arg;
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
@@ -449,7 +468,11 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		} else {
 			arg = v8::Undefined(to->_isolate);
 		}
-		to->resolvePromise(promise, arg);
+		if (static_cast<MessageType>(packetType) == kResolvePromise) {
+			to->resolvePromise(promise, arg);
+		} else {
+			to->rejectPromise(promise, arg);
+		}
 		}
 		break;
 	case kReleaseExport:
@@ -490,8 +513,22 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		promiseid_t promise;
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
 		arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+		v8::TryCatch tryCatch(to->_isolate);
+		tryCatch.SetCaptureMessage(true);
+		tryCatch.SetVerbose(true);
 		to->execute(*v8::String::Utf8Value(arg));
-		sendInvokeResult(to, from, promise, v8::Undefined(to->_isolate));
+		if (tryCatch.HasCaught()) {
+			v8::Handle<v8::Object> error = v8::Object::New(to->_isolate);
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "message"), tryCatch.Message()->Get());
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "fileName"), tryCatch.Message()->GetScriptResourceName());
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "lineNumber"), v8::Integer::New(to->_isolate, tryCatch.Message()->GetLineNumber()));
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "sourceLine"), tryCatch.Message()->GetSourceLine());
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "exception"), tryCatch.Exception());
+			error->Set(v8::String::NewFromUtf8(to->_isolate, "stackTrace"), tryCatch.StackTrace());
+			sendPromiseReject(to, from, promise, error);
+		} else {
+			sendPromiseResolve(to, from, promise, v8::Undefined(to->_isolate));
+		}
 		}
 		break;
 	case kKill:
@@ -507,7 +544,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		assert(length == sizeof(promise));
 		std::memcpy(&promise, begin, sizeof(promiseid_t));
 		v8::Handle<v8::Object> result = v8::Local<v8::Object>::New(to->_isolate, to->_exportObject);
-		sendInvokeResult(to, from, promise, result);
+		sendPromiseResolve(to, from, promise, result);
 		break;
 	}
 }
