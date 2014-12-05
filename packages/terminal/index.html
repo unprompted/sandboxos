@@ -1,0 +1,19 @@
+<html>
+	<head>
+		<title>Web Terminal</title>
+		<link type ="text/css" rel="stylesheet" href="/terminal/style.css"></link>
+	</head>
+	<body>
+		<div id="body">
+			<h1>Web Terminal</h1>
+			<div class="navigation"><a href="/wiki">Home</a></div>
+			<div class="terminal"><textarea id="terminal" readonly></textarea></div>
+			<div class="input">
+				<span class="prompt">&gt;</span>
+				<input type='text' id='input' onkeydown="enter()"></input>
+			</div>
+			<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+			<script src="/terminal/frontend.js"></script>
+		</div>
+	</body>
+</html>

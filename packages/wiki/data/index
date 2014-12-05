@@ -13,7 +13,7 @@ I embedded a JavaScript engine in a C++ application and used it to make some web
 </div>
 <div style="width: 300px; float: left; padding: 1em">
 	<h1>Sharing</h1>
-	<p>This is open source.  Browse or branch it <a href="http://www.unprompted.com/projects/browser/projects/sandboxos/trunk">from here</a>.</p>
+	<p>This is open source.  Browse or branch it <a href="https://github.com/unprompted/sandboxos">from here</a>.</p>
 	<p>All tasks are yours to improve.  Clone any task on this server or your own, make it better, and then share what you made, all from a browser.</p>
 	<p>Let's get many instances of this all talking to each other just like popular social networks don't.</p>
 </div>

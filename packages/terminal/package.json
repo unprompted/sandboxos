@@ -1,0 +1,6 @@
+{
+	"name": "terminal",
+	"start": "backend.js",
+	"imports": ["auth", "httpd", "system", "shell"],
+	"href": "/terminal"
+}
