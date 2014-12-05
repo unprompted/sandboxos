@@ -1,6 +1,6 @@
 var haveIndex = -1;
 
-function enter() {
+function enter(event) {
 	if (event.keyCode == 13) {
 		send();
 		event.preventDefault();
@@ -56,6 +56,7 @@ function send(command) {
 }
 
 $(document).ready(function() {
+	$("#input").keydown(enter);
 	$("#input").focus();
 	send("hello");
 	receive();

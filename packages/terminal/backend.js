@@ -5,13 +5,15 @@ var kStaticFiles = [
 	{uri: '/terminal/style.css', path: 'style.css', type: 'text/css'},
 	{uri: '/terminal/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
-var kBacklog = 8;
+var kBacklog = 64;
 
 function Terminal() {
 	this._waiting = [];
 	this._index = 0;
 	this._firstLine = 0;
 	this._lines = [];
+	this._lastRead = null;
+	this._lastWrite = null;
 	return this;
 }
 
@@ -24,12 +26,13 @@ Terminal.prototype.dispatch = function(data) {
 
 Terminal.prototype.print = function(line) {
 	this._lines.push(line);
-	if (this._lines.length > kBacklog * 2) {
-		this._lines = this._lines.slice(this._lines.length - kBacklog);
-		this._firstLine = this._index - kBacklog;
-	}
-	this.dispatch({index: this._index, lines: [line]});
 	this._index++;
+	if (this._lines.length >= kBacklog * 2) {
+		this._firstLine = this._index - kBacklog;
+		this._lines = this._lines.slice(this._lines.length - kBacklog);
+	}
+	this.dispatch({index: this._index - 1, lines: [line]});
+	this._lastWrite = new Date();
 }
 
 Terminal.prototype.clear = function() {
@@ -40,8 +43,9 @@ Terminal.prototype.clear = function() {
 
 Terminal.prototype.getOutput = function(haveIndex) {
 	var terminal = this;
+	terminal._lastRead = new Date();
 	return new Promise(function(resolve) {
-		if (haveIndex + 1 < terminal._index) {
+		if (haveIndex < terminal._index - 1) {
 			resolve({index: terminal._index - 1, lines: terminal._lines.slice(haveIndex + 1 - terminal._firstLine)});
 		} else {
 			terminal._waiting.push(resolve);
@@ -49,18 +53,35 @@ Terminal.prototype.getOutput = function(haveIndex) {
 	});
 }
 
+Terminal.who = function() {
+	var result = {};
+	for (var i in gTerminals) {
+		result[i] = {lastRead: gTerminals[i]._lastRead.toString(), lastWrite: gTerminals[i]._lastWrite.toString()};
+	}
+	return result;
+}
+
+Terminal.prototype.send = function(user, message) {
+	if (gTerminals[user]) {
+		gTerminals[user].print("Message from " + this.owner + ": " + message);
+	}
+}
+
 Terminal.prototype.exportInterface = function() {
 	return {
 		print: this.print.bind(this),
 		clear: this.clear.bind(this),
+		who: Terminal.who,
+		send: this.send.bind(this),
 	};
 }
 
-function getTerminal() {
-	if (!gTerminals.test) {
-		gTerminals.test = new Terminal();
+function getTerminal(session) {
+	if (!gTerminals[session.name]) {
+		gTerminals[session.name] = new Terminal();
+		gTerminals[session.name].owner = session.name;
 	}
-	return gTerminals.test;
+	return gTerminals[session.name];
 }
 
 function sessionHandler(request, response, session) {
@@ -77,7 +98,7 @@ function sessionHandler(request, response, session) {
 		}
 	}
 	if (!found) {
-		var terminal = getTerminal();
+		var terminal = getTerminal(session);
 		if (request.uri == "/terminal/send") {
 			var command = request.body;
 			terminal.print("> " + command);
