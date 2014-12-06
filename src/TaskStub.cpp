@@ -6,10 +6,21 @@
 #include "TaskTryCatch.h"
 
 #include <cstring>
+
+#ifdef WIN32
+#include <io.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+static const int STDIN_FILENO = 0;
+static const int STDOUT_FILENO = 1;
+static const int STDERR_FILENO = 2;
+#else
 #include <unistd.h>
+#endif
 
 TaskStub::TaskStub(v8::Isolate* isolate, v8::Handle<v8::Object> taskObject)
 :	_taskObject(isolate, taskObject) {
+	std::memset(&_process, 0, sizeof(_process));
 }
 
 void TaskStub::ref() {
@@ -24,7 +35,7 @@ void TaskStub::release() {
 	}
 }
 
-TaskStub* TaskStub::createParent(Task* task, uv_stream_t* handle) {
+TaskStub* TaskStub::createParent(Task* task, uv_file file) {
 	v8::Isolate::Scope isolateScope(task->_isolate);
 	v8::HandleScope scope(task->_isolate);
 
@@ -40,8 +51,15 @@ TaskStub* TaskStub::createParent(Task* task, uv_stream_t* handle) {
 	parentStub->_owner = task;
 	parentStub->_id = Task::kParentId;
 
+	if (uv_pipe_init(task->_loop, &parentStub->_stream.getStream(), 1) != 0) {
+		std::cerr << "uv_pipe_init failed\n";
+	}
 	parentStub->_stream.setOnReceive(Task::onReceivePacket, parentStub);
-	parentStub->_stream.accept(handle);
+	if (uv_pipe_open(&parentStub->_stream.getStream(), file) != 0) {
+		std::cerr << "uv_pipe_open failed\n";
+	}
+	parentStub->_stream.start();
+
 	return parentStub;
 }
 
@@ -78,11 +96,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 	stub->_id = id;
 
-	uv_os_sock_t sock[2];
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sock) != 0) {
-		perror("socketpair");
-	}
-
 	char executable[1024];
 	size_t size = sizeof(executable);
 	uv_exepath(executable, &size);
@@ -90,13 +103,14 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	char arg1[] = "--child";
 	char* argv[] = { executable, arg1, 0 };
 
-	uv_pipe_t* pipe = new uv_pipe_t;
+	uv_pipe_t* pipe = reinterpret_cast<uv_pipe_t*>(&stub->_stream.getStream());
+	std::memset(pipe, 0, sizeof(*pipe));
 	if (uv_pipe_init(parent->getLoop(), pipe, 1) != 0) {
 		std::cerr << "uv_pipe_init failed\n";
 	}
 
 	uv_stdio_container_t io[3];
-	io[0].flags = static_cast<uv_stdio_flags>(UV_CREATE_PIPE | UV_READABLE_PIPE);
+	io[0].flags = static_cast<uv_stdio_flags>(UV_CREATE_PIPE | UV_READABLE_PIPE | UV_WRITABLE_PIPE);
 	io[0].data.stream = reinterpret_cast<uv_stream_t*>(pipe);
 	io[1].flags = UV_INHERIT_FD;
 	io[1].data.fd = STDOUT_FILENO;
@@ -115,26 +129,8 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cerr << "uv_spawn failed\n";
 	}
 
-	uv_tcp_t stream;
-	if (uv_tcp_init(parent->getLoop(), &stream) != 0) {
-		std::cerr << "uv_tcp_init failed\n";
-	}
-	if (uv_tcp_open(&stream, sock[0]) != 0) {
-		std::cerr << "uv_tcp_open failed\n";
-	}
-
 	stub->_stream.setOnReceive(Task::onReceivePacket, stub);
-	stub->_stream.createFrom(parent->getLoop(), sock[1]);
-
-	uv_write_t* request = reinterpret_cast<uv_write_t*>(new char[sizeof(uv_write_t) + sizeof(int)]);
-	uv_buf_t buf;
-	buf.base = reinterpret_cast<char*>(request) + sizeof(uv_write_t);
-	buf.len = sizeof(int);
-	std::memset(buf.base, 0, sizeof(int));
-
-	if (uv_write2(request, reinterpret_cast<uv_stream_t*>(pipe), &buf, 1, reinterpret_cast<uv_stream_t*>(&stream), onPipeWrite) != 0) {
-		std::cerr << "uv_write2 failed\n";
-	}
+	stub->_stream.start();
 
 	args.GetReturnValue().Set(taskObject);
 }

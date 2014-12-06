@@ -14,10 +14,15 @@
 #include <libplatform/libplatform.h>
 #include <map>
 #include <sys/types.h>
-#include <unistd.h>
 #include <uv.h>
 #include <v8.h>
 #include <v8-platform.h>
+
+#ifdef WIN32
+static const int STDIN_FILENO = 0;
+#else
+#include <unistd.h>
+#endif
 
 extern v8::Platform* gPlatform;
 int gNextTaskId = 1;
@@ -239,12 +244,16 @@ v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t ex
 	v8::Handle<v8::Value> result;
 	if (to->_exports[exportId]) {
 		v8::Handle<v8::Array> arguments = v8::Handle<v8::Array>::Cast(Serialize::load(to, from, buffer));
-		std::vector<v8::Handle<v8::Value> > array;
+		std::vector<v8::Handle<v8::Value> > argumentArray;
 		for (size_t i = 1; i < arguments->Length(); ++i) {
-			array.push_back(arguments->Get(i));
+			argumentArray.push_back(arguments->Get(i));
 		}
 		v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(to->_isolate, to->_exports[exportId]->_persistent);
-		result = function->Call(v8::Handle<v8::Object>::Cast(arguments->Get(0)), array.size(), &*array.begin());
+		v8::Handle<v8::Value>* argumentPointer = 0;
+		if (argumentArray.size()) {
+			argumentPointer = &*argumentArray.begin();
+		}
+		result = function->Call(v8::Handle<v8::Object>::Cast(arguments->Get(0)), argumentArray.size(), argumentPointer);
 	} else {
 		std::cout << "That's not an export we have\n";
 	}
@@ -442,37 +451,42 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 	v8::HandleScope scope(to->_isolate);
 
 	switch (static_cast<MessageType>(packetType)) {
-	case kStatistics: {
-		promiseid_t promise;
-		std::memcpy(&promise, begin, sizeof(promise));
-		v8::Handle<v8::Value> result = to->getStatistics();
-		sendPromiseResolve(to, from, promise, result);
+	case kStatistics:
+		{
+			promiseid_t promise;
+			std::memcpy(&promise, begin, sizeof(promise));
+			v8::Handle<v8::Value> result = to->getStatistics();
+			sendPromiseResolve(to, from, promise, result);
 		}
 		break;
-	case kInvokeExport: {
-		promiseid_t promise;
-		exportid_t exportId;
-		std::memcpy(&promise, begin, sizeof(promise));
-		std::memcpy(&exportId, begin + sizeof(promise), sizeof(exportId));
-		v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(exportid_t), begin + length));
-		sendPromiseResolve(to, from, promise, result);
+	case kInvokeExport:
+		{
+			promiseid_t promise;
+			exportid_t exportId;
+			std::memcpy(&promise, begin, sizeof(promise));
+			std::memcpy(&exportId, begin + sizeof(promise), sizeof(exportId));
+			v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(exportid_t), begin + length));
+			sendPromiseResolve(to, from, promise, result);
 		}
 		break;
 	case kResolvePromise:
-	case kRejectPromise: {
-		v8::Handle<v8::Value> arg;
-		promiseid_t promise;
-		std::memcpy(&promise, begin, sizeof(promiseid_t));
-		if (length > sizeof(promiseid_t)) {
-			arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
-		} else {
-			arg = v8::Undefined(to->_isolate);
-		}
-		if (static_cast<MessageType>(packetType) == kResolvePromise) {
-			to->resolvePromise(promise, arg);
-		} else {
-			to->rejectPromise(promise, arg);
-		}
+	case kRejectPromise:
+		{
+			v8::Handle<v8::Value> arg;
+			promiseid_t promise;
+			std::memcpy(&promise, begin, sizeof(promiseid_t));
+			if (length > sizeof(promiseid_t)) {
+				arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+			}
+			else {
+				arg = v8::Undefined(to->_isolate);
+			}
+			if (static_cast<MessageType>(packetType) == kResolvePromise) {
+				to->resolvePromise(promise, arg);
+			}
+			else {
+				to->rejectPromise(promise, arg);
+			}
 		}
 		break;
 	case kReleaseExport:
@@ -485,58 +499,63 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 			to->_exports.erase(exportId);
 		}
 		break;
-	case kReleaseImport: {
-		assert(length == sizeof(exportid_t));
-		exportid_t exportId;
-		memcpy(&exportId, begin, sizeof(exportId));
-		for (size_t i = 0; i < to->_imports.size(); ++i) {
-			if (to->_imports[i]->_task == from->getId() && to->_imports[i]->_export == exportId) {
-				to->_imports[i]->release();
-				break;
+	case kReleaseImport:
+		{
+			assert(length == sizeof(exportid_t));
+			exportid_t exportId;
+			memcpy(&exportId, begin, sizeof(exportId));
+			for (size_t i = 0; i < to->_imports.size(); ++i) {
+				if (to->_imports[i]->_task == from->getId() && to->_imports[i]->_export == exportId) {
+					to->_imports[i]->release();
+					break;
+				}
 			}
 		}
-		}
 		break;
-	case kSetTrusted: {
-		assert(length == sizeof(bool));
-		bool trusted = false;
-		memcpy(&trusted, begin, sizeof(bool));
-		to->_trusted = trusted;
+	case kSetTrusted:
+		{
+			assert(length == sizeof(bool));
+			bool trusted = false;
+			memcpy(&trusted, begin, sizeof(bool));
+			to->_trusted = trusted;
 		}
 		break;
 	case kActivate:
 		to->activate();
 		break;
-	case kExecute: {
-		assert(length >= sizeof(promiseid_t));
-		v8::Handle<v8::Value> arg;
-		promiseid_t promise;
-		std::memcpy(&promise, begin, sizeof(promiseid_t));
-		arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
-		v8::TryCatch tryCatch(to->_isolate);
-		tryCatch.SetCaptureMessage(true);
-		tryCatch.SetVerbose(true);
-		to->execute(*v8::String::Utf8Value(arg));
-		if (tryCatch.HasCaught()) {
-			v8::Handle<v8::Object> error = v8::Object::New(to->_isolate);
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "message"), tryCatch.Message()->Get());
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "fileName"), tryCatch.Message()->GetScriptResourceName());
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "lineNumber"), v8::Integer::New(to->_isolate, tryCatch.Message()->GetLineNumber()));
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "sourceLine"), tryCatch.Message()->GetSourceLine());
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "exception"), tryCatch.Exception());
-			error->Set(v8::String::NewFromUtf8(to->_isolate, "stackTrace"), tryCatch.StackTrace());
-			sendPromiseReject(to, from, promise, error);
-		} else {
-			sendPromiseResolve(to, from, promise, v8::Undefined(to->_isolate));
-		}
+	case kExecute:
+		{
+			assert(length >= sizeof(promiseid_t));
+			v8::Handle<v8::Value> arg;
+			promiseid_t promise;
+			std::memcpy(&promise, begin, sizeof(promiseid_t));
+			arg = Serialize::load(to, from, std::vector<char>(begin + sizeof(promiseid_t), begin + length));
+			v8::TryCatch tryCatch(to->_isolate);
+			tryCatch.SetCaptureMessage(true);
+			tryCatch.SetVerbose(true);
+			to->execute(*v8::String::Utf8Value(arg));
+			if (tryCatch.HasCaught()) {
+				v8::Handle<v8::Object> error = v8::Object::New(to->_isolate);
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "message"), tryCatch.Message()->Get());
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "fileName"), tryCatch.Message()->GetScriptResourceName());
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "lineNumber"), v8::Integer::New(to->_isolate, tryCatch.Message()->GetLineNumber()));
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "sourceLine"), tryCatch.Message()->GetSourceLine());
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "exception"), tryCatch.Exception());
+				error->Set(v8::String::NewFromUtf8(to->_isolate, "stackTrace"), tryCatch.StackTrace());
+				sendPromiseReject(to, from, promise, error);
+			}
+			else {
+				sendPromiseResolve(to, from, promise, v8::Undefined(to->_isolate));
+			}
 		}
 		break;
 	case kKill:
 		::exit(1);
 		break;
-	case kSetImports: {
-		v8::Handle<v8::Object> result = v8::Handle<v8::Object>::Cast(Serialize::load(to, from, std::vector<char>(begin, begin + length)));
-		to->_importObject = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(to->_isolate, result);
+	case kSetImports:
+		{
+			v8::Handle<v8::Object> result = v8::Handle<v8::Object>::Cast(Serialize::load(to, from, std::vector<char>(begin, begin + length)));
+			to->_importObject = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(to->_isolate, result);
 		}
 		break;
 	case kGetExports:
@@ -550,32 +569,5 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 }
 
 void Task::configureFromStdin() {
-	uv_pipe_t* pipe = new uv_pipe_t;
-	pipe->data = this;
-	if (uv_pipe_init(_loop, pipe, 1) != 0) {
-		std::cerr << "uv_pipe_init failed\n";
-	}
-	if (uv_pipe_open(pipe, STDIN_FILENO) != 0) {
-		std::cerr << "uv_pipe_open failed\n";
-	}
-	if (uv_read_start(reinterpret_cast<uv_stream_t*>(pipe), onPipeAllocate, onPipeRead) != 0) {
-		std::cerr << "uv_read_start failed\n";
-	}
-}
-
-void Task::onPipeAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer) {
-	buffer->base = new char[suggestedSize];
-	buffer->len = suggestedSize;
-}
-
-void Task::onPipeRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* buffer) {
-	Task* task = reinterpret_cast<Task*>(handle->data);
-	if (uv_pipe_pending_count(reinterpret_cast<uv_pipe_t*>(handle)) != 0) {
-		task->_parent = TaskStub::createParent(task, handle);
-
-		uv_read_stop(handle);
-		uv_close(reinterpret_cast<uv_handle_t*>(handle), 0);
-		delete reinterpret_cast<uv_pipe_t*>(handle);
-	}
-	delete buffer->base;
+	_parent = TaskStub::createParent(this, STDIN_FILENO);
 }

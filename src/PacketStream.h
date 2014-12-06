@@ -9,18 +9,19 @@ public:
 	PacketStream();
 	~PacketStream();
 
-	void accept(uv_stream_t* stream);
-	void createFrom(uv_loop_t* loop, uv_os_sock_t sock);
+	void start();
 
 	typedef void (OnReceive)(int packetType, const char* begin, size_t length, void* userData);
 	void send(int packetType, char* begin, size_t length);
 	void setOnReceive(OnReceive* onReceiveCallback, void* userData);
 	void close();
 
+	uv_pipe_t& getStream() { return _stream; }
+
 private:
 	OnReceive* _onReceive;
 	void* _onReceiveUserData;
-	uv_tcp_t _stream;
+	uv_pipe_t _stream;
 	std::vector<char> _buffer;
 
 	void processMessages();

@@ -1,12 +1,15 @@
+#include "Task.h"
+
 #include <cstring>
 #include <libplatform/libplatform.h>
-#include <unistd.h>
 #include <uv.h>
-#include <sys/prctl.h>
 #include <v8.h>
 #include <v8-platform.h>
 
-#include "Task.h"
+#ifndef WIN32
+#include <sys/prctl.h>
+#include <unistd.h>
+#endif
 
 v8::Platform* gPlatform = 0;
 
@@ -27,13 +30,17 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (isChild) {
+#ifndef WIN32
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
+#endif
 		Task task;
 		task.configureFromStdin();
 		task.activate();
 		task.run();
 	} else {
+#ifndef WIN32
 		setpgid(0, 0);
+#endif
 		Task task;
 		task.setTrusted(true);
 		task.activate();

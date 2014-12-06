@@ -15,7 +15,7 @@ public:
 	void release();
 
 	static void create(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static TaskStub* createParent(Task* task, uv_stream_t* handle);
+	static TaskStub* createParent(Task* task, uv_file file);
 
 	taskid_t getId() { return _id; }
 	Task* getOwner() { return _owner; }
@@ -29,7 +29,7 @@ private:
 	Task* _owner = 0;
 	PacketStream _stream;
 	taskid_t _id = -1;
-	uv_process_t _process = {0};
+	uv_process_t _process;
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onExit;
 

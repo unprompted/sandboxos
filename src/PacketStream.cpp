@@ -16,18 +16,7 @@ PacketStream::~PacketStream() {
 	}
 }
 
-void PacketStream::accept(uv_stream_t* stream) {
-	uv_tcp_init(stream->loop, &_stream);
-	if (uv_accept(stream, reinterpret_cast<uv_stream_t*>(&_stream)) != 0) {
-		std::cerr << "uv_accept failed\n";
-	}
-	_stream.data = this;
-	uv_read_start(reinterpret_cast<uv_stream_t*>(&_stream), onAllocate, onRead);
-}
-
-void PacketStream::createFrom(uv_loop_t* loop, uv_os_sock_t sock) {
-	uv_tcp_init(loop, &_stream);
-	uv_tcp_open(&_stream, sock);
+void PacketStream::start() {
 	_stream.data = this;
 	uv_read_start(reinterpret_cast<uv_stream_t*>(&_stream), onAllocate, onRead);
 }
