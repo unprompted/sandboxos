@@ -5,7 +5,6 @@
 #include <v8.h>
 
 typedef int promiseid_t;
-typedef int socketid_t;
 class Task;
 
 class Socket {
@@ -32,7 +31,6 @@ private:
 	Task* _task;
 	uv_tcp_t _socket;
 	promiseid_t _promise;
-	socketid_t _id;
 	int _refCount;
 	bool _connected;
 

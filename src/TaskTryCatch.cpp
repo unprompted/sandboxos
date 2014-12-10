@@ -8,8 +8,7 @@ const char* TaskTryCatch::toString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "(null)";
 }
 
-TaskTryCatch::TaskTryCatch(Task* task)
-:	_task(task) {
+TaskTryCatch::TaskTryCatch(Task* task) {
 	_tryCatch.SetCaptureMessage(true);
 	_tryCatch.SetVerbose(true);
 }

@@ -12,7 +12,6 @@ public:
 
 private:
 	v8::TryCatch _tryCatch;
-	Task* _task;
 	static const char* toString(const v8::String::Utf8Value& value);
 };
 
