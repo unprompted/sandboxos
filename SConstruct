@@ -8,7 +8,7 @@ options.AddVariables(PathVariable('uv', 'Location of libuv', '../sys/libuv'))
 options.AddVariables(PathVariable('v8', 'Location of v8', '../sys/v8'))
 
 VariantDir('build', 'src', duplicate=0)
-env = Environment(options=options, CXX='clang++')
+env = Environment(options=options)
 v8 = env['v8']
 uv = env['uv']
 env.Append(CPPPATH=[
