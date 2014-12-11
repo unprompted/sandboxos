@@ -41,7 +41,7 @@ void PacketStream::setOnReceive(OnReceive* onReceiveCallback, void* userData) {
 }
 
 void PacketStream::onWrite(uv_write_t* request, int status) {
-	delete reinterpret_cast<char*>(request);
+	delete[] reinterpret_cast<char*>(request);
 }
 
 void PacketStream::onAllocate(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer) {
