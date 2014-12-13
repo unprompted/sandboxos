@@ -263,12 +263,14 @@ function getData(fileName) {
 }
 
 function putData(fileName, contents) {
-	return File.makeDirectory(packageFilePath(this.taskName, "data")).then(function() {
-		var finalPath = packageFilePath(this.taskName, "data/" + fileName);
+	var taskName = this.taskName;
+	var write = function() {
+		var finalPath = packageFilePath(taskName, "data/" + fileName);
 		if (finalPath) {
 			return File.writeFile(finalPath, contents);
 		}
-	});
+	};
+	return File.makeDirectory(packageFilePath(taskName, "data")).then(write, write);
 }
 
 function getPackageFile(fileName, packageName) {
