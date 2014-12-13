@@ -8,7 +8,11 @@ options.AddVariables(PathVariable('uv', 'Location of libuv', '../sys/libuv'))
 options.AddVariables(PathVariable('v8', 'Location of v8', '../sys/v8'))
 
 VariantDir('build', 'src', duplicate=0)
-env = Environment(options=options)
+kwargs = {}
+if sys.platform == 'darwin':
+	kwargs['CXX'] = 'clang++'
+
+env = Environment(options=options, **kwargs)
 v8 = env['v8']
 uv = env['uv']
 env.Append(CPPPATH=[
@@ -24,6 +28,14 @@ if sys.platform == 'win32':
 		os.path.join(uv, 'Debug/lib'),
 	])
 	env.Append(LINKFLAGS=['/DEBUG'])
+elif sys.platform == 'darwin':
+	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv'])
+	env.Append(CXXFLAGS=['--std=c++11', '-g', '-Wall', '-stdlib=libstdc++'])
+	env.Append(LINKFLAGS=['-g', '-stdlib=libstdc++'])
+	env.Append(LIBPATH=[
+		os.path.join(v8, 'out/x64.release'),
+		os.path.join(uv, 'out/Debug'),
+	])
 else:
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv', 'rt'])
 	env.Append(CXXFLAGS=['--std=c++0x', '-g', '-Wall'])

@@ -6,7 +6,7 @@
 #include <v8.h>
 #include <v8-platform.h>
 
-#ifndef WIN32
+#if !defined (WIN32) && !defined (__MACH__)
 #include <sys/prctl.h>
 #include <unistd.h>
 #endif
@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (isChild) {
-#ifndef WIN32
+#if !defined (WIN32) && !defined (__MACH__)
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 #endif
 		Task task;
@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 		task.activate();
 		task.run();
 	} else {
-#ifndef WIN32
+#if !defined (WIN32) && !defined (__MACH__)
 		setpgid(0, 0);
 #endif
 		Task task;
