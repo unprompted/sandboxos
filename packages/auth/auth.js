@@ -2,6 +2,9 @@ var gAccounts = {};
 var gPermissions = {};
 var gSessions = {};
 
+var bCryptLib = require('bCrypt');
+bCrypt = new bCryptLib.bCrypt();
+
 function getCookies(headers) {
 	var cookies = {};
 
@@ -72,6 +75,15 @@ function getPermissions(session) {
 	return permissions;
 }
 
+function verifyPassword(password, hash) {
+	return bCrypt.hashpw(password, hash) == hash;
+}
+
+function hashPassword(password) {
+	var salt = bCrypt.gensalt(12);
+	return bCrypt.hashpw(password, salt);
+}
+
 function handler(request, response) {
 	var session = getCookies(request.headers).session;
 	if (request.uri == "/login") {
@@ -86,7 +98,7 @@ function handler(request, response) {
 			if (form.register == "1") {
 				if (!gAccounts[form.name] &&
 					form.password == form.confirm) {
-					gAccounts[form.name] = {password: form.password};
+					gAccounts[form.name] = {password: hashPassword(form.password)};
 					gSessions[session] = {name: form.name};
 					imports.system.putData("accounts.json", JSON.stringify(gAccounts));
 				} else {
@@ -94,7 +106,7 @@ function handler(request, response) {
 				}
 			} else {
 				if (gAccounts[form.name] &&
-					gAccounts[form.name].password == form.password) {
+					verifyPassword(form.password, gAccounts[form.name].password)) {
 					gSessions[session] = {name: form.name};
 				} else {
 					loginError = "Invalid username or password.";

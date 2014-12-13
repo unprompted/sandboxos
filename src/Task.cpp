@@ -27,8 +27,6 @@ static const int STDIN_FILENO = 0;
 extern v8::Platform* gPlatform;
 int gNextTaskId = 1;
 
-v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
-
 int Task::_count;
 
 struct ExportRecord {
@@ -122,7 +120,7 @@ void Task::run() {
 	_imports.clear();
 }
 
-v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName) {
+v8::Handle<v8::String> Task::loadFile(v8::Isolate* isolate, const char* fileName) {
 	v8::Handle<v8::String> value;
 	std::ifstream file(fileName, std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
 	std::streampos fileSize = file.tellg();
@@ -143,6 +141,7 @@ void Task::activate() {
 
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
 	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
+	global->Set(v8::String::NewFromUtf8(_isolate, "require"), v8::FunctionTemplate::New(_isolate, require));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
@@ -199,7 +198,9 @@ void Task::execute(const char* fileName) {
 
 	v8::Handle<v8::String> source = loadFile(_isolate, fileName);
 	std::cout << "Running script " << fileName << "\n";
-	_scriptName = fileName;
+	if (!_scriptName.size()) {
+		_scriptName = fileName;
+	}
 	if (!source.IsEmpty()) {
 		v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
 		if (!script.IsEmpty()) {
@@ -570,4 +571,65 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 
 void Task::configureFromStdin() {
 	_parent = TaskStub::createParent(this, STDIN_FILENO);
+}
+
+std::string Task::resolveRequire(const std::string& require) {
+	std::string result;
+	std::string path = _scriptName;
+	size_t position = path.rfind('/');
+	if (position != std::string::npos) {
+		path.resize(position + 1);
+		std::cout << "Looking in " << path << " for " << require << "\n";
+		if (require.find("..") == std::string::npos && require.find('/') == std::string::npos) {
+			result = path + require;
+		}
+		if (result.size() && require.rfind(".js") != require.size() - 3) {
+			result += ".js";
+		}
+	}
+	return result;
+}
+
+void Task::require(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	Task* task = Task::get(args.GetIsolate());
+	v8::String::Utf8Value pathValue(args[0]);
+	if (*pathValue) {
+		std::string unresolved(*pathValue, *pathValue + pathValue.length());
+		std::string path = task->resolveRequire(unresolved);
+		if (!path.size()) {
+			args.GetReturnValue().Set(args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), ("require(): Unable to resolve module: " + unresolved).c_str()))));
+		} else {
+			ScriptExportMap::iterator it = task->_scriptExports.find(path);
+			if (it != task->_scriptExports.end()) {
+				v8::Handle<v8::Object> exports = v8::Local<v8::Object>::New(args.GetIsolate(), it->second);
+				args.GetReturnValue().Set(exports);
+			} else {
+				v8::Handle<v8::Object> exports = v8::Object::New(args.GetIsolate());
+				task->_scriptExports[path] = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> >(args.GetIsolate(), exports);
+
+				v8::Handle<v8::String> name = v8::String::NewFromUtf8(args.GetIsolate(), path.c_str());
+				v8::Handle<v8::String> source = loadFile(args.GetIsolate(), path.c_str());
+				std::cout << "Requiring script " << path << "\n";
+				if (!source.IsEmpty()) {
+					v8::Handle<v8::Object> global = args.GetIsolate()->GetCurrentContext()->Global();
+					v8::Handle<v8::Value> oldExports = global->Get(v8::String::NewFromUtf8(args.GetIsolate(), "exports"));
+					global->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), exports);
+					v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
+					if (!script.IsEmpty()) {
+						script->Run();
+						std::cout << "Script " << path << " completed\n";
+					} else {
+						std::cerr << "Failed to compile script.\n";
+					}
+					global->Set(v8::String::NewFromUtf8(args.GetIsolate(), "exports"), oldExports);
+					args.GetReturnValue().Set(exports);
+				} else {
+					std::cerr << "Failed to load " << path << ".\n";
+				}
+			}
+		}
+	} else {
+		args.GetReturnValue().Set(args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "require(): No module specified."))));
+	}
 }

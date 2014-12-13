@@ -16,7 +16,8 @@ struct ImportRecord;
 class Task;
 class TaskStub;
 
-struct uv_loop_s; typedef struct uv_loop_s uv_loop_t;
+struct uv_loop_s;
+typedef struct uv_loop_s uv_loop_t;
 
 typedef int taskid_t;
 typedef int promiseid_t;
@@ -76,6 +77,9 @@ private:
 	static const taskid_t kParentId = 0;
 	std::map<taskid_t, TaskStub*> _children;
 
+	typedef std::map<std::string, v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > > ScriptExportMap;
+	ScriptExportMap _scriptExports;
+
 	bool _trusted = false;
 	bool _killed = false;
 	std::string _scriptName;
@@ -84,7 +88,6 @@ private:
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;
 	promiseid_t _nextPromise = 0;
 	uv_loop_t* _loop = 0;
-	uv_thread_t _thread;
 
 	std::map<exportid_t, ExportRecord*> _exports;
 	exportid_t _nextExport = 0;
@@ -96,14 +99,14 @@ private:
 	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _importObject;
 	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _exportObject;
 
-	int64_t _memoryAllocated = 0;
-	int64_t _memoryLimit = 64 * 1024 * 1024;
-
 	v8::Handle<v8::Object> getStatistics();
+
+	std::string resolveRequire(const std::string& require);
 
 	static void activate(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void exit(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void require(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invokeCatch(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -122,6 +125,8 @@ private:
 
 	static void sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result);
 	static void sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promiseId, exportid_t exportId, v8::Handle<v8::Value> result);
+
+	static v8::Handle<v8::String> loadFile(v8::Isolate* isolate, const char* fileName);
 
 	friend struct ImportRecord;
 	friend class TaskStub;

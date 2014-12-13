@@ -1,0 +1,4 @@
+This uses javascript-bcrypt <https://code.google.com/p/javascript-bcrypt/>,
+which is licensed under the New BSD License.
+
+It has been modified both to operate synchronously and use require().
