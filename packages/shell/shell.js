@@ -29,6 +29,10 @@ kBuiltin.date = function(terminal) {
 	terminal.print(new Date().toString());
 }
 
+kBuiltin.echo = function(terminal, args) {
+	terminal.print(args.slice(1).join(" "));
+}
+
 function splitArgs(command) {
 	// TODO: Real argument splitting.
 	return command.split(/\s+/);
