@@ -2,8 +2,9 @@
 
 #include "Task.h"
 
-#include <iostream>
+#include <cstring>
 #include <fstream>
+#include <iostream>
 #include <uv.h>
 
 #ifdef WIN32
@@ -13,13 +14,21 @@
 #include <unistd.h>
 #endif
 
+struct FileRequest {
+	uv_fs_t request;
+	Task* task;
+	promiseid_t promise;
+};
+
 void File::configure(v8::Isolate* isolate, v8::Handle<v8::ObjectTemplate> global) {
-	global->Set(v8::String::NewFromUtf8(isolate, "readFile"), v8::FunctionTemplate::New(isolate, readFile));
-	global->Set(v8::String::NewFromUtf8(isolate, "readDirectory"), v8::FunctionTemplate::New(isolate, readDirectory));
-	global->Set(v8::String::NewFromUtf8(isolate, "makeDirectory"), v8::FunctionTemplate::New(isolate, makeDirectory));
-	global->Set(v8::String::NewFromUtf8(isolate, "writeFile"), v8::FunctionTemplate::New(isolate, writeFile));
-	global->Set(v8::String::NewFromUtf8(isolate, "renameFile"), v8::FunctionTemplate::New(isolate, renameFile));
-	global->Set(v8::String::NewFromUtf8(isolate, "unlinkFile"), v8::FunctionTemplate::New(isolate, unlinkFile));
+	v8::Local<v8::ObjectTemplate> fileTemplate = v8::ObjectTemplate::New(isolate);
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "readFile"), v8::FunctionTemplate::New(isolate, readFile));
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "readDirectory"), v8::FunctionTemplate::New(isolate, readDirectory));
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "makeDirectory"), v8::FunctionTemplate::New(isolate, makeDirectory));
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "writeFile"), v8::FunctionTemplate::New(isolate, writeFile));
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "renameFile"), v8::FunctionTemplate::New(isolate, renameFile));
+	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "unlinkFile"), v8::FunctionTemplate::New(isolate, unlinkFile));
+	global->Set(v8::String::NewFromUtf8(isolate, "File"), fileTemplate);
 }
 
 void File::readFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -108,12 +117,25 @@ void File::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void File::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = Task::get(args.GetIsolate());
 	v8::HandleScope scope(args.GetIsolate());
 	v8::Handle<v8::String> directory = args[0]->ToString();
 
-#ifdef WIN32
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), CreateDirectory(*v8::String::Utf8Value(directory), 0) == 0 ? -1 : 0));
-#else
-	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), mkdir(*v8::String::Utf8Value(directory), 0777)));
-#endif
+	FileRequest* request = new FileRequest;
+	std::memset(request, 0, sizeof(*request));
+	request->request.data = request;
+	request->task = task;
+	request->promise = task->allocatePromise();
+	uv_fs_mkdir(task->getLoop(), &request->request, *v8::String::Utf8Value(directory), 0777, onMakeDirectory);
+	args.GetReturnValue().Set(task->getPromise(request->promise));
+}
+
+void File::onMakeDirectory(uv_fs_t* request) {
+	FileRequest* fileRequest = reinterpret_cast<FileRequest*>(request->data);
+	if (request->result != 0) {
+		fileRequest->task->rejectPromise(fileRequest->promise, v8::Integer::New(fileRequest->task->getIsolate(), request->result));
+	} else {
+		fileRequest->task->resolvePromise(fileRequest->promise, v8::Integer::New(fileRequest->task->getIsolate(), request->result));
+	}
+	delete fileRequest;
 }
