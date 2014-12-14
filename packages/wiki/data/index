@@ -93,7 +93,7 @@ In no particular order:
  * Make an app store.  Not too important until we have multiple installs but pretty important.
  * Lots of the API exposed from C++ isn't async but should be.
  * Pick a name for this thing.
- * Set up an automated build.
+ * ~~Set up an [https://www.unprompted.com/projects/build/sandboxos automated build].~~
  * Feedback is really bad or missing.  If you break a task, it might just stop responding to web requests.  I have the benefit of being able to see console output, but that's really noisy and bad.  There might be times where it is necessary to restart the whole process.  Ultimately there should be a way to see feedback when you've broken something, and things should be hardened so that you can't take down the whole system without abusing administrative rights.
  * Security here is not good at the moment.  I'm essentially trusting you to please don't do bad things.  I've taken some steps to harden this thing, but it has a long way to go.
  * ~~Inter-task messaging is really awkward to type.  And the way you need to respond to httpd requests is even weirder.  I will work on this.  It should be possible to get most things close to being first-class function calls, except asynchronous.~~

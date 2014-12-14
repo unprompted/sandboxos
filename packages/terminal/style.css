@@ -4,47 +4,37 @@ body {
 }
 
 #body {
-	display: table;
+	display: flex;
+	flex-flow: column;
 	width: 100%;
 	height: 100%;
 }
 
 .navigation {
 	height: auto;
-	width: 100%;
-}
-
-.terminal {
-	display: table-row;
-	height: 100%;
-	width: 100%;
 }
 
 #terminal {
-	display: table-cell;
-	width: 100%;
-	height: 100%;
+	flex: 1;
 	background-color: #000;
 	color: #0f0;
 	border: 1px solid #040;
 	outline: none;
+	width: 100%;
 }
 
 .input {
-	display: table;
-	width: 100%;
+	display: flex;
+	flex-flow: row;
 }
 
 .prompt {
-	display: table-cell;
-	width: auto;
-	max-width: 0;
+	padding-right: 0.5em;
 }
 
 #input {
+	flex: 1;
 	font-family: monospace;
-	display: table-cell;
-	width: 100%;
 	background-color: #000;
 	color: #0f0;
 	border: 1px solid #040;
