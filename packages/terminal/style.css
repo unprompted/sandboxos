@@ -21,6 +21,7 @@ body {
 	border: 1px solid #040;
 	outline: none;
 	width: 100%;
+	resize: none;
 }
 
 .input {
