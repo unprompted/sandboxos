@@ -6,13 +6,17 @@ import sys
 options = Variables('options.cache', ARGUMENTS)
 options.AddVariables(PathVariable('uv', 'Location of libuv', '../sys/libuv'))
 options.AddVariables(PathVariable('v8', 'Location of v8', '../sys/v8'))
+options.AddVariables(BoolVariable('package', 'Build a package', False))
 
 VariantDir('build', 'src', duplicate=0)
 kwargs = {}
 if sys.platform == 'darwin':
 	kwargs['CXX'] = 'clang++'
 
-env = Environment(options=options, **kwargs)
+env = Environment(options=options, tools=['default', 'packaging'], **kwargs)
+options.Save('options.cache', env)
+Help(options.GenerateHelpText(env))
+
 v8 = env['v8']
 uv = env['uv']
 env.Append(CPPPATH=[
@@ -46,3 +50,26 @@ else:
 		os.path.join(uv, 'out/Debug/obj.target'),
 	])
 env.Program('sandboxos', Glob('build/*.cpp'))
+
+def listAllFiles(root):
+	for root, dirs, files in os.walk(root):
+		for f in files:
+			yield os.path.join(root, f)
+
+if env['package'] and sys.platform == 'win32':
+	files = [
+		'COPYING',
+		'LICENSE',
+		'SConstruct',
+		'sandboxos.exe',
+		'sandboxos.pdb',
+	]
+	files += listAllFiles('src')
+	files += listAllFiles('packages')
+	env.Package(
+		NAME='SandboxOS',
+		target='dist/SandboxOS-win32.zip',
+		PACKAGETYPE='zip',
+		PACKAGEROOT='SandboxOS-win32',
+		source=files
+	)
