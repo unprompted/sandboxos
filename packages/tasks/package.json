@@ -2,6 +2,7 @@
 	"name": "tasks",
 	"start": "backend.js",
 	"trusted": true,
-	"imports": ["httpd", "system"],
-	"href": "/tasks"
+	"imports": ["httpd", "system", "filesystem"],
+	"href": "/tasks",
+	"description": "A task for viewing and interacting with the current state of all installed packages."
 }

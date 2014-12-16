@@ -6,5 +6,13 @@ function sayHello(request, response) {
 	response.end("Hello, " + request.client.peerName + ".");
 }
 
+imports.filesystem.getPackageData().then(function(fs) {
+	fs.readFile("hello.js").then(function(data) {
+		print(data);
+	});
+}).catch(function(e) {
+	print("E: " + e);
+});
+
 // Register for a callback anytime somebody visits /helloworld.
 imports.httpd.get('/helloworld', sayHello);

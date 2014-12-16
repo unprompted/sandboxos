@@ -255,24 +255,6 @@ function accessWrite(taskName, packageName) {
 	return taskIsTrusted(taskName);
 }
 
-function getData(fileName) {
-	var finalPath = packageFilePath(this.taskName, "data/" + fileName);
-	if (finalPath) {
-		return File.readFile(finalPath);
-	}
-}
-
-function putData(fileName, contents) {
-	var taskName = this.taskName;
-	var write = function() {
-		var finalPath = packageFilePath(taskName, "data/" + fileName);
-		if (finalPath) {
-			return File.writeFile(finalPath, contents);
-		}
-	};
-	return File.makeDirectory(packageFilePath(taskName, "data")).then(write, write);
-}
-
 function getPackageFile(fileName, packageName) {
 	if (accessRead(this.taskName, packageName)) {
 		var finalPath = packageFilePath(packageName || this.taskName, fileName);
@@ -353,8 +335,6 @@ start();
 
 exports = {
 	registerTaskStatusChanged: registerTaskStatusChanged,
-	getData: getData,
-	putData: putData,
 	getPackageFile: getPackageFile,
 	putPackageFile: putPackageFile,
 	renamePackageFile: renamePackageFile,

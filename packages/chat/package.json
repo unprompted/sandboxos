@@ -1,6 +1,7 @@
 {
 	"name": "chat",
 	"start": "backend.js",
-	"imports": ["auth", "httpd", "system"],
-	"href": "/chat"
+	"imports": ["auth", "httpd", "filesystem"],
+	"href": "/chat",
+	"description": "A basic multi-user chat example."
 }

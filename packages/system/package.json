@@ -1,5 +1,6 @@
 {
 	"name": "system",
 	"start": "system.js",
-	"trusted": true
+	"trusted": true,
+	"description": "This task manages all other tasks.  It starts, stops, and transfers messages between them."
 }

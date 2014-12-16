@@ -1,0 +1,36 @@
+body {
+	background-color: #ddd;
+}
+
+.package {
+	margin-bottom: 0.125in;
+	background-color: #fff;
+	padding: 1em;
+}
+
+.packageName {
+	font-size: x-large;
+}
+
+.actions {
+	display: flex;
+	flex-flow: row;
+	align-items: center;
+}
+
+.action {
+	margin-left: 4px;
+}
+
+.action:first-child {
+	margin-left: 0;
+}
+
+.description {
+	margin-top: 0.125in;
+	margin-bottom: 0.125in;
+}
+
+.statistics {
+	font-size: xx-small;
+}

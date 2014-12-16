@@ -5,6 +5,20 @@ var gSessions = {};
 var bCryptLib = require('bCrypt');
 bCrypt = new bCryptLib.bCrypt();
 
+var packageFs = null;
+var dataFs = null;
+imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
+imports.filesystem.getPackageData().then(function(fs) {
+	dataFs = fs;
+
+	dataFs.readFile("accounts.json").then(function(data) {
+		gAccounts = JSON.parse(data);
+	});
+	dataFs.readFile("permissions.json").then(function(data) {
+		gPermissions = JSON.parse(data);
+	});
+});
+
 function getCookies(headers) {
 	var cookies = {};
 
@@ -100,7 +114,7 @@ function handler(request, response) {
 					form.password == form.confirm) {
 					gAccounts[form.name] = {password: hashPassword(form.password)};
 					gSessions[session] = {name: form.name};
-					imports.system.putData("accounts.json", JSON.stringify(gAccounts));
+					dataFs.writeFile("accounts.json", JSON.stringify(gAccounts));
 				} else {
 					loginError = "Error registering account.";
 				}
@@ -124,7 +138,7 @@ function handler(request, response) {
 			response.end();
 		} else {
 			response.writeHead(200, {"Content-Type": "text/html", "Connection": "close", "Set-Cookie": cookie});
-			imports.system.getPackageFile("index.html").then(function(html) {
+			packageFs.readFile("index.html").then(function(html) {
 				var contents = "";
 
 				if (session && gSessions[session]) {
@@ -166,13 +180,6 @@ function query(headers) {
 		return {session: gSessions[session], permissions: getPermissions(session)};
 	}
 }
-
-imports.system.getData("accounts.json").then(function(data) {
-	gAccounts = JSON.parse(data);
-});
-imports.system.getData("permissions.json").then(function(data) {
-	gPermissions = JSON.parse(data);
-});
 
 imports.httpd.all("/login", handler);
 

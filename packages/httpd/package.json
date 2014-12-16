@@ -2,5 +2,6 @@
 	"name": "httpd",
 	"start": "httpd.js",
 	"trusted": true,
-	"imports": ["log"]
+	"imports": ["log"],
+	"description": "A very basic web server."
 }

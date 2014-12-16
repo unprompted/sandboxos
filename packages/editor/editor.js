@@ -1,3 +1,14 @@
+var kStaticFiles = [
+	{uri: '/editor', path: 'index.html', type: 'text/html'},
+	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
+	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
+	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
+	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
+];
+
+var packageFs;
+imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
+
 function escapeHtml(value) {
 	var kMap = {
 		"&": "&amp;",
@@ -38,14 +49,6 @@ function decodeForm(encoded) {
 	}
 	return result;
 }
-
-var kStaticFiles = [
-	{uri: '/editor', path: 'index.html', type: 'text/html'},
-	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
-	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
-	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
-	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
-];
 
 function copyFile(oldPackage, newPackage, fileName) {
 	return imports.system.getPackageFile(fileName, oldPackage).then(function(result) {
@@ -95,7 +98,7 @@ function sessionHandler(request, response, auth) {
 		match = {path: "package.html", type: "text/html"};
 	}
 	if (match) {
-		imports.system.getPackageFile(match.path).then(function(contents) {
+		packageFs.readFile(match.path).then(function(contents) {
 			response.writeHead(200, {"Content-Type": match.type, "Connection": "close", "Content-Length": contents.length});
 			response.end(contents);
 		});

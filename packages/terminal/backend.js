@@ -1,4 +1,5 @@
 var gTerminals = {};
+var gFileSystem;
 
 var kStaticFiles = [
 	{uri: '/terminal', path: 'index.html', type: 'text/html'},
@@ -6,6 +7,8 @@ var kStaticFiles = [
 	{uri: '/terminal/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 var kBacklog = 64;
+
+imports.filesystem.getPackage().then(function(fs) { gFileSystem = fs; });
 
 function Terminal() {
 	this._waiting = [];
@@ -90,9 +93,12 @@ function sessionHandler(request, response, session) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			imports.system.getPackageFile(file.path).then(function(data) {
+			gFileSystem.readFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
+			}).then(function(e) {
+				response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+				response.end("500 Internal Server Error\n" + e.toString());
 			});
 			break;
 		}

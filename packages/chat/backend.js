@@ -7,13 +7,16 @@ var kStaticFiles = [
 	{uri: '/chat/frontend.js', path: 'frontend.js', type: 'text/javascript'},
 ];
 
+var packageFs;
+imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
+
 function sessionHandler(request, response, session) {
 	var found = false;
 	for (var i in kStaticFiles) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			imports.system.getPackageFile(file.path).then(function(data) {
+			packageFs.readFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});

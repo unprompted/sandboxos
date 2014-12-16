@@ -2,6 +2,7 @@
 	"name": "editor",
 	"start": "editor.js",
 	"trusted": true,
-	"imports": ["auth", "httpd", "system"],
-	"href": "/tasks"
+	"imports": ["auth", "filesystem", "httpd", "system"],
+	"href": "/tasks",
+	"description": "A webapp for editing webapps."
 }

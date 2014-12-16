@@ -1,9 +1,13 @@
 var kStaticFiles = [
 	{uri: '/tasks', path: 'index.html', type: 'text/html'},
 	{uri: '/tasks/frontend.js', path: 'frontend.js', type: 'text/javascript'},
+	{uri: '/tasks/style.css', path: 'style.css', type: 'text/css'},
 ];
 
 var gWatchers = [];
+
+var packageFs;
+imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
 
 function decode(encoded) {
 	var result = "";
@@ -63,7 +67,7 @@ function handle(request, response) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			imports.system.getPackageFile(file.path).then(function(data) {
+			packageFs.readFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});

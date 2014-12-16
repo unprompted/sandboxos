@@ -44,92 +44,93 @@ function showError(error) {
 	}
 }
 
-function handleNewData(data) {
-	console.debug(data);
-	$("#tasks").empty();
+function createTaskActionDiv(name, taskName, action) {
+	var div = document.createElement("div");
+	$(div).addClass("action");
+	var button = document.createElement("input");
+	$(button).attr("type", "button");
+	$(button).attr("value", name);
+	$(button).data("taskName", taskName);
+	$(button).click(action);
+	$(div).append(button);
+	return div;
+}
 
-	var tr = document.createElement("tr");
-	var columns = ["Package", "Status", "Actions", "Statistics"];
-	for (var i in columns) {
-		var th = document.createElement("th");
-		$(th).text(columns[i]);
-		$(tr).append(th);
-	}
-	$("#tasks").append(tr);
+function handleNewData(data) {
+	$("#tasks").empty();
 
 	for (var i in data.packages) {
 		var package = data.packages[i];
-		var tr = document.createElement("tr");
+		var div = document.createElement("div");
+		$(div).addClass("package");
 
-		var td = document.createElement("td");
+		var nameDiv = document.createElement("div");
+		$(nameDiv).addClass("packageName");
 		if (data.tasks[package]
 			&& data.tasks[package].manifest
 			&& data.tasks[package].manifest.href) {
 			var a = document.createElement("a");
 			$(a).attr("href", data.tasks[package].manifest.href);
 			$(a).text(package);
-			$(td).append(a);
+			$(nameDiv).append(a);
 		} else {
-			$(td).text(package);
+			$(nameDiv).text(package);
 		}
-		$(tr).append(td);
+		$(div).append(nameDiv);
 
+		var descriptionDiv = document.createElement("div");
+		$(descriptionDiv).addClass("description");
+		if (data.tasks[package] && data.tasks[package].manifest) {
+			$(descriptionDiv).text(data.tasks[package].manifest.description || "Package has no description.");
+		} else {
+			$(descriptionDiv).text("No description available.");
+		}
+		$(div).append(descriptionDiv);
+
+		var statusDiv = document.createElement("div");
 		if (package == "system") {
-			var td = document.createElement("td");
-			$(td).text("always running");
-			$(tr).append(td);
+			$(statusDiv).text("always running");
 		} else if (data.tasks[package]) {
-			var td = document.createElement("td");
-			$(td).text(data.tasks[package].status);
-			if (data.tasks[package].error) {
-				$(td).click(showError(data.tasks[package].error));
-				$(td).css({color: "red", cursor: "pointer"});
-			}
-			$(tr).append(td);
+			$(statusDiv).text(data.tasks[package].status);
 		} else {
-			var td = document.createElement("td");
-			$(td).text("not running");
-			$(tr).append(td);
+			$(statusDiv).text("stopped");
+		}
+		$(div).append(statusDiv);
+
+		if (data.tasks[package] && data.tasks[package].error) {
+			var errorDiv = document.createElement("div");
+			$(errorDiv).text(data.tasks[package].error);
+			$(errorDiv).addClass("error");
+			$(div).append(errorDiv);
 		}
 
-		// Actions
-		var td = document.createElement("td");
-		var a = document.createElement("a");
-		$(a).text("edit");
-		$(a).attr("href", "/editor/" + package + "/");
-		$(td).append(a);
-		$(td).append(" ");
-		if (data.tasks[package]) {
-			var stop = document.createElement("input");
-			$(stop).attr("type", "button");
-			$(stop).attr("value", "Stop");
-			$(stop).data("taskName", package);
-			$(stop).click(stopTask);
-			$(td).append(stop);
+		var actionsDiv = document.createElement("div");
+		$(actionsDiv).addClass("actions");
 
-			var restart = document.createElement("input");
-			$(restart).attr("type", "button");
-			$(restart).attr("value", "Restart");
-			$(restart).data("taskName", package);
-			$(restart).click(restartTask);
-			$(td).append(restart);
+		var editDiv = document.createElement("div");
+		$(editDiv).addClass("action");
+		var edit = document.createElement("a");
+		$(edit).text("edit");
+		$(edit).attr("href", "/editor/" + package + "/");
+		$(editDiv).append(edit);
+		$(actionsDiv).append(editDiv);
+
+		if (data.tasks[package]) {
+			$(actionsDiv).append(createTaskActionDiv("Stop", package, stopTask));
+			$(actionsDiv).append(createTaskActionDiv("Restart", package, restartTask));
 		} else {
-			var start = document.createElement("input");
-			$(start).attr("type", "button");
-			$(start).attr("value", "Start");
-			$(start).data("taskName", package);
-			$(start).click(startTask);
-			$(td).append(start);
+			$(actionsDiv).append(createTaskActionDiv("Start", package, startTask));
 		}
-		$(tr).append(td);
+		$(div).append(actionsDiv);
 
-		var td = document.createElement("td");
 		if (data.tasks[package]) {
-			$(td).append(JSON.stringify(data.tasks[package].statistics));
+			var statisticsDiv = document.createElement("div");
+			$(statisticsDiv).addClass("statistics");
+			$(statisticsDiv).text("Statistics: " + JSON.stringify(data.tasks[package].statistics, null, "\t"));
+			$(div).append(statisticsDiv);
 		}
-		$(tr).append(td);
 
-		$("#tasks").append(tr);
+		$("#tasks").append(div);
 	}
 }
 

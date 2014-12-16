@@ -1,4 +1,5 @@
 {
 	"name": "shell",
-	"start": "shell.js"
+	"start": "shell.js",
+	"description": "A very basic command shell."
 }

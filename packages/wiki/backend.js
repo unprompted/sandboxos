@@ -3,6 +3,11 @@ var kStaticFiles = [
 	{uri: '/wiki/style.css', path: 'style.css', type: 'text/css'},
 ];
 
+var wikiFs = null;
+var packageFs = null;
+imports.filesystem.getPackageData().then(function(fs) { wikiFs = fs; });
+imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
+
 function startsWith(string, start) {
 	return string.substring(0, start.length) == start;
 }
@@ -116,12 +121,15 @@ function wikiToHtml(text) {
 
 function render(response, fileName, isEdit) {
 	Promise.all([
-		imports.system.getPackageFile(isEdit ? "edit.html" : "index.html"),
-		imports.system.getData(fileName),
+		packageFs.readFile(isEdit ? "edit.html" : "index.html"),
+		wikiFs.readFile(fileName),
 	]).then(function(data) {
 		var html = data[0].replace(/\$\(CONTENTS\)/g, isEdit ? data[1] : wikiToHtml(data[1])).replace(/\$\(PAGE\)/g, fileName);
 		response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
 		response.end(html);
+	}).catch(function(e) {
+		response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+		response.end("500 Internal Server Error\n" + e.toString());
 	});
 }
 
@@ -131,7 +139,7 @@ function handler(request, response) {
 		if (kStaticFiles[i].uri == request.uri) {
 			found = true;
 			var file = kStaticFiles[i];
-			imports.system.getPackageFile(file.path).then(function(data) {
+			packageFs.readFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
 			});
@@ -154,7 +162,7 @@ function handler(request, response) {
 
 		if (request.method == "POST") {
 			var form = decodeForm(request.body);
-			imports.system.putData(fileName, form.contents).then(function() {
+			wikiFs.writeFile(fileName, form.contents).then(function() {
 				response.writeHead(303, {"Content-Type": "text/plain", "Connection": "close", "Location": "/wiki/" + fileName});
 				response.end("");
 			});

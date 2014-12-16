@@ -1,6 +1,7 @@
 {
 	"name": "wiki",
 	"start": "backend.js",
-	"imports": ["httpd", "system"],
-	"href": "/wiki"
+	"imports": ["httpd", "filesystem"],
+	"href": "/wiki",
+	"description": "An extremely basic collaborative document editor."
 }

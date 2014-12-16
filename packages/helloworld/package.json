@@ -1,6 +1,7 @@
 {
 	"name": "helloworld",
 	"start": "hello.js",
-	"imports": ["httpd"],
-	"href": "/helloworld"
+	"imports": ["httpd", "filesystem"],
+	"href": "/helloworld",
+	"description": "A \"Hello, world!\" example.  Displays \"Hello, world!\" when visited in a web browser."
 }
