@@ -1,5 +1,5 @@
-#ifndef INCLUDED_FILE
-#define INCLUDED_FILE
+#ifndef INCLUDED_File
+#define INCLUDED_File
 
 #include <v8.h>
 

@@ -7,6 +7,7 @@
 #include <v8-platform.h>
 
 #if !defined (WIN32) && !defined (__MACH__)
+#include <signal.h>
 #include <sys/prctl.h>
 #include <unistd.h>
 #endif
@@ -28,6 +29,12 @@ int main(int argc, char* argv[]) {
 			isChild = true;
 		}
 	}
+
+#if !defined (WIN32)
+	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+		perror("signal");
+	}
+#endif
 
 	if (isChild) {
 #if !defined (WIN32) && !defined (__MACH__)
