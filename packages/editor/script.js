@@ -38,17 +38,27 @@ function setText(text) {
 	}
 }
 
-function clonePackage() {
-	var newPackage = prompt("Name of new package:");
-	if (newPackage) {
+function copyToWorkspace() {
+	if (confirm("Are you sure you want to copy this package to your workspace?  It will overwrite any existing copy you have.")) {
 		$.ajax({
-			url: "clone",
-			data: {newName: newPackage},
+			url: "copyToWorkspace",
 		}).then(function(data) {
-			alert("Package '" + newPackage + "' created successfully.");
-			window.location.href = "/editor/" + newPackage + "/";
+			alert("Package copied successfully.");
+			window.location.reload();
 		}).fail(function(xhr, status, error) {
-			alert("Unable to clone package to " + newPackage + ".\n\n" + JSON.parse(xhr.responseText));
+			alert("Unable to copy the package to your workspace.\n\n" + JSON.parse(xhr.responseText));
+		});
+	}
+}
+
+function install() {
+	if (confirm("Are you sure you want to install this package?  It will overwrite any existing package of the same name.")) {
+		$.ajax({
+			url: "install",
+		}).then(function(data) {
+			alert("Package installed successfully.\n\n" + JSON.stringify(data));
+		}).fail(function(xhr, status, error) {
+			alert("Unable to install the package.\n\n" + JSON.parse(xhr.responseText));
 		});
 	}
 }

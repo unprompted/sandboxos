@@ -255,78 +255,6 @@ function accessWrite(taskName, packageName) {
 	return taskIsTrusted(taskName);
 }
 
-function getPackageFile(fileName, packageName) {
-	if (accessRead(this.taskName, packageName)) {
-		var finalPath = packageFilePath(packageName || this.taskName, fileName);
-		if (finalPath) {
-			return File.readFile(finalPath);
-		}
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
-function putPackageFile(fileName, contents, packageName) {
-	if (accessWrite(this.taskName, packageName)) {
-		var finalPath = packageFilePath(packageName || this.taskName, fileName);
-		if (finalPath) {
-			return File.writeFile(finalPath, contents);
-		}
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
-function renamePackageFile(fromName, toName, packageName) {
-	if (accessWrite(this.taskName, packageName)) {
-		var oldName = packageFilePath(packageName || this.taskName, fromName);
-		var newName = packageFilePath(packageName || this.taskName, toName);
-		if (oldName && newName) {
-			return File.renameFile(oldName, newName);
-		}
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
-function unlinkPackageFile(fileName, packageName) {
-	if (accessWrite(this.taskName, packageName)) {
-		var finalName = packageFilePath(packageName || this.taskName, fileName);
-		if (finalName) {
-			return File.unlinkFile(finalName);
-		}
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
-function createPackage(packageName) {
-	if (accessWrite(this.taskName, packageName)) {
-		var path = packageFilePath(packageName, "");
-		if (path) {
-			return File.makeDirectory(path);
-		}
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
-function listPackageFiles(packageName) {
-	if (accessRead(this.taskName, packageName)) {
-		var list = File.readDirectory(packageFilePath(packageName || this.taskName, ""));
-		list.sort();
-		var finalList = [];
-		for (var i in list) {
-			if (list[i][0] != ".") {
-				finalList.push(list[i]);
-			}
-		}
-		return finalList;
-	} else {
-		throw new Error("Permission denied.");
-	}
-}
-
 function registerTaskStatusChanged(callback) {
 	gStatusWatchers[this.taskName] = callback;
 }
@@ -335,12 +263,6 @@ start();
 
 exports = {
 	registerTaskStatusChanged: registerTaskStatusChanged,
-	getPackageFile: getPackageFile,
-	putPackageFile: putPackageFile,
-	renamePackageFile: renamePackageFile,
-	unlinkPackageFile: unlinkPackageFile,
-	createPackage: createPackage,
-	listPackageFiles: listPackageFiles,
 	getPackageList: getPackageList,
 	getTasks: getTasks,
 	startTask: startTask,

@@ -1,6 +1,7 @@
 var gAccounts = {};
 var gPermissions = {};
 var gSessions = {};
+var gTokens = {};
 
 var bCryptLib = require('bCrypt');
 bCrypt = new bCryptLib.bCrypt();
@@ -181,8 +182,32 @@ function query(headers) {
 	}
 }
 
+function getCredentials(headers, task) {
+	var session = getCookies(headers).session;
+	if (session && gSessions[session]) {
+		var now = new Date();
+		var random = Math.random();
+		var token = hashPassword(task + ":" + session + ":" + random + ":" + now.toString());
+		gTokens[token] = {session: session, granted: now, random: random, task: task};
+		return {user: gSessions[session].name, token: token};
+	}
+}
+
+function verifyCredentials(credentials) {
+	if (gTokens[credentials.token]
+		&& gTokens[credentials.token].task == this.taskName
+		&& gSessions[gTokens[credentials.token].session]
+		&& gSessions[gTokens[credentials.token].session].name == credentials.user) {
+		return {permissions: getPermissions(gTokens[credentials.token].session)};
+	} else {
+		throw new Error("Access denied.");
+	}
+}
+
 imports.httpd.all("/login", handler);
 
 exports = {
 	query: query,
+	getCredentials: getCredentials,
+	verifyCredentials: verifyCredentials,
 };

@@ -50,12 +50,6 @@ function decodeForm(encoded) {
 	return result;
 }
 
-function copyFile(oldPackage, newPackage, fileName) {
-	return imports.system.getPackageFile(fileName, oldPackage).then(function(result) {
-		return imports.system.putPackageFile(fileName, result, newPackage);
-	});
-}
-
 function handler(request, response) {
 	imports.auth.query(request.headers).then(function(auth) {
 		if (auth) {
@@ -67,21 +61,15 @@ function handler(request, response) {
 	});
 }
 
-function validateCanWrite(auth, packageName) {
-	return new Promise(function(resolve, reject) {
-		if (auth.permissions.administrator) {
-			resolve(true);
-		} else {
-			imports.system.getPackageFile("package.json", packageName).then(function(packageFile) {
-				var data = JSON.parse(packageFile);
-				if (data.trusted) {
-					throw new Error("Permission denied.");
-				}
-				resolve(true);
-			}).catch(function(e) {
-				reject(e);
-			});
-		}
+function getWorkspace(auth, packageName, create) {
+	var promise = imports.filesystem.getPackageData();
+	if (create) {
+		promise = promise.then(function(fs) {
+			fs.ensureDirectoryTreeExists(auth.session.name + "/" + packageName).then(function() { return fs; });
+		});
+	}
+	return promise.then(function(fs) {
+		return fs.chroot(auth.session.name + "/" + packageName);
 	});
 }
 
@@ -113,13 +101,21 @@ function sessionHandler(request, response, auth) {
 			handled = true;
 			if (action == "get") {
 				var form = decodeForm(request.query);
-				imports.system.getPackageFile(form.fileName, packageName).then(function(result) {
+
+				getWorkspace(auth, packageName).then(function(fs) {
+					return fs.readFile(form.fileName);
+				}).then(function(contents) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(result);
+					response.end(contents);
+				}).catch(function(error) {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "list") {
 				var form = decodeForm(request.query);
-				imports.system.listPackageFiles(packageName).then(function(result) {
+				getWorkspace(auth, packageName).then(function(fs) {
+					return fs.listDirectory(".");
+				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
@@ -128,25 +124,18 @@ function sessionHandler(request, response, auth) {
 				});;
 			} else if (action == "put") {
 				var form = decodeForm(request.body);
-				validateCanWrite(auth, packageName).then(function() {
-					if (form.fileName == "package.json"
-						&& JSON.parse(JSON.parse(form.contents)).trusted
-						&& !auth.permissions.administrator) {
-						throw new Error("Permission denied.");
-					}
-					return imports.system.putPackageFile(form.fileName, JSON.parse(form.contents), packageName);
-				}).then(function(result) {
-					return imports.system.restartTask(packageName);
+				getWorkspace(auth, packageName).then(function(fs) {
+					return fs.writeFile(form.fileName, JSON.parse(form.contents));
 				}).then(function() {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end("updated");
+					response.end("written");
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(error.toString()));
 				});;
 			} else if (action == "new") {
 				var form = decodeForm(request.query);
-				imports.system.createPackage(packageName).then(function(result) {
+				getWorkspace(auth, packageName, true).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
@@ -155,8 +144,8 @@ function sessionHandler(request, response, auth) {
 				});
 			} else if (action == "unlink") {
 				var form = decodeForm(request.query);
-				validateCanWrite(auth, packageName).then(function() {
-					return imports.system.unlinkPackageFile(form.fileName, packageName);
+				getWorkspace(auth, packageName).then(function(fs) {
+					return fs.unlinkFile(form.fileName);
 				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
@@ -166,11 +155,8 @@ function sessionHandler(request, response, auth) {
 				});
 			} else if (action == "rename") {
 				var form = decodeForm(request.query);
-				validateCanWrite(auth, packageName).then(function() {
-					if (form.newName == "package.json" || form.oldName == "package.json") {
-						throw new Error("Renaming to/from package.json is not allowed.");
-					}
-					return imports.system.renamePackageFile(form.oldName, form.newName, packageName);
+				getWorkspace(auth, packageName).then(function(fs) {
+					return fs.renameFile(form.oldName, form.newName);
 				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
@@ -178,23 +164,34 @@ function sessionHandler(request, response, auth) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(error.toString()));
 				});
-			} else if (action == "clone") {
+			} else if (action == "copyToWorkspace") {
 				var form = decodeForm(request.query);
-				var oldName = packageName;
-				var newName = form.newName;
-				validateCanWrite(auth, packageName).then(function() {
-					return imports.system.createPackage(newName);
-				}).then(function() {
-					return imports.system.listPackageFiles(oldName);
-				}).then(function(oldPackageContents) {
-					promises = [];
-					for (var i in oldPackageContents) {
-						promises.push(copyFile(oldName, newName, oldPackageContents[i]));
-					}
-					return Promise.all(promises);
-				}).then(function(data) {
+				Promise.all([
+					imports.filesystem.getPackage(packageName),
+					imports.filesystem.getPackageData().then(function(fs) {
+						return fs.ensureDirectoryTreeExists(auth.session.name + "/" + packageName).then(function() {
+							return fs.chroot(auth.session.name + "/" + packageName);
+						});
+					}),
+				]).then(function(filesystems) {
+					return imports.filesystem.copy(filesystems[0], filesystems[1]);
+				}).then(function(v) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end("cloned");
+					response.end("copied");
+				}).catch(function(error) {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(JSON.stringify(error.toString()));
+				});
+			} else if (action == "install") {
+				var form = decodeForm(request.query);
+				getWorkspace(auth, packageName).then(function(fs) {
+					return imports.auth.getCredentials(request.headers, 'packager').then(function(credentials) {
+						print(fs);
+						return imports.packager.install(fs, credentials);
+					});
+				}).then(function(result) {
+					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(error.toString()));

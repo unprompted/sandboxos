@@ -81,37 +81,70 @@ function FileSystem(options) {
 		}
 	}
 
+	this.chroot = function(path) {
+		return new FileSystem({root: root + "/" + path, permissions: permissions});
+	}
+
+	this.ensureDirectoryTreeExists = function(path) {
+		return fs.makeDirectory(path).catch(function(e) {
+			if (e == -2) {
+				// ENOENT
+				return fs.ensureDirectoryTreeExists(path + "/..").then(function() { this.ensureDirectoryTreeExists(path); });
+			} else if (e == -17) {
+				// EEXIST
+			}
+		});
+	}
+
 	return this;
 };
 
-function isValidTaskName(taskName) {
+function isValidName(taskName) {
 	return taskName && taskName.indexOf("..") == -1 && taskName.indexOf("/") == -1;
 }
 
 function makePackageDataFileSystem() {
-	if (isValidTaskName(this.taskName)) {
+	if (isValidName(this.taskName)) {
 		return new FileSystem({root: "data/" + this.taskName, permissions: {read: true, write: true}});
 	}
 }
 
 function makePackageFileSystem(packageName, permissions) {
-	if (isValidTaskName(this.taskName)) {
+	if (isValidName(this.taskName) && (!packageName || isValidName(packageName))) {
 		if (this.taskName == "packager") {
 			var granted = permissions || {read: true, write: true};
-			if (packageName) {
-				if (isValidTaskName(packageName)) {
-					return new FileSystem({root: "packages/" + packageName, permissions: granted});
-				}
-			} else {
-				return new FileSystem({root: "packages/" + this.taskName, permissions: granted});
-			}
+			return new FileSystem({root: "packages/" + (packageName || this.taskName), permissions: granted});
 		} else {
-			return new FileSystem({root: "packages/" + this.taskName, permissions: {read: true}});
+			return new FileSystem({root: "packages/" + (packageName || this.taskName), permissions: {read: true}});
 		}
 	}
+}
+
+function writeToTarget(fileName, fs) {
+	return function(data) {
+		fs.writeFile(fileName, data);
+	};
+}
+
+function copy(source, target) {
+	return Promise.all([source.listDirectory("."), target.listDirectory(".")]).then(function(list) {
+		var operations = [];
+		var sourceFiles = list[0];
+		var targetFiles = list[1];
+		for (var i in sourceFiles) {
+			operations.push(source.readFile(sourceFiles[i]).then(writeToTarget(sourceFiles[i], target)));
+		}
+		for (var i in targetFiles) {
+			if (sourceFiles.indexOf(targetFiles[i]) == -1) {
+				operations.push(target.unlinkFile(targetFiles[i]));
+			}
+		}
+		return Promise.all(operations);
+	});
 }
 
 exports = {
 	getPackageData: makePackageDataFileSystem,
 	getPackage: makePackageFileSystem,
+	copy: copy,
 };
