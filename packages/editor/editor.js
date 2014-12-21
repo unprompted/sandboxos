@@ -1,11 +1,7 @@
 var kStaticFiles = [
 	{uri: '/editor', path: 'index.html', type: 'text/html'},
-	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
-	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
-	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
 	{uri: '/editor/style.css', path: 'style.css', type: 'text/css'},
 	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
-	{uri: '/editor/ace.js', path: 'ace.js', type: 'text/javascript'},
 ];
 
 var packageFs;
@@ -105,7 +101,6 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "list") {
-				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.listDirectory(".");
 				}).then(function(result) {
@@ -114,9 +109,8 @@ function sessionHandler(request, response, auth) {
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(error);
-				});;
+				});
 			} else if (action == "put") {
-				var form = decodeForm(request.body);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.writeFile(form.fileName, JSON.parse(form.contents));
 				}).then(function() {
@@ -125,9 +119,8 @@ function sessionHandler(request, response, auth) {
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(error.toString()));
-				});;
+				});
 			} else if (action == "new") {
-				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName, true).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
@@ -136,7 +129,6 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "unlink") {
-				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.unlinkFile(form.fileName);
 				}).then(function(result) {
@@ -147,7 +139,6 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "rename") {
-				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.renameFile(form.oldName, form.newName);
 				}).then(function(result) {
@@ -158,7 +149,6 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "copyToWorkspace") {
-				var form = decodeForm(request.query);
 				Promise.all([
 					imports.filesystem.getPackage(packageName),
 					imports.filesystem.getPackageData().then(function(fs) {
@@ -176,7 +166,6 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "install") {
-				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return imports.auth.getCredentials(request.headers, 'packager').then(function(credentials) {
 						print(fs);

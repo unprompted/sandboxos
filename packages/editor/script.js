@@ -138,6 +138,7 @@ $(document).ready(function() {
 	refreshPackage();
 	gEditor = ace.edit("editor");
 	gEditor.$blockScrolling = Infinity;
+	gEditor.setAnimatedScroll(false);
 	gEditor.setTheme("ace/theme/terminal");
 	gEditor.session.setUseSoftTabs(false);
 });

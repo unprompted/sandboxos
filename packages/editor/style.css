@@ -17,9 +17,6 @@ html, body {
 	flex-flow: column;
 }
 
-#toolbar {
-}
-
 li.current {
 	font-weight: bold;
 }
