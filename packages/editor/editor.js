@@ -3,20 +3,13 @@ var kStaticFiles = [
 	{uri: '/editor/codemirror-compressed.js', path: 'codemirror-compressed.js', type: 'text/javascript'},
 	{uri: '/editor/codemirror.css', path: 'codemirror.css', type: 'text/css'},
 	{uri: '/editor/lesser-dark.css', path: 'lesser-dark.css', type: 'text/css'},
+	{uri: '/editor/style.css', path: 'style.css', type: 'text/css'},
 	{uri: '/editor/script.js', path: 'script.js', type: 'text/javascript'},
+	{uri: '/editor/ace.js', path: 'ace.js', type: 'text/javascript'},
 ];
 
 var packageFs;
 imports.filesystem.getPackage().then(function(fs) { packageFs = fs; });
-
-function escapeHtml(value) {
-	var kMap = {
-		"&": "&amp;",
-		"<": "&lt;",
-		">": "&gt;",
-	};
-	return value.replace(/[&<>]/g, function(v) { return kMap[v]; });
-}
 
 function decode(encoded) {
 	var result = "";

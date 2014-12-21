@@ -1,13 +1,12 @@
-var cm;
 var currentFileName;
+var gEditor;
 
 function saveFile() {
-	cm.save()
 	if (currentFileName) {
 		$.ajax({
 			type: "POST",
 			url: "put",
-			data: {fileName: currentFileName, contents: JSON.stringify($("#edit").val())},
+			data: {fileName: currentFileName, contents: JSON.stringify(gEditor.getValue())},
 			dataType: "text",
 		}).fail(function(xhr, status, error) {
 			alert("Unable to save " + currentFileName + ".\n\n" + JSON.parse(xhr.responseText));
@@ -20,20 +19,19 @@ function endsWith(string, suffix) {
 }
 
 function setText(text) {
-	if (cm) {
-		cm.setValue(text);
-	} else {
-		$("#edit").val(text);
+	if (gEditor) {
+		gEditor.setValue(text);
+		gEditor.selection.clearSelection();
 	}
 	if (currentFileName) {
 		if (endsWith(currentFileName, ".js")) {
-			cm.setOption("mode", "javascript");
+			gEditor.session.setMode("ace/mode/javascript");
 		} else if (endsWith(currentFileName, ".json")) {
-			cm.setOption("mode", {name: "javascript", json: true});
+			gEditor.session.setMode("ace/mode/json");
 		} else if (endsWith(currentFileName, ".html")) {
-			cm.setOption("mode", "htmlmixed");
+			gEditor.session.setMode("ace/mode/html");
 		} else if (endsWith(currentFileName, ".css")) {
-			cm.setOption("mode", "css");
+			gEditor.session.setMode("ace/mode/css");
 		}
 	}
 }
@@ -138,14 +136,8 @@ function changeFile() {
 
 $(document).ready(function() {
 	refreshPackage();
-	var editor = document.getElementById("edit");
-	cm = CodeMirror.fromTextArea(editor, {
-		indentWithTabs: true,
-		theme: 'lesser-dark',
-		indentUnit: 4,
-		smartIndent: false,
-		lineNumbers: true,
-		electricChars: false,
-		showTrailingSpace: true,
-	});
+	gEditor = ace.edit("editor");
+	gEditor.$blockScrolling = Infinity;
+	gEditor.setTheme("ace/theme/terminal");
+	gEditor.session.setUseSoftTabs(false);
 });

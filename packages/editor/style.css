@@ -1,0 +1,32 @@
+html, body {
+	display: flex;
+	flex-flow: row;
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	width: 100%;
+}
+
+#files {
+	cursor: hand;
+}
+
+#editor {
+	flex-grow: 1;
+	display: flex;
+	flex-flow: column;
+}
+
+#toolbar {
+}
+
+li.current {
+	font-weight: bold;
+}
+
+#editor {
+	margin: 0;
+	padding: 0;
+	flex-grow: 1;
+	font-size: medium;
+}
