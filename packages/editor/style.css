@@ -11,7 +11,7 @@ html, body {
 	cursor: hand;
 }
 
-#editor {
+#content {
 	flex-grow: 1;
 	display: flex;
 	flex-flow: column;
@@ -28,5 +28,6 @@ li.current {
 	margin: 0;
 	padding: 0;
 	flex-grow: 1;
+	height: 100%;
 	font-size: medium;
 }
