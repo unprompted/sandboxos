@@ -1,0 +1,19 @@
+#!/bin/bash
+
+cat > test.js << EOF
+var task = new Task();
+task.onExit = function() {
+	print("child exited");
+};
+task.activate();
+task.execute("child.js").then(function() {
+	print("child started");
+});
+EOF
+
+cat > child.js << EOF
+print("I am the child process.");
+exit(0);
+EOF
+
+$SANDBOXOS test.js

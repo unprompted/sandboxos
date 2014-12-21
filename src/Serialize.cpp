@@ -111,6 +111,17 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 	return true;
 }
 
+v8::Handle<v8::Value> Serialize::store(Task* task, v8::TryCatch& tryCatch) {
+	v8::Handle<v8::Object> error = v8::Object::New(task->getIsolate());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "message"), tryCatch.Message()->Get());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "fileName"), tryCatch.Message()->GetScriptResourceName());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "lineNumber"), v8::Integer::New(task->getIsolate(), tryCatch.Message()->GetLineNumber()));
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "sourceLine"), tryCatch.Message()->GetSourceLine());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "exception"), tryCatch.Exception());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "stackTrace"), tryCatch.StackTrace());
+	return error;
+}
+
 v8::Handle<v8::Value> Serialize::load(Task* task, TaskStub* from, const std::vector<char>& buffer) {
 	int offset = 0;
 	return loadInternal(task, from, buffer, offset, 0);

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cat > test.js << EOF
+print("hi");
+EOF
+
+valgrind --log-file=$LOGDIR/valgrind.log $SANDBOXOS test.js

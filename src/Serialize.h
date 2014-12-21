@@ -12,6 +12,8 @@ public:
 	static bool store(Task* task, std::vector<char>& buffer, v8::Handle<v8::Value> value);
 	static v8::Handle<v8::Value> load(Task* task, TaskStub* from, const std::vector<char>& buffer);
 
+	static v8::Handle<v8::Value> store(Task* task, v8::TryCatch& tryCatch);
+
 private:
 	static bool storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<v8::Value> value, int depth);
 	static v8::Handle<v8::Value> loadInternal(Task* task, TaskStub* from, const std::vector<char>& buffer, int& offse, int deptht);

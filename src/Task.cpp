@@ -97,7 +97,6 @@ Task::~Task() {
 	{
 		v8::Isolate::Scope isolateScope(_isolate);
 		v8::HandleScope handleScope(_isolate);
-		_isolate->GetCurrentContext()->Exit();
 		_context.Reset();
 	}
 
@@ -466,8 +465,14 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 			exportid_t exportId;
 			std::memcpy(&promise, begin, sizeof(promise));
 			std::memcpy(&exportId, begin + sizeof(promise), sizeof(exportId));
+
+			v8::TryCatch tryCatch;
 			v8::Handle<v8::Value> result = invokeExport(from, to, exportId, std::vector<char>(begin + sizeof(promiseid_t) + sizeof(exportid_t), begin + length));
-			sendPromiseResolve(to, from, promise, result);
+			if (tryCatch.HasCaught()) {
+				sendPromiseReject(to, from, promise, Serialize::store(to, tryCatch));
+			} else {
+				sendPromiseResolve(to, from, promise, result);
+			}
 		}
 		break;
 	case kResolvePromise:
@@ -536,14 +541,7 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 			tryCatch.SetVerbose(true);
 			to->execute(*v8::String::Utf8Value(arg));
 			if (tryCatch.HasCaught()) {
-				v8::Handle<v8::Object> error = v8::Object::New(to->_isolate);
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "message"), tryCatch.Message()->Get());
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "fileName"), tryCatch.Message()->GetScriptResourceName());
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "lineNumber"), v8::Integer::New(to->_isolate, tryCatch.Message()->GetLineNumber()));
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "sourceLine"), tryCatch.Message()->GetSourceLine());
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "exception"), tryCatch.Exception());
-				error->Set(v8::String::NewFromUtf8(to->_isolate, "stackTrace"), tryCatch.StackTrace());
-				sendPromiseReject(to, from, promise, error);
+				sendPromiseReject(to, from, promise, Serialize::store(to, tryCatch));
 			}
 			else {
 				sendPromiseResolve(to, from, promise, v8::Undefined(to->_isolate));

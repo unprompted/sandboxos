@@ -135,15 +135,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(taskObject);
 }
 
-void TaskStub::onPipeWrite(uv_write_t* request, int status) {
-	uv_close(reinterpret_cast<uv_handle_t*>(request->handle), onPipeClose);
-	delete reinterpret_cast<char*>(request);
-}
-
-void TaskStub::onPipeClose(uv_handle_t* handle) {
-	delete reinterpret_cast<uv_pipe_t*>(handle);
-}
-
 void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminationSignal) {
 	TaskStub* stub = reinterpret_cast<TaskStub*>(process->data);
 	if (!stub->_onExit.IsEmpty()) {
@@ -154,7 +145,9 @@ void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminat
 		args[0] = v8::Integer::New(stub->_owner->_isolate, status);
 		args[1] = v8::Integer::New(stub->_owner->_isolate, terminationSignal);
 		callback->Call(callback, 2, &args[0]);
+	} else {
 	}
+	stub->_stream.close();
 	stub->_owner->_children.erase(stub->_id);
 	uv_close(reinterpret_cast<uv_handle_t*>(process), 0);
 }

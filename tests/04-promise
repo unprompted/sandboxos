@@ -1,0 +1,27 @@
+#!/bin/bash
+
+cat > test.js << EOF
+var task = new Task();
+task.activate();
+task.execute("child.js").then(function() {
+	task.getExports().then(function(exports) {
+		return exports.add(1, 1);
+	}).then(function(sum) {
+		if (sum == 2) {
+			exit(0);
+		} else {
+			exit(1);
+		}
+	});
+});
+EOF
+
+cat > child.js << EOF
+exports = {
+	add: function(left, right) {
+		return left + right;
+	}
+}
+EOF
+
+$SANDBOXOS test.js

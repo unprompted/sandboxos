@@ -54,8 +54,6 @@ private:
 	static void onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data);
 
 	static void onProcessExit(uv_process_t* process, int64_t status, int terminationSignal);
-	static void onPipeWrite(uv_write_t* request, int status);
-	static void onPipeClose(uv_handle_t* handle);
 };
 
 #endif

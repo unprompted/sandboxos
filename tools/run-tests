@@ -1,0 +1,36 @@
+#!/bin/bash
+
+ROOT=$(cd $(dirname ${BASH_SOURCE[0]})/..; pwd)
+TMP=$ROOT/tmp
+LOGS=$ROOT/logs
+TESTS=$ROOT/tests
+export SANDBOXOS=$ROOT/sandboxos
+
+mkdir $TMP 2> /dev/null
+mkdir $LOGS 2> /dev/null
+
+REQUESTED_TESTS=$*
+if [[ -z $REQUESTED_TESTS ]]; then
+	REQUESTED_TESTS = $(ls TESTS/*)
+fi
+
+for NAME in $REQUESTED_TESTS; do
+	TEST=$TESTS/$NAME
+	echo -n "$(basename $TEST) "
+	rm -rf $TMP/*
+	pushd $TMP > /dev/null
+	export LOGDIR=$LOGS/$NAME
+	mkdir $LOGDIR 2> /dev/null
+	$TEST > $LOGDIR/stdout.log 2> $LOGDIR/stderr.log
+	RESULT=$?
+	popd > /dev/null
+	if [[ $RESULT != 0 ]]; then
+		echo "FAILED (with exit code $RESULT)"
+		exit $RESULT
+	else
+		echo "SUCCESS"
+	fi
+done
+
+echo
+echo "All tests completed successfully."

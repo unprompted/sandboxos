@@ -11,6 +11,10 @@ PacketStream::PacketStream()
 PacketStream::~PacketStream() {
 	_onReceive = 0;
 	_onReceiveUserData = 0;
+	close();
+}
+
+void PacketStream::close() {
 	if (!uv_is_closing(reinterpret_cast<uv_handle_t*>(&_stream))) {
 		uv_close(reinterpret_cast<uv_handle_t*>(&_stream), 0);
 	}
