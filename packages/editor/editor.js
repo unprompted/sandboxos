@@ -90,7 +90,6 @@ function sessionHandler(request, response, auth) {
 			handled = true;
 			if (action == "get") {
 				var form = decodeForm(request.query);
-
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.readFile(form.fileName);
 				}).then(function(contents) {
@@ -111,6 +110,7 @@ function sessionHandler(request, response, auth) {
 					response.end(error);
 				});
 			} else if (action == "put") {
+				var form = decodeForm(request.body);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.writeFile(form.fileName, JSON.parse(form.contents));
 				}).then(function() {
@@ -129,6 +129,7 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "unlink") {
+				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.unlinkFile(form.fileName);
 				}).then(function(result) {
@@ -139,6 +140,7 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "rename") {
+				var form = decodeForm(request.query);
 				getWorkspace(auth, packageName).then(function(fs) {
 					return fs.renameFile(form.oldName, form.newName);
 				}).then(function(result) {
@@ -168,7 +170,6 @@ function sessionHandler(request, response, auth) {
 			} else if (action == "install") {
 				getWorkspace(auth, packageName).then(function(fs) {
 					return imports.auth.getCredentials(request.headers, 'packager').then(function(credentials) {
-						print(fs);
 						return imports.packager.install(fs, credentials);
 					});
 				}).then(function(result) {

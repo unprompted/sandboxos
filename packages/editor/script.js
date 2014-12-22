@@ -117,9 +117,6 @@ function refreshPackage() {
 function changeFile() {
 	currentFileName = $(this).text();
 	$("#fileSpecific").show();
-	$("#save").val("Save " + currentFileName);
-	$("#rename").val("Rename " + currentFileName);
-	$("#delete").val("Delete " + currentFileName);
 	$("#files").children().each(function (i) {
 		if ($(this).text() == currentFileName) {
 			$(this).addClass("current");
@@ -139,6 +136,7 @@ $(document).ready(function() {
 	gEditor = ace.edit("editor");
 	gEditor.$blockScrolling = Infinity;
 	gEditor.setAnimatedScroll(false);
+	gEditor.setShowInvisibles(true);
 	gEditor.setTheme("ace/theme/terminal");
 	gEditor.session.setUseSoftTabs(false);
 });
