@@ -132,6 +132,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 		v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 		v8::Handle<v8::Value> data;
 		if (readSize <= 0) {
+			socket->close();
 			socket->_connected = false;
 		}
 
@@ -197,6 +198,7 @@ void Socket::onClose(uv_handle_t* handle) {
 			v8::HandleScope scope(socket->_task->getIsolate());
 			promiseid_t promise = socket->_promise;
 			socket->_promise = -1;
+			socket->_connected = false;
 			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), 0));
 		}
 		if (socket->_object.IsEmpty()) {
