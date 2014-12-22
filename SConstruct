@@ -26,12 +26,12 @@ env.Append(CPPPATH=[
 ])
 if sys.platform == 'win32':
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'libuv', 'advapi32', 'winmm', 'wsock32', 'ws2_32', 'psapi', 'iphlpapi'])
-	env.Append(CXXFLAGS=['/EHsc', '/MTd', '/Zi'])
+	env.Append(CXXFLAGS=['/EHsc', '/MTd', '/Zi', '/Gy'])
 	env.Append(LIBPATH=[
 		os.path.join(v8, 'build/Debug/lib'),
 		os.path.join(uv, 'Debug/lib'),
 	])
-	env.Append(LINKFLAGS=['/DEBUG'])
+	env.Append(LINKFLAGS=['/DEBUG', '/OPT:REF', '/OPT:ICF'])
 elif sys.platform == 'darwin':
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv'])
 	env.Append(CXXFLAGS=['--std=c++11', '-g', '-Wall', '-stdlib=libstdc++'])
@@ -54,7 +54,8 @@ env.Program('sandboxos', Glob('build/*.cpp'))
 def listAllFiles(root):
 	for root, dirs, files in os.walk(root):
 		for f in files:
-			yield os.path.join(root, f)
+			if not f.startswith('.'):
+				yield os.path.join(root, f)
 
 if env['package'] and sys.platform == 'win32':
 	files = [
