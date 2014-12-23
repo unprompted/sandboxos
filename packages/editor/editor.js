@@ -180,7 +180,9 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "restartTask") {
-				imports.system.restartTask(packageName).then(function(result) {
+				imports.auth.getCredentials(request.headers, 'packager').then(function(credentials) {
+					return imports.packager.restartTask(packageName, credentials);
+				}).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
