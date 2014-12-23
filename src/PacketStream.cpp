@@ -61,6 +61,8 @@ void PacketStream::onRead(uv_stream_t* handle, ssize_t count, const uv_buf_t* bu
 			owner->processMessages();
 		}
 		delete[] reinterpret_cast<char*>(buffer->base);
+	} else {
+		owner->close();
 	}
 }
 

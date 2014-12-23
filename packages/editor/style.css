@@ -21,6 +21,10 @@ li.current {
 	font-weight: bold;
 }
 
+li.modified {
+	color: red;
+}
+
 #editor {
 	margin: 0;
 	padding: 0;

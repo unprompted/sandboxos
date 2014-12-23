@@ -33,7 +33,14 @@ function read(packageName) {
 	return imports.filesystem.getPackage(packageName, {read: true, write: false});
 }
 
+function restartTask(packageName, credentials) {
+	return imports.auth.verifyCredentials(credentials).then(function(user) {
+		return imports.system.restartTask(packageName);
+	});
+}
+
 exports = {
 	install: install,
 	read: read,
+	restartTask: restartTask,
 };

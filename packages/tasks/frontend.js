@@ -115,11 +115,13 @@ function handleNewData(data) {
 		$(editDiv).append(edit);
 		$(actionsDiv).append(editDiv);
 
-		if (data.tasks[package]) {
-			$(actionsDiv).append(createTaskActionDiv("Stop", package, stopTask));
-			$(actionsDiv).append(createTaskActionDiv("Restart", package, restartTask));
-		} else {
-			$(actionsDiv).append(createTaskActionDiv("Start", package, startTask));
+		if (package != "system") {
+			if (data.tasks[package]) {
+				$(actionsDiv).append(createTaskActionDiv("Stop", package, stopTask));
+				$(actionsDiv).append(createTaskActionDiv("Restart", package, restartTask));
+			} else {
+				$(actionsDiv).append(createTaskActionDiv("Start", package, startTask));
+			}
 		}
 		$(div).append(actionsDiv);
 

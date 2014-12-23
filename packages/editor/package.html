@@ -12,11 +12,13 @@
 			<h1>Editor</h1>
 			<div id="nav">
 				<div><a href="/wiki">home</a> &gt; <a href="/tasks">tasks</a></div>
-				<input id="copyToWorkspace" type="button" value="Copy to Workspace" onclick="copyToWorkspace()" style="display: block; clear: both">
 				<input id="install" type="button" value="Install" onclick="install()" style="display: block; clear: both">
+				<input id="getLatest" type="button" value="Get Latest" onclick="copyToWorkspace()" style="display: block; clear: both">
 				<input id="newFile" type="button" value="New File" onclick="newFile()" style="display: block; clear: both">
+				<input id="saveAll" type="button" value="Save All" onclick="saveAll()" style="display: block; clear: both">
 				<h2>Files</h2>
 				<ul id="files"></ul>
+				<div id="status"></div>
 			</div>
 		</div>
 		<div id="content">
