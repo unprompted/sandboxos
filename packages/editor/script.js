@@ -215,6 +215,7 @@ $(document).ready(function() {
 	gEditor = ace.edit("editor");
 	gEditor.$blockScrolling = Infinity;
 	gEditor.setAnimatedScroll(false);
+	gEditor.setBehavioursEnabled(false);
 	gEditor.setShowInvisibles(true);
 	gEditor.setTheme("ace/theme/terminal");
 	gEditor.session.setUseSoftTabs(false);
