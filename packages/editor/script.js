@@ -57,7 +57,7 @@ function copyToWorkspace(options) {
 			url: "copyToWorkspace",
 		}).then(function(data) {
 			alert("Package copied successfully.");
-			window.location.reload();
+			refreshPackage();
 		}).fail(function(xhr, status, error) {
 			alert("Unable to copy the package to your workspace.\n\n" + JSON.parse(xhr.responseText));
 		});
