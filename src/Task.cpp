@@ -267,9 +267,12 @@ void Task::sendPromiseResolve(Task* from, TaskStub* to, promiseid_t promise, v8:
 		v8::Handle<v8::Object> data = v8::Object::New(from->_isolate);
 		data->Set(v8::String::NewFromUtf8(from->_isolate, "task"), v8::Int32::New(from->_isolate, to->getId()));
 		data->Set(v8::String::NewFromUtf8(from->_isolate, "promise"), v8::Int32::New(from->_isolate, promise));
-		v8::Handle<v8::Function> then = v8::Function::New(from->_isolate, invokeThen, data);
 		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
+		v8::Handle<v8::Function> then = v8::Function::New(from->_isolate, invokeThen, data);
 		promise->Then(then);
+		v8::Handle<v8::Function> catchCallback = v8::Function::New(from->_isolate, invokeCatch, data);
+		promise->Catch(catchCallback);
+		from->_isolate->RunMicrotasks();
 	} else {
 		sendPromiseMessage(from, to, kResolvePromise, promise, result);
 	}
@@ -281,9 +284,12 @@ void Task::sendPromiseReject(Task* from, TaskStub* to, promiseid_t promise, v8::
 		v8::Handle<v8::Object> data = v8::Object::New(from->_isolate);
 		data->Set(v8::String::NewFromUtf8(from->_isolate, "task"), v8::Int32::New(from->_isolate, to->getId()));
 		data->Set(v8::String::NewFromUtf8(from->_isolate, "promise"), v8::Int32::New(from->_isolate, promise));
-		v8::Handle<v8::Function> catchCallback = v8::Function::New(from->_isolate, invokeCatch, data);
 		v8::Handle<v8::Promise> promise = v8::Handle<v8::Promise>::Cast(result);
+		v8::Handle<v8::Function> then = v8::Function::New(from->_isolate, invokeThen, data);
+		promise->Then(then);
+		v8::Handle<v8::Function> catchCallback = v8::Function::New(from->_isolate, invokeCatch, data);
 		promise->Catch(catchCallback);
+		from->_isolate->RunMicrotasks();
 	} else {
 		sendPromiseMessage(from, to, kRejectPromise, promise, result);
 	}

@@ -99,43 +99,46 @@ function startTaskInternal(packageName) {
 		print(error);
 	}
 
-	if (manifest) {
-		task = {}
-		task.manifest = manifest;
-		task.pending = !importsReady(task);
-		tasks[packageName] = task
+	return new Promise(function(resolve, reject) {
+		if (manifest) {
+			task = {}
+			task.manifest = manifest;
+			task.pending = !importsReady(task);
+			tasks[packageName] = task
 
-		if (!task.pending) {
-			notifyTaskStatusChanged(packageName, "starting");
-			task.task = new Task();
-			task.task.packageName = packageName;
-			task.task.trusted = true;
-			task.task.onExit = function(exitCode, terminationSignal) {
-				if (terminationSignal) {
-					print("Task " + packageName + " terminated with signal " + terminationSignal + ".");
-				} else {
-					print("Task " + packageName + " returned " + exitCode + ".");
-				}
-				delete tasks[packageName];
-				notifyTaskStatusChanged(packageName, "stopped");
-			};
-			task.task.activate();
-			gatherImports(task).then(function() {
-				task.task.execute(packageFilePath(packageName, manifest.start)).then(function() {
-					task.started = true;
-					notifyTaskStatusChanged(packageName, "started");
-					updateDependentTasks(packageName);
-					updatePendingTasks();
-				}).catch(function(error) {
-					task.error = error;
-					notifyTaskStatusChanged(packageName, "error");
+			if (!task.pending) {
+				notifyTaskStatusChanged(packageName, "starting");
+				task.task = new Task();
+				task.task.packageName = packageName;
+				task.task.trusted = true;
+				task.task.onExit = function(exitCode, terminationSignal) {
+					if (terminationSignal) {
+						print("Task " + packageName + " terminated with signal " + terminationSignal + ".");
+					} else {
+						print("Task " + packageName + " returned " + exitCode + ".");
+					}
+					delete tasks[packageName];
+					notifyTaskStatusChanged(packageName, "stopped");
+				};
+				task.task.activate();
+				gatherImports(task).then(function() {
+					task.task.execute(packageFilePath(packageName, manifest.start)).then(function() {
+						task.started = true;
+						notifyTaskStatusChanged(packageName, "started");
+						updateDependentTasks(packageName);
+						updatePendingTasks();
+						resolve();
+					}).catch(function(error) {
+						task.error = error;
+						notifyTaskStatusChanged(packageName, "error");
+						reject(error);
+					});
 				});
-			});
+			}
+		} else {
+			reject(new Error("Package " + packageName + " has no package.json."));
 		}
-	} else {
-		print("Package " + packageName + " has no package.json.");
-	}
-	return task;
+	});
 }
 
 function startTask(packageName) {
@@ -158,17 +161,20 @@ function stopTask(taskName) {
 }
 
 function restartTask(taskName) {
-	if (taskIsTrusted(this.taskName)) {
-		print("killing " + taskName);
-		var previousOnExit = tasks[taskName].task.onExit;
-		tasks[taskName].task.onExit = function() {
-			previousOnExit();
-			startTaskInternal(taskName);
+	var originatingTask = this;
+	return new Promise(function(resolve, reject) {
+		if (taskIsTrusted(originatingTask.taskName)) {
+			print("killing " + taskName);
+			var previousOnExit = tasks[taskName].task.onExit;
+			tasks[taskName].task.onExit = function() {
+				previousOnExit();
+				startTaskInternal(taskName).then(resolve, reject);
+			}
+			tasks[taskName].task.kill();
+		} else {
+			throw new Error("Permission denied.");
 		}
-		tasks[taskName].task.kill();
-	} else {
-		throw new Error("Permission denied.");
-	}
+	});
 }
 
 function packageFilePath(packageName, fileName) {

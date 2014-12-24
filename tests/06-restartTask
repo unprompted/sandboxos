@@ -11,12 +11,23 @@ mkdir -p packages/test
 cat > packages/test/test.js << EOF
 print("Hello!");
 
-imports.system.restartTask("hello").then(function(r) {
-	print("restart succeeded: " + r);
-	imports.system.finishTest(0);
+File.writeFile("packages/hello/hello.js", "this will fail to run!$^!U#%^#$%#%");
+
+var p = imports.system.restartTask("hello");
+print("here is our promise: " + p.toString());
+print(p);
+
+p.then(function(r) {
+	print("restart succeeded when it should not have: " + r);
+	imports.system.finishTest(1);
 }).catch(function(e) {
 	print("restart failed: " + e);
-	imports.system.finishTest(1);
+	print(e.toString());
+	for (var i in e) {
+		print(i);
+		print(e[i]);
+	}
+	imports.system.finishTest(0);
 });
 EOF
 
