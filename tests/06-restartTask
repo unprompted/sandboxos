@@ -1,9 +1,10 @@
 #!/bin/bash
 
 mkdir -p packages
-for i in filesystem system packager; do
+for i in filesystem packager; do
 	ln -s $ROOT/packages/$i packages/$i
 done
+cp -R $ROOT/packages/system packages/system
 
 mkdir -p packages/test
 

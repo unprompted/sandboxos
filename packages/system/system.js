@@ -269,27 +269,3 @@ exports = {
 	stopTask: stopTask,
 	restartTask: restartTask,
 };
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
-exports.finishTest = function(result) {
-	exit(result);
-}
