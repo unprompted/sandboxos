@@ -1,0 +1,68 @@
+#!/bin/bash
+
+mkdir -p packages
+for i in filesystem system packager; do
+	ln -s $ROOT/packages/$i packages/$i
+done
+
+mkdir -p packages/test
+
+cat > packages/test/test.js << EOF
+print("Hello!");
+
+imports.system.restartTask("hello").then(function(r) {
+	print("restart succeeded: " + r);
+	imports.system.finishTest(0);
+}).catch(function(e) {
+	print("restart failed: " + e);
+	imports.system.finishTest(1);
+});
+EOF
+
+cat > packages/test/package.json << EOF
+{
+	"name": "test",
+	"start": "test.js",
+	"trusted": true,
+	"imports": ["packager", "system"]
+}
+EOF
+
+cat >> packages/system/system.js << EOF
+exports.finishTest = function(result) {
+	exit(result);
+}
+EOF
+
+mkdir -p packages/hello
+
+cat > packages/hello/hello.js << EOF
+print("Hi.");
+EOF
+
+cat > packages/hello/package.json << EOF
+{
+	"name": "hello",
+	"start": "hello.js"
+}
+EOF
+
+
+mkdir -p packages/auth
+
+cat > packages/auth/auth.js << EOF
+exports = {
+	query: function() { return null; },
+	getCredentials: function() { return {user: 'test', token: 'token'}; },
+	verifyCredentials: function() { return {permissions: []}; },
+};
+EOF
+
+cat > packages/auth/package.json << EOF
+{
+	"name": "auth",
+	"start": "auth.js"
+}
+EOF
+
+$SANDBOXOS packages/system/system.js
