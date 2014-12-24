@@ -296,12 +296,16 @@ void Task::sendPromiseReject(Task* from, TaskStub* to, promiseid_t promise, v8::
 }
 
 void Task::sendPromiseMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, v8::Handle<v8::Value> result) {
-	std::vector<char> buffer;
-	buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
-	if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
-		Serialize::store(from, buffer, result);
+	if (to) {
+		std::vector<char> buffer;
+		buffer.insert(buffer.end(), reinterpret_cast<char*>(&promise), reinterpret_cast<char*>(&promise) + sizeof(promise));
+		if (!result.IsEmpty() && !result->IsUndefined() && !result->IsNull()) {
+			Serialize::store(from, buffer, result);
+		}
+		to->getStream().send(messageType, &*buffer.begin(), buffer.size());
+	} else {
+		std::cerr << "Sending to a NULL task.\n";
 	}
-	to->getStream().send(messageType, &*buffer.begin(), buffer.size());
 }
 
 void Task::sendPromiseExportMessage(Task* from, TaskStub* to, MessageType messageType, promiseid_t promise, exportid_t exportId, v8::Handle<v8::Value> result) {

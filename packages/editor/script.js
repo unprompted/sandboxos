@@ -87,12 +87,18 @@ function restartTask() {
 	}).then(function(data) {
 		$("#status").text("Done.");
 	}).fail(function(xhr, status, error) {
-		$("#status").text("Failed to restart.");
+		$("#status").text("Task did not start.");
+		var exception = JSON.parse(xhr.responseText);
+		if (exception.exception) {
+			$("#errors").text(exception.message + "\n" + exception.fileName + ":" + exception.lineNumber + "\n" + exception.sourceLine);
+			$("#errors").show();
+		}
 	});
 }
 
 function install() {
 	if (confirm("Are you sure you want to install this package?  It will overwrite any existing package of the same name.")) {
+		$("#errors").hide();
 		saveAll().then(function() {
 			$("#status").text("Installing...");
 			$.ajax({

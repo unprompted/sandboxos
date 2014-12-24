@@ -187,7 +187,7 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end(JSON.stringify(error.toString()));
+					response.end(JSON.stringify(error));
 				});
 			} else {
 				handled = false;
