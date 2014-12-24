@@ -71,7 +71,7 @@ function saveAll() {
 		if (gBuffers[i]) {
 			var buffer = (i == currentFileName) ? gEditor.getValue() : gBuffers[i];
 			if (gOriginalBuffers[i] != buffer) {
-				promises.push(saveFileInternal(currentFileName, buffer));
+				promises.push(saveFileInternal(i, buffer));
 			}
 		}
 	}
