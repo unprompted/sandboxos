@@ -49,6 +49,13 @@ else:
 		os.path.join(v8, 'out/native/obj.target/tools/gyp'),
 		os.path.join(uv, 'out/Debug/obj.target'),
 	])
+
+ldapEnv = env.Copy()
+if sys.platform == 'win32':
+	ldapEnv.Append(CPPPATH=['deps/win32'])
+lmdb = ldapEnv.Library('build/lmdb', Glob('deps/liblmdb/mdb.c'))
+
+env.Append(LIBS=[lmdb])
 env.Program('sandboxos', Glob('build/*.cpp'))
 
 def listAllFiles(root):

@@ -29,3 +29,10 @@ the terms of the MIT License, the licensors of this Program grant you
 additional permission to convey the resulting work.  {Corresponding Source for
 a non-source form of such a combination shall include the source code for the
 parts of libuv used as well as that of the covered work.}
+
+If you modify this Program, or any covered work, by linking or combining it
+with liblmdb (or a modified version of that library), containing parts covered
+by the terms of the OpenLDAP Public License, the licensors of this Program
+grant you additional permission to convey the resulting work.  {Corresponding
+Source for a non-source form of such a combination shall include the source
+code for the parts of liblmdb used as well as that of the covered work.}
