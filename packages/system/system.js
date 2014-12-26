@@ -110,7 +110,7 @@ function startTaskInternal(packageName) {
 				notifyTaskStatusChanged(packageName, "starting");
 				task.task = new Task();
 				task.task.packageName = packageName;
-				task.task.trusted = true;
+				task.task.trusted = manifest.trusted || false;
 				task.task.onExit = function(exitCode, terminationSignal) {
 					if (terminationSignal) {
 						print("Task " + packageName + " terminated with signal " + terminationSignal + ".");

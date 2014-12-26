@@ -217,6 +217,8 @@ function textChanged() {
 }
 
 $(document).ready(function() {
+	var parts = window.location.href.split("/");
+	$("#packageName").text(parts[parts.length - 2]);
 	refreshPackage();
 	gEditor = ace.edit("editor");
 	gEditor.$blockScrolling = Infinity;

@@ -151,7 +151,7 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		promiseid_t promise = socket->_task->allocatePromise();
 		args.GetReturnValue().Set(socket->_task->getPromise(promise));
 		v8::Handle<v8::String> value = args[0].As<v8::String>();
-		if (!value->IsUndefined()) {
+		if (!value.IsEmpty() && value->IsString()) {
 			int valueLength = value->Utf8Length();
 			char* rawBuffer = new char[sizeof(uv_write_t) + valueLength];
 			uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);

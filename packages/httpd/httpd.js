@@ -68,7 +68,7 @@ function Response(client) {
 		303: 'See other',
 		404: 'File not found',
 		500: 'Internal server error',
-	}
+	};
 	return {
 		writeHead: function(status) {
 			var reason;
@@ -121,7 +121,7 @@ function handleConnection(client) {
 	var headers = {};
 	var lineByLine = true;
 	var bodyToRead = -1;
-	var body = undefined;
+	var body;
 
 	function finish() {
 		handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client));
@@ -191,13 +191,13 @@ var kBacklog = 8;
 function runServer(ip, port) {
 	var socket = new Socket();
 	var bindResult = socket.bind(ip, port);
-	if (bindResult != 0) {
+	if (bindResult !== 0) {
 		throw "bind failed: " + bindResult;
 	}
 	var listenResult = socket.listen(kBacklog, function() {
 		handleConnection(socket.accept());
 	});
-	if (listenResult != 0) {
+	if (listenResult !== 0) {
 		throw "listen failed: " + listenResult;
 	}
 }
