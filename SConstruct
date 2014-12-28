@@ -73,7 +73,7 @@ def listAllFiles(root):
 				yield os.path.join(root, f)
 		hidden = [d for d in dirs if d.startswith('.')]
 		for d in hidden:
-			dirs.remove(hidden)
+			dirs.remove(d)
 
 if env['package'] and sys.platform == 'win32':
 	files = [
