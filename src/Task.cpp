@@ -1,5 +1,6 @@
 #include "Task.h"
 
+#include "Database.h"
 #include "File.h"
 #include "Serialize.h"
 #include "Socket.h"
@@ -146,6 +147,7 @@ void Task::activate() {
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "imports"), getImports);
 	if (_trusted) {
+		global->Set(v8::String::NewFromUtf8(_isolate, "Database"), v8::FunctionTemplate::New(_isolate, Database::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
 		File::configure(_isolate, global);

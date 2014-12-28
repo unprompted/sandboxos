@@ -31,8 +31,8 @@ private:
 	Task* _task;
 	uv_tcp_t _socket;
 	promiseid_t _promise;
-	int _refCount;
-	bool _connected;
+	int _refCount = 1;
+	bool _connected = false;
 
 	static int _count;
 	static int _openCount;

@@ -9,9 +9,7 @@
 int Socket::_count = 0;
 int Socket::_openCount = 0;
 
-Socket::Socket(Task* task)
-:	_refCount(1),
-	_connected(false) {
+Socket::Socket(Task* task) {
 	v8::HandleScope scope(task->getIsolate());
 	++_count;
 

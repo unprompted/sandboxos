@@ -1,0 +1,32 @@
+#!/bin/bash
+
+mkdir testdb
+
+cat > test.js << EOF
+var db = new Database("testdb");
+if (db.a) {
+	exit(1);
+}
+db.a = 1;
+if (db.a != 1) {
+	exit(1);
+}
+db.b = 2;
+db.c = 3;
+
+var expected = ['a', 'b', 'c'];
+for (var i in db) {
+	if (expected.indexOf(i) == -1) {
+		print("Did not find " + i + " in db.");
+		exit(2);
+	} else {
+		expected.splice(expected.indexOf(i), 1);
+	}
+}
+if (expected.length) {
+	print("Expected but did not find: " + JSON.stringify(expected));
+	exit(3);
+}
+EOF
+
+$SANDBOXOS test.js

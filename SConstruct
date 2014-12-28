@@ -23,6 +23,7 @@ env.Append(CPPPATH=[
 	os.path.join(v8, 'include'),
 	v8,
 	os.path.join(uv, 'include'),
+	os.path.join('deps', 'liblmdb'),
 ])
 if sys.platform == 'win32':
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'libuv', 'advapi32', 'winmm', 'wsock32', 'ws2_32', 'psapi', 'iphlpapi'])
@@ -50,10 +51,13 @@ else:
 		os.path.join(uv, 'out/Debug/obj.target'),
 	])
 
-ldapEnv = env.Copy()
+ldapEnv = env.Clone()
 if sys.platform == 'win32':
 	ldapEnv.Append(CPPPATH=['deps/win32'])
-lmdb = ldapEnv.Library('build/lmdb', Glob('deps/liblmdb/mdb.c'))
+lmdb = ldapEnv.Library('build/lmdb', [
+	'deps/liblmdb/mdb.c',
+	'deps/liblmdb/midl.c',
+])
 
 env.Append(LIBS=[lmdb])
 env.Program('sandboxos', Glob('build/*.cpp'))
