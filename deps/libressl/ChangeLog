@@ -1,0 +1,101 @@
+Because this project is maintained both in the OpenBSD tree using CVS and in
+Git, it can be confusing following all of the changes.
+
+Most of the libssl and libcrypto source code is is here in OpenBSD CVS:
+
+	http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/lib/libssl/
+
+Some of the libcrypto and OS-compatibility files for entropy and random number
+generation are here:
+
+	http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/lib/libcrypto/
+
+A new simplified SSL wrapper library is here:
+
+	http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/lib/libtls/
+
+The LibreSSL Portable project copies these portions of the OpenBSD tree, along
+with relevant portions of the C library, to a Git repository. This makes it
+easier to follow all of the relevant changes to the upstream project in a
+single place:
+
+	https://github.com/libressl-portable/openbsd/commits/master
+
+The portable bits of the project are largely maintained out-of-tree, and their
+history is also available from Git.
+
+	https://github.com/libressl-portable/portable/commits/master
+
+LibreSSL Portable Release Notes:
+
+2.1.2 - Many new features and improvements
+	* Added reworked GOST cipher suite support
+	   thanks to Dmitry Eremin-Solenikov
+
+	* Enabled Camellia ciphers due to improved patent situation
+
+	* Use builtin arc4random implementation on OS X and FreeBSD
+	   this addresses some deficiencies in the native implementations of
+	   these operating systems, see commit logs for more information
+
+	* Added initial Windows mingw-w64 support (32 and 64-bit)
+	   thanks to Song Dongsheng and others for code and feedback
+
+	* Enabled assembly optimizations on x86_64 CPUs
+	   supports Linux, *BSD, Solaris and OS X operating systems
+	   thanks to Wouter Clarie for the initial implementation
+
+	* Added no_ssl3/no_tls1_1/no_tls1_2 options to openssl(1)
+
+	* Improved build infrastructure, 'make distcheck' now passes
+	   this simplifies and speeds developer efficiency
+	   thanks to Dmitry Eremin-Solenikov and Wouter Clarie
+
+	* Allow conditional building of the libtls library
+	   expect the API and ABI of the library to change
+	   feedback is welcome
+
+	* Fixes for more memory leaks, cleanups, etc.
+
+2.1.1 - Security update
+	* Address POODLE attack by disabling SSLv3 by default
+
+	* Fix Eliptical Curve cipher selection bug
+	  (https://github.com/libressl-portable/portable/issues/35)
+
+2.1.0 - First release from the OpenBSD 5.7 tree
+	* Added support for automatic ephemeral EC keys
+
+	* Fixes for many memory leaks and overflows in error handlers
+
+	* The TLS padding extension (that works around bugs in F5 terminators) is
+	  off by default
+
+	* support for getrandom(2) on Linux 3.17
+
+	* the NO_ASM macro is no longer being set, providing the first bits toward
+	  enabling other assembly offloads.
+
+2.0.5 - Fixes for CVEs from OpenSSL 1.0.1i
+	* CVE-2014-3506
+	* CVE-2014-3507
+	* CVE-2014-3508 (partially vulnerable)he
+	* CVE-2014-3509
+	* CVE-2014-3510
+	* CVE-2014-3511
+	* Synced LibreSSL Portable with the release version of OpenBSD 5.6
+
+2.0.4 - Portability fixes, deleted unused SRP code
+
+2.0.3 - Portability fixes, improvements to fork detection
+
+2.0.2 - Address arc4random fork PID wraparound issues with pthread_atfork
+
+2.0.1 - Portability fixes:
+	* Removed -Werror and and other non-portable compiler flags
+
+	* Allow setting OPENSSLDIR and ENGINSDIR
+
+2.0.0 - First release from the OpenBSD 5.6 tree
+	* Removal of many obsolete features and coding conventions from the OpenSSL
+	  1.0.1h source
