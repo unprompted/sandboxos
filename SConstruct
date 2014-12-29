@@ -104,7 +104,7 @@ if sys.platform == 'linux2':
 
 	sslCliSources = Glob('build/deps/libressl/apps/*.c')
 	sslCliSources = [s for s in sslCliSources if buildSslSource(str(s))]
-	sslEnv.Program('openssl-cli', sslCliSources, LIBS=[lssl],
+	sslEnv.Program('openssl-cli', sslCliSources, LIBS=[lssl, 'rt'],
 		CPPDEFINES=['HAVE_POLL', 'OPENSSL_NO_HW_PADLOCK'])
 
 env.Program('sandboxos', Glob('build/src/*.cpp'))
