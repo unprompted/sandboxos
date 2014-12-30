@@ -83,7 +83,6 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	taskObject->SetInternalField(0, v8::External::New(args.GetIsolate(), stub));
 	stub->_owner = parent;
 
-
 	taskid_t id = 0;
 	if (parent) {
 		do {
@@ -125,14 +124,15 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	options.file = argv[0];
 
 	stub->_process.data = stub;
-	if (uv_spawn(parent->getLoop(), &stub->_process, &options) != 0) {
-		std::cerr << "uv_spawn failed\n";
+	int result = uv_spawn(parent->getLoop(), &stub->_process, &options);
+	if (result == 0) {
+		stub->_stream.setOnReceive(Task::onReceivePacket, stub);
+		stub->_stream.start();
+
+		args.GetReturnValue().Set(taskObject);
+	} else {
+		std::cerr << "uv_spawn failed: " << uv_strerror(result) << "\n";
 	}
-
-	stub->_stream.setOnReceive(Task::onReceivePacket, stub);
-	stub->_stream.start();
-
-	args.GetReturnValue().Set(taskObject);
 }
 
 void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminationSignal) {
