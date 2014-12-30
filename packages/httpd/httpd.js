@@ -188,12 +188,7 @@ function handleConnection(client) {
 
 var kBacklog = 8;
 
-function runServer(ip, port) {
-	var socket = new Socket();
-	var bindResult = socket.bind(ip, port);
-	if (bindResult !== 0) {
-		throw "bind failed: " + bindResult;
-	}
+function runServer(socket) {
 	var listenResult = socket.listen(kBacklog, function() {
 		handleConnection(socket.accept());
 	});
@@ -202,7 +197,15 @@ function runServer(ip, port) {
 	}
 }
 
-runServer("0.0.0.0", 12345);
+var socket = new Socket();
+socket.bind("0.0.0.0", 12345);
+runServer(socket);
+
+/*
+var secureSocket = new SecureSocket("privatekey.pem", "certificate.pem");
+secureSocket.bind("0.0.0.0", 12346);
+runServer(secureSocket);
+*/
 
 exports = {
 	all: all,

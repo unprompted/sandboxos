@@ -65,49 +65,12 @@ lmdb = ldapEnv.Library('build/lmdb', [
 env.Append(LIBS=[lmdb])
 
 if sys.platform == 'linux2':
-	sslEnv = env.Clone()
-	sslEnv.Append(CPPPATH=[
-		'deps/libressl',
-		'deps/libressl/crypto',
-		'deps/libressl/crypto/asn1',
-		'deps/libressl/crypto/evp',
-		'deps/libressl/crypto/md2',
-		'deps/libressl/crypto/modes',
-		'deps/libressl/crypto/store',
-		'deps/libressl/include',
-	])
+	env.Append(LIBS=['crypto', 'ssl'])
 
-	sslSources = Glob('build/deps/libressl/ssl/*.c') + \
-		Glob('build/deps/libressl/crypto/*.c') + \
-		Glob('build/deps/libressl/crypto/*/*.c') + \
-		Glob('build/deps/libressl/engines/*.c')
-
-	def buildSslSource(fileName):
-		basename = os.path.basename(fileName)
-		parentDirectory = os.path.basename(os.path.dirname(fileName))
-		return basename not in ('b_win.c', 'ui_openssl_win.c', 'apps_win.c', 'poll_win.c', 'chacha-merged.c', 'poly1305-donna.c') \
-			and not parentDirectory in ('compat',)
-
-	sslSources = [s for s in sslSources if buildSslSource(str(s))]
-	sslSources += [
-		'build/deps/libressl/crypto/compat/arc4random.c',
-		'build/deps/libressl/crypto/compat/explicit_bzero.c',
-		'build/deps/libressl/crypto/compat/issetugid_linux.c',
-		'build/deps/libressl/crypto/compat/getentropy_linux.c',
-		'build/deps/libressl/crypto/compat/reallocarray.c',
-		'build/deps/libressl/crypto/compat/strlcat.c',
-		'build/deps/libressl/crypto/compat/strlcpy.c',
-		'build/deps/libressl/crypto/compat/timingsafe_memcmp.c',
-	]
-	lssl = sslEnv.Library('build/libressl', sslSources, CPPDEFINES=['OPENSSL_NO_HW_PADLOCK'])
-	env.Append(LIBS=[lssl])
-
-	sslCliSources = Glob('build/deps/libressl/apps/*.c')
-	sslCliSources = [s for s in sslCliSources if buildSslSource(str(s))]
-	sslEnv.Program('openssl-cli', sslCliSources, LIBS=[lssl, 'rt'],
-		CPPDEFINES=['HAVE_POLL', 'OPENSSL_NO_HW_PADLOCK'])
-
-env.Program('sandboxos', Glob('build/src/*.cpp'))
+source = Glob('build/src/*.cpp')
+if sys.platform != 'linux2':
+	source = [s for s in source if not os.path.basename(str(s)) == 'SecureSocket_openssl.cpp']
+env.Program('sandboxos', source)
 
 def listAllFiles(root):
 	for root, dirs, files in os.walk(root):
