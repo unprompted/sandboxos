@@ -22,7 +22,6 @@ private:
 	MDB_env* _environment;
 	MDB_dbi _database;
 	MDB_txn* _transaction;
-	MDB_cursor* _cursor;
 
 	static int _count;
 
