@@ -19,7 +19,9 @@ public:
 	void close();
 
 	static void create(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void startTls(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void connect(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void accept(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -41,6 +43,7 @@ private:
 	Task* _task;
 	uv_tcp_t _socket;
 	promiseid_t _promise;
+	promiseid_t _startTlsPromise = -1;
 	int _refCount = 1;
 	bool _connected = false;
 
@@ -61,6 +64,7 @@ private:
 
 	static SecureSocket_openssl* get(v8::Handle<v8::Object> socketObject);
 	static void onClose(uv_handle_t* handle);
+	static void onConnect(uv_connect_t* request, int status);
 	static void onNewConnection(uv_stream_t* server, int status);
 
 	static void allocateBuffer(uv_handle_t* handle, size_t suggestedSize, uv_buf_t* buffer);

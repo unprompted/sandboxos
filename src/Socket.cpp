@@ -4,6 +4,7 @@
 #include "TaskTryCatch.h"
 
 #include <assert.h>
+#include <cstring>
 #include <uv.h>
 
 int Socket::_count = 0;
@@ -59,11 +60,46 @@ void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::String::Utf8Value ip(args[0]->ToString());
 		int port = args[1]->ToInteger()->Value();
-		std::cout << "Trying to bind to " << *ip << " " << port << "\n";
 		struct sockaddr_in6 address;
 		uv_ip6_addr(*ip, port, &address);
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(),
 			uv_tcp_bind(&socket->_socket, reinterpret_cast<struct sockaddr*>(&address), 0)));
+	}
+}
+
+void Socket::connect(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Socket* socket = Socket::get(args.This())) {
+		v8::String::Utf8Value ip(args[0]->ToString());
+		int port = args[1]->ToInteger()->Value();
+		struct sockaddr_in address;
+		uv_ip4_addr(*ip, port, &address);
+
+		promiseid_t promise = socket->_task->allocatePromise();
+
+		uv_connect_t* request = new uv_connect_t();
+		std::memset(request, 0, sizeof(*request));
+		request->data = reinterpret_cast<void*>(promise);
+		int result = uv_tcp_connect(request, &socket->_socket, reinterpret_cast<const sockaddr*>(&address), onConnect);
+		if (result == 0) {
+			args.GetReturnValue().Set(socket->_task->getPromise(promise));
+		} else {
+			args.GetReturnValue().Set(socket->_task->getPromise(promise));
+			std::string error("uv_tcp_connect failed immediately: " + std::string(uv_strerror(result)));
+			socket->_task->rejectPromise(promise, args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str()))));
+		}
+	}
+}
+
+void Socket::onConnect(uv_connect_t* request, int status) {
+	promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
+	if (promise != -1) {
+		Socket* socket = reinterpret_cast<Socket*>(request->handle->data);
+		if (status == 0) {
+			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
+		} else {
+			std::string error("uv_tcp_connect failed: " + std::string(uv_strerror(status)));
+			socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str()));
+		}
 	}
 }
 

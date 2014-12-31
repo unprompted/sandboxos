@@ -193,7 +193,7 @@ function runServer(socket) {
 		handleConnection(socket.accept());
 	});
 	if (listenResult !== 0) {
-		throw "listen failed: " + listenResult;
+		throw new Error("listen failed: " + listenResult);
 	}
 }
 

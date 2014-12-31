@@ -25,6 +25,8 @@ SecureSocket_openssl::SecureSocket_openssl(Task* task) {
 	v8::Local<v8::ObjectTemplate> socketTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	socketTemplate->SetInternalFieldCount(1);
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "connect"), v8::FunctionTemplate::New(task->getIsolate(), connect));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "startTls"), v8::FunctionTemplate::New(task->getIsolate(), startTls));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
@@ -78,6 +80,42 @@ void SecureSocket_openssl::bind(const v8::FunctionCallbackInfo<v8::Value>& args)
 		uv_ip6_addr(*ip, port, &address);
 		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(),
 			uv_tcp_bind(&socket->_socket, reinterpret_cast<struct sockaddr*>(&address), 0)));
+	}
+}
+
+void SecureSocket_openssl::connect(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (SecureSocket_openssl* socket = SecureSocket_openssl::get(args.This())) {
+		v8::String::Utf8Value ip(args[0]->ToString());
+		int port = args[1]->ToInteger()->Value();
+		struct sockaddr_in address;
+		uv_ip4_addr(*ip, port, &address);
+
+		promiseid_t promise = socket->_task->allocatePromise();
+
+		uv_connect_t* request = new uv_connect_t();
+		std::memset(request, 0, sizeof(*request));
+		request->data = reinterpret_cast<void*>(promise);
+		int result = uv_tcp_connect(request, &socket->_socket, reinterpret_cast<const sockaddr*>(&address), onConnect);
+		if (result == 0) {
+			args.GetReturnValue().Set(socket->_task->getPromise(promise));
+		} else {
+			args.GetReturnValue().Set(socket->_task->getPromise(promise));
+			std::string error("uv_tcp_connect failed immediately: " + std::string(uv_strerror(result)));
+			socket->_task->rejectPromise(promise, args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str()))));
+		}
+	}
+}
+
+void SecureSocket_openssl::onConnect(uv_connect_t* request, int status) {
+	promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
+	if (promise != -1) {
+		SecureSocket_openssl* socket = reinterpret_cast<SecureSocket_openssl*>(request->handle->data);
+		if (status == 0) {
+			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
+		} else {
+			std::string error("uv_tcp_connect failed: " + std::string(uv_strerror(status)));
+			socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str()));
+		}
 	}
 }
 
@@ -145,51 +183,58 @@ void SecureSocket_openssl::read(const v8::FunctionCallbackInfo<v8::Value>& args)
 }
 
 void SecureSocket_openssl::update() {
-	if (!SSL_is_init_finished(_ssl)) {
-		int result = SSL_do_handshake(_ssl);
-		if (result < 0) {
-			int error = SSL_get_error(_ssl, result);
-			if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE) {
-				_task->getIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(_task->getIsolate(), "SSL_connect failed.")));
-				close();
+	if (_ssl) {
+		if (!SSL_is_init_finished(_ssl)) {
+			int result = SSL_do_handshake(_ssl);
+			if (result < 0) {
+				int error = SSL_get_error(_ssl, result);
+				if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE) {
+					_task->getIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(_task->getIsolate(), "SSL_connect failed.")));
+					close();
+				}
 			}
 		}
-	}
 
-	if (SSL_is_init_finished(_ssl) && !_onRead.IsEmpty()) {
+		if (SSL_is_init_finished(_ssl) && !_onRead.IsEmpty()) {
+			while (true) {
+				char buffer[8192];
+				int result = SSL_read(_ssl, buffer, sizeof(buffer));
+				if (result > 0) {
+					v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(_task->getIsolate(), _onRead);
+					v8::Handle<v8::Value> arg = v8::String::NewFromUtf8(_task->getIsolate(), buffer, v8::String::kNormalString, result);
+					callback->Call(callback, 1, &arg);
+				} else {
+					break;
+					close();
+				}
+			}
+		}
+
+		char buffer[8192];
 		while (true) {
-			char buffer[8192];
-			int result = SSL_read(_ssl, buffer, sizeof(buffer));
+			int result = BIO_read(_bioOut, buffer, sizeof(buffer));
 			if (result > 0) {
-				v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(_task->getIsolate(), _onRead);
-				v8::Handle<v8::Value> arg = v8::String::NewFromUtf8(_task->getIsolate(), buffer, v8::String::kNormalString, result);
-				callback->Call(callback, 1, &arg);
+				char* rawBuffer = new char[sizeof(uv_write_t) + result];
+				uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
+				rawBuffer += sizeof(uv_write_t);
+				std::memcpy(rawBuffer, buffer, result);
+
+				uv_buf_t writeBuffer;
+				writeBuffer.base = rawBuffer;
+				writeBuffer.len = result;
+
+				request->data = reinterpret_cast<void*>(-1);
+				if (uv_write(request, reinterpret_cast<uv_stream_t*>(&_socket), &writeBuffer, 1, onWrite) != 0) {
+					std::cerr << "uv_write failed\n";
+				}
 			} else {
 				break;
-				close();
 			}
 		}
-	}
 
-	char buffer[8192];
-	while (true) {
-		int result = BIO_read(_bioOut, buffer, sizeof(buffer));
-		if (result > 0) {
-			char* rawBuffer = new char[sizeof(uv_write_t) + result];
-			uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
-			rawBuffer += sizeof(uv_write_t);
-			std::memcpy(rawBuffer, buffer, result);
-
-			uv_buf_t writeBuffer;
-			writeBuffer.base = rawBuffer;
-			writeBuffer.len = result;
-
-			request->data = reinterpret_cast<void*>(-1);
-			if (uv_write(request, reinterpret_cast<uv_stream_t*>(&_socket), &writeBuffer, 1, onWrite) != 0) {
-				std::cerr << "uv_write failed\n";
-			}
-		} else {
-			break;
+		if (_startTlsPromise != -1 && SSL_is_init_finished(_ssl)) {
+			_task->resolvePromise(_startTlsPromise, v8::Undefined(_task->getIsolate()));
+			_startTlsPromise = -1;
 		}
 	}
 }
@@ -209,8 +254,14 @@ void SecureSocket_openssl::onRead(uv_stream_t* stream, ssize_t readSize, const u
 		}
 
 		if (readSize >= 0) {
-			BIO_write(socket->_bioIn, buffer->base, readSize);
-			socket->update();
+			if (socket->_ssl) {
+				BIO_write(socket->_bioIn, buffer->base, readSize);
+				socket->update();
+			} else {
+				v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(),socket-> _onRead);
+				v8::Handle<v8::Value> arg = v8::String::NewFromUtf8(socket->_task->getIsolate(), buffer->base, v8::String::kNormalString, readSize);
+				callback->Call(callback, 1, &arg);
+			}
 		} else if (!socket->_onRead.IsEmpty()) {
 			v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 			v8::Handle<v8::Value> arg = v8::Undefined(socket->_task->getIsolate());
@@ -227,9 +278,28 @@ void SecureSocket_openssl::write(const v8::FunctionCallbackInfo<v8::Value>& args
 		v8::Handle<v8::String> value = args[0].As<v8::String>();
 		if (!value.IsEmpty() && value->IsString()) {
 			v8::String::Utf8Value utf8Value(value);
-			int result = SSL_write(socket->_ssl, *utf8Value, utf8Value.length());
-			socket->update();
-			socket->_task->resolvePromise(promise, v8::Integer::New(args.GetIsolate(), result));
+			int result = -1;
+			if (socket->_ssl) {
+				result = SSL_write(socket->_ssl, *utf8Value, utf8Value.length());
+				socket->update();
+			} else {
+				char* rawBuffer = new char[sizeof(uv_write_t) + utf8Value.length()];
+				uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
+				rawBuffer += sizeof(uv_write_t);
+				std::memcpy(rawBuffer, *utf8Value, utf8Value.length());
+
+				uv_buf_t writeBuffer;
+				writeBuffer.base = rawBuffer;
+				writeBuffer.len = utf8Value.length();
+
+				request->data = reinterpret_cast<void*>(-1);
+				result = uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &writeBuffer, 1, onWrite);
+			}
+			if (result != 0) {
+				socket->_task->rejectPromise(promise, v8::Integer::New(args.GetIsolate(), result));
+			} else {
+				socket->_task->resolvePromise(promise, v8::Integer::New(args.GetIsolate(), result));
+			}
 		} else {
 			socket->_task->rejectPromise(promise, v8::Integer::New(args.GetIsolate(), -2));
 		}
@@ -300,19 +370,28 @@ void SecureSocket_openssl::create(const v8::FunctionCallbackInfo<v8::Value>& arg
 		v8::String::Utf8Value keyFile(args[0]);
 		v8::String::Utf8Value certificateFile(args[1]);
 
-		if (!SSL_CTX_use_certificate_chain_file(socket->_context, *certificateFile)) {
-			args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "Failed to read certificate.")));
-		} else if (!SSL_CTX_use_PrivateKey_file(socket->_context, *keyFile, SSL_FILETYPE_PEM)) {
+		if (args.Length() > 0 && !SSL_CTX_use_PrivateKey_file(socket->_context, *v8::String::Utf8Value(args[0]), SSL_FILETYPE_PEM)) {
 			args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "Failed to read private key.")));
+		} else if (args.Length() > 1 && !SSL_CTX_use_certificate_chain_file(socket->_context, *v8::String::Utf8Value(args[1]))) {
+			args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "Failed to read certificate.")));
 		} else {
-			socket->_ssl = SSL_new(socket->_context);
-			SSL_set_bio(socket->_ssl, socket->_bioIn, socket->_bioOut);
-
 			v8::Handle<v8::Object> result = v8::Local<v8::Object>::New(args.GetIsolate(), socket->_object);
 			args.GetReturnValue().Set(result);
 		}
 
 		socket->release();
+	}
+}
+
+void SecureSocket_openssl::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (SecureSocket_openssl* socket = SecureSocket_openssl::get(args.This())) {
+		socket->_ssl = SSL_new(socket->_context);
+		SSL_set_bio(socket->_ssl, socket->_bioIn, socket->_bioOut);
+		SSL_connect(socket->_ssl);
+		socket->update();
+
+		socket->_startTlsPromise = socket->_task->allocatePromise();
+		args.GetReturnValue().Set(socket->_task->getPromise(socket->_startTlsPromise));
 	}
 }
 
