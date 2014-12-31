@@ -11,6 +11,10 @@
 #include "SecureSocket_openssl.h"
 #endif
 
+#if defined (__MACH__)
+#include "SecureSocket_commoncrypto.h"
+#endif
+
 #include <algorithm>
 #include <assert.h>
 #include <cstring>
@@ -155,6 +159,8 @@ void Task::activate() {
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
 #if !defined (WIN32) && !defined (__MACH__)
 		global->Set(v8::String::NewFromUtf8(_isolate, "SecureSocket"), v8::FunctionTemplate::New(_isolate, SecureSocket_openssl::create));
+#elif defined (__MACH__)
+		global->Set(v8::String::NewFromUtf8(_isolate, "SecureSocket"), v8::FunctionTemplate::New(_isolate, SecureSocket_commoncrypto::create));
 #endif
 		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
 		File::configure(_isolate, global);

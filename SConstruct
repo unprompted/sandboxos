@@ -67,9 +67,12 @@ env.Append(LIBS=[lmdb])
 if sys.platform == 'linux2':
 	env.Append(LIBS=['crypto', 'ssl'])
 
-source = Glob('build/src/*.cpp')
-if sys.platform != 'linux2':
-	source = [s for s in source if not os.path.basename(str(s)) == 'SecureSocket_openssl.cpp']
+source = [s for s in Glob('build/src/*.cpp') if not os.path.basename(str(s)).startswith("SecureSocket_")]
+if sys.platform == 'linux2':
+	source.append('build/src/SecureSocket_openssl.cpp')
+elif sys.platform == 'darwin':
+	source.append('build/src/SecureSocket_commoncrypto.cpp')
+	env.Append(FRAMEWORKS=['CoreFoundation', 'Security'])
 env.Program('sandboxos', source)
 
 def listAllFiles(root):
