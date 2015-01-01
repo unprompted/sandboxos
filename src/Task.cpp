@@ -223,6 +223,8 @@ void Task::execute(const char* fileName) {
 		} else {
 			std::cerr << "Failed to compile script.\n";
 		}
+	} else {
+		std::cerr << "Failed to load file " << fileName << "\n";
 	}
 }
 

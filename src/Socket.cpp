@@ -10,6 +10,12 @@
 int Socket::_count = 0;
 int Socket::_openCount = 0;
 
+struct SocketResolveData {
+	uv_getaddrinfo_t resolver;
+	Socket* socket;
+	promiseid_t promise;
+};
+
 Socket::Socket(Task* task) {
 	v8::HandleScope scope(task->getIsolate());
 	++_count;
@@ -17,6 +23,7 @@ Socket::Socket(Task* task) {
 	v8::Local<v8::ObjectTemplate> socketTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	socketTemplate->SetInternalFieldCount(1);
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "connect"), v8::FunctionTemplate::New(task->getIsolate(), connect));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
@@ -33,7 +40,6 @@ Socket::Socket(Task* task) {
 	++_openCount;
 	_socket.data = this;
 	_task = task;
-	_promise = -1;
 }
 
 Socket::~Socket() {
@@ -46,10 +52,10 @@ void Socket::close() {
 			_onRead.Reset();
 		}
 
-		if (_promise != -1) {
-			int promise = _promise;
+		if (_closePromise != -1) {
+			int promise = _closePromise;
+			_closePromise = -1;
 			_task->rejectPromise(promise, v8::Integer::New(_task->getIsolate(), -1));
-			_promise = -1;
 		}
 
 		uv_close(reinterpret_cast<uv_handle_t*>(&_socket), onClose);
@@ -58,37 +64,95 @@ void Socket::close() {
 
 void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
-		v8::String::Utf8Value ip(args[0]->ToString());
-		int port = args[1]->ToInteger()->Value();
-		struct sockaddr_in6 address;
-		uv_ip6_addr(*ip, port, &address);
-		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(),
-			uv_tcp_bind(&socket->_socket, reinterpret_cast<struct sockaddr*>(&address), 0)));
+		v8::String::Utf8Value node(args[0]->ToString());
+		v8::String::Utf8Value port(args[1]->ToString());
+
+		SocketResolveData* data = new SocketResolveData();
+		std::memset(data, 0, sizeof(*data));
+		struct addrinfo hints;
+		hints.ai_family = PF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		hints.ai_flags = 0;
+		data->resolver.data = data;
+		data->socket = socket;
+		data->promise = socket->_task->allocatePromise();
+
+		int result = uv_getaddrinfo(socket->_task->getLoop(), &data->resolver, onResolvedForBind, *node, *port, &hints);
+		if (result != 0) {
+			std::string error = "uv_getaddrinfo: " + std::string(uv_strerror(result));
+			socket->_task->rejectPromise(data->promise, v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str())));
+			delete data;
+		}
+
+		args.GetReturnValue().Set(socket->_task->getPromise(data->promise));
 	}
+}
+
+void Socket::onResolvedForBind(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result) {
+	SocketResolveData* data = reinterpret_cast<SocketResolveData*>(resolver->data);
+	if (status != 0) {
+		std::string error = "uv_getaddrinfo: " + std::string(uv_strerror(status));
+		data->socket->_task->rejectPromise(data->promise, v8::Exception::Error(v8::String::NewFromUtf8(data->socket->_task->getIsolate(), error.c_str())));
+	} else {
+		int bindResult = uv_tcp_bind(&data->socket->_socket, result->ai_addr, 0);
+		if (bindResult != 0) {
+			std::string error = "uv_tcp_bind: " + std::string(uv_strerror(bindResult));
+			data->socket->_task->rejectPromise(data->promise, v8::Exception::Error(v8::String::NewFromUtf8(data->socket->_task->getIsolate(), error.c_str())));
+		} else {
+			data->socket->_task->resolvePromise(data->promise, v8::Undefined(data->socket->_task->getIsolate()));
+		}
+	}
+	delete data;
 }
 
 void Socket::connect(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
-		v8::String::Utf8Value ip(args[0]->ToString());
-		int port = args[1]->ToInteger()->Value();
-		struct sockaddr_in address;
-		uv_ip4_addr(*ip, port, &address);
+		v8::String::Utf8Value node(args[0]->ToString());
+		v8::String::Utf8Value port(args[1]->ToString());
 
 		promiseid_t promise = socket->_task->allocatePromise();
 
-		uv_connect_t* request = new uv_connect_t();
-		std::memset(request, 0, sizeof(*request));
-		request->data = reinterpret_cast<void*>(promise);
-		int result = uv_tcp_connect(request, &socket->_socket, reinterpret_cast<const sockaddr*>(&address), onConnect);
-		if (result == 0) {
-			args.GetReturnValue().Set(socket->_task->getPromise(promise));
-		} else {
-			args.GetReturnValue().Set(socket->_task->getPromise(promise));
-			std::string error("uv_tcp_connect failed immediately: " + std::string(uv_strerror(result)));
-			socket->_task->rejectPromise(promise, args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str()))));
+		SocketResolveData* data = new SocketResolveData();
+		std::memset(data, 0, sizeof(*data));
+		struct addrinfo hints;
+		hints.ai_family = PF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+		hints.ai_flags = 0;
+		data->resolver.data = data;
+		data->socket = socket;
+		data->promise = promise;
+
+		int result = uv_getaddrinfo(socket->_task->getLoop(), &data->resolver, onResolvedForConnect, *node, *port, &hints);
+		if (result != 0) {
+			std::string error = "uv_getaddrinfo: " + std::string(uv_strerror(result));
+			socket->_task->rejectPromise(promise, v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str())));
+			delete data;
 		}
+
+		args.GetReturnValue().Set(socket->_task->getPromise(promise));
 	}
 }
+
+void Socket::onResolvedForConnect(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result) {
+	SocketResolveData* data = reinterpret_cast<SocketResolveData*>(resolver->data);
+	if (status != 0) {
+		std::string error = "uv_getaddrinfo: " + std::string(uv_strerror(status));
+		data->socket->_task->rejectPromise(data->promise, v8::Exception::Error(v8::String::NewFromUtf8(data->socket->_task->getIsolate(), error.c_str())));
+	} else {
+		uv_connect_t* request = new uv_connect_t();
+		std::memset(request, 0, sizeof(*request));
+		request->data = reinterpret_cast<void*>(data->promise);
+		int connectResult = uv_tcp_connect(request, &data->socket->_socket, result->ai_addr, onConnect);
+		if (connectResult != 0) {
+			std::string error("uv_tcp_connect: " + std::string(uv_strerror(connectResult)));
+			data->socket->_task->rejectPromise(data->promise, v8::Exception::Error(v8::String::NewFromUtf8(data->socket->_task->getIsolate(), error.c_str())));
+		}
+	}
+	delete data;
+}
+
 
 void Socket::onConnect(uv_connect_t* request, int status) {
 	promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
@@ -97,7 +161,7 @@ void Socket::onConnect(uv_connect_t* request, int status) {
 		if (status == 0) {
 			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
 		} else {
-			std::string error("uv_tcp_connect failed: " + std::string(uv_strerror(status)));
+			std::string error("uv_tcp_connect: " + std::string(uv_strerror(status)));
 			socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str()));
 		}
 	}
@@ -140,7 +204,8 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
-		args.GetReturnValue().Set(socket->makePromise());
+		socket->_closePromise = socket->_task->allocatePromise();
+		args.GetReturnValue().Set(socket->_task->getPromise(socket->_closePromise));
 		socket->close();
 	}
 }
@@ -201,7 +266,7 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 				std::cerr << "uv_write failed\n";
 			}
 		} else {
-			socket->_task->rejectPromise(socket->_promise, v8::Integer::New(args.GetIsolate(), -2));
+			socket->_task->rejectPromise(promise, v8::Integer::New(args.GetIsolate(), -2));
 		}
 	}
 }
@@ -215,23 +280,13 @@ void Socket::onWrite(uv_write_t* request, int status) {
 	delete[] reinterpret_cast<char*>(request);
 }
 
-v8::Handle<v8::Promise::Resolver> Socket::makePromise() {
-	if (_promise != -1) {
-		promiseid_t promise = _promise;
-		_promise = -1;
-		_task->rejectPromise(promise, v8::Integer::New(_task->getIsolate(), -1));
-	}
-	_promise = _task->allocatePromise();
-	return _task->getPromise(_promise);
-}
-
 void Socket::onClose(uv_handle_t* handle) {
 	--_openCount;
 	if (Socket* socket = reinterpret_cast<Socket*>(handle->data)) {
-		if (socket->_promise != -1) {
+		if (socket->_closePromise != -1) {
 			v8::HandleScope scope(socket->_task->getIsolate());
-			promiseid_t promise = socket->_promise;
-			socket->_promise = -1;
+			promiseid_t promise = socket->_closePromise;
+			socket->_closePromise = -1;
 			socket->_connected = false;
 			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), 0));
 		}

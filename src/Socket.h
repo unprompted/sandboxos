@@ -31,7 +31,7 @@ private:
 
 	Task* _task;
 	uv_tcp_t _socket;
-	promiseid_t _promise;
+	promiseid_t _closePromise = -1;
 	int _refCount = 1;
 	bool _connected = false;
 
@@ -43,10 +43,10 @@ private:
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;
 
-	v8::Handle<v8::Promise::Resolver> makePromise();
-
 	static Socket* get(v8::Handle<v8::Object> socketObject);
 	static void onClose(uv_handle_t* handle);
+	static void onResolvedForBind(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result);
+	static void onResolvedForConnect(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result);
 	static void onConnect(uv_connect_t* request, int status);
 	static void onNewConnection(uv_stream_t* server, int status);
 
