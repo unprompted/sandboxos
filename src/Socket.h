@@ -9,18 +9,9 @@ class Task;
 
 class Socket {
 public:
-	void close();
-
 	static void create(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void connect(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void accept(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void read(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void write(const v8::FunctionCallbackInfo<v8::Value>& args);
-	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
+	void close();
 
 	static int getCount() { return _count; }
 	static int getOpenCount() { return _openCount; }
@@ -43,8 +34,20 @@ private:
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;
 
+	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void connect(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void accept(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void shutdown(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void read(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void write(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
 	static Socket* get(v8::Handle<v8::Object> socketObject);
 	static void onClose(uv_handle_t* handle);
+	static void onShutdown(uv_shutdown_t* request, int status);
 	static void onResolvedForBind(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result);
 	static void onResolvedForConnect(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result);
 	static void onConnect(uv_connect_t* request, int status);

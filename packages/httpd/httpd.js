@@ -91,10 +91,9 @@ function Response(client) {
 		},*/
 		end: function(data) {
 			if (data) {
-				client.write(data).then(function() { client.close(); });
-			} else {
-				client.close();
+				client.write(data);
 			}
+			client.shutdown();
 		},
 		isConnected: function() { return client.isConnected; },
 	};
@@ -198,8 +197,9 @@ function runServer(socket) {
 }
 
 var socket = new Socket();
-socket.bind("0.0.0.0", 12345);
-runServer(socket);
+socket.bind("0.0.0.0", 12345).then(function() {
+	runServer(socket);
+});
 
 /*
 var secureSocket = new SecureSocket("privatekey.pem", "certificate.pem");

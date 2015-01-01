@@ -26,6 +26,7 @@ Socket::Socket(Task* task) {
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "connect"), v8::FunctionTemplate::New(task->getIsolate(), connect));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "shutdown"), v8::FunctionTemplate::New(task->getIsolate(), shutdown));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write));
@@ -210,6 +211,22 @@ void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
+void Socket::shutdown(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Socket* socket = Socket::get(args.This())) {
+		uv_shutdown_t* request = new uv_shutdown_t();
+		std::memset(request, 0, sizeof(*request));
+		promiseid_t promise = socket->_task->allocatePromise();
+		request->data = reinterpret_cast<void*>(promise);
+		int result = uv_shutdown(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), onShutdown);
+		if (result != 0) {
+			std::string error = "uv_shutdown: " + std::string(uv_strerror(result));
+			socket->_task->rejectPromise(promise, v8::Exception::Error(v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str())));
+			delete request;
+		}
+		args.GetReturnValue().Set(socket->_task->getPromise(promise));
+	}
+}
+
 void Socket::read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
@@ -294,6 +311,19 @@ void Socket::onClose(uv_handle_t* handle) {
 			delete socket;
 		}
 	}
+}
+
+void Socket::onShutdown(uv_shutdown_t* request, int status) {
+	if (Socket* socket = reinterpret_cast<Socket*>(request->handle->data)) {
+		promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
+		if (status == 0) {
+			socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
+		} else {
+			std::string error = "uv_shutdown: " + std::string(uv_strerror(status));
+			socket->_task->rejectPromise(promise, v8::Exception::Error(v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str())));
+		}
+	}
+	delete request;
 }
 
 void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
