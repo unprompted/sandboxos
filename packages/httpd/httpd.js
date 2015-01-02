@@ -197,6 +197,7 @@ socket.bind("0.0.0.0", 12345).then(function() {
 	runServer(socket);
 });
 
+/*
 function runSecureServer(socket) {
 	var privateKey = File.readFile("privatekey.pem");
 	var certificate = File.readFile("certificate.pem")
@@ -216,6 +217,7 @@ var secureSocket = new Socket();
 secureSocket.bind("0.0.0.0", 12346).then(function() {
 	runSecureServer(secureSocket);
 });
+*/
 
 exports = {
 	all: all,

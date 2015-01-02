@@ -1,5 +1,8 @@
 #include "Tls.h"
 
+#if !defined (WIN32) && !defined (__MACH__)
+#include <cstring>
+#include <locale>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
@@ -7,10 +10,6 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#include <cstring>
-#include <iostream>
-
-#if !defined (WIN32) && !defined (__MACH__)
 class Tls_openssl : public Tls {
 public:
 	Tls_openssl(const char* key, const char* certificate);
@@ -171,7 +170,7 @@ bool Tls_openssl::wildcardMatch(const char* pattern, const char* name) {
 				}
 			}
 			return false;
-		} else if (tolower(*pattern) == tolower(*name)) {
+		} else if (std::tolower(*pattern) == std::tolower(*name)) {
 			++pattern;
 			++name;
 		} else {
