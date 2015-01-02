@@ -32,7 +32,7 @@ public:
 	virtual int readEncrypted(char* buffer, size_t bytes) = 0;
 	virtual int writeEncrypted(const char* buffer, size_t bytes) = 0;
 
-	virtual bool verifyPeerCertificate(const char* hostname) = 0;
+	virtual void setHostname(const char* hostname) = 0;
 };
 
 #endif

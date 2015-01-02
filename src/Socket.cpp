@@ -75,6 +75,7 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 			const char* certificate = *certificateUtf8;
 			socket->_tls = Tls::create(key, certificate);
 			if (socket->_tls) {
+				socket->_tls->setHostname(socket->_peerName.c_str());
 				if (socket->_direction == kAccept) {
 					socket->_tls->startAccept();
 				} else if (socket->_direction == kConnect) {
@@ -327,12 +328,16 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 		v8::HandleScope handleScope(socket->_task->getIsolate());
 		TaskTryCatch tryCatch(socket->_task);
 		v8::Handle<v8::Value> data;
-		if (readSize <= 0) {
-			socket->close();
-			socket->_connected = false;
-		}
 
-		if (readSize >= 0) {
+		if (readSize <= 0) {
+			socket->_connected = false;
+			v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
+			if (!callback.IsEmpty()) {
+				data = v8::Undefined(socket->_task->getIsolate());
+				callback->Call(callback, 1, &data);
+			}
+			socket->close();
+		} else {
 			if (socket->_tls) {
 				socket->_tls->writeEncrypted(buffer->base, readSize);
 				if (socket->_startTlsPromise != -1) {
@@ -340,11 +345,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 					if (result == Tls::kDone) {
 						promiseid_t promise = socket->_startTlsPromise;
 						socket->_startTlsPromise = -1;
-						if (socket->_direction == kAccept || socket->_tls->verifyPeerCertificate(socket->_peerName.c_str())) {
-							socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
-						} else {
-							socket->_task->rejectPromise(promise, v8::Undefined(socket->_task->getIsolate()));
-						}
+						socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
 					} else if (result == Tls::kFailed) {
 						promiseid_t promise = socket->_startTlsPromise;
 						socket->_startTlsPromise = -1;
@@ -356,8 +357,10 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 						int result = socket->_tls->readPlain(plain, sizeof(plain));
 						if (result > 0) {
 							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
-							data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
-							callback->Call(callback, 1, &data);
+							if (!callback.IsEmpty()) {
+								data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
+								callback->Call(callback, 1, &data);
+							}
 						} else if (result == Tls::kReadFailed) {
 							socket->close();
 							break;
@@ -368,6 +371,8 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 								callback->Call(callback, 1, &data);
 							}
 							break;
+						} else {
+							break;
 						}
 					}
 				}
@@ -376,14 +381,10 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 				}
 			} else {
 				v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
-				data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer->base), v8::String::kNormalString, readSize);
-				callback->Call(callback, 1, &data);
-			}
-		} else {
-			v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
-			if (!callback.IsEmpty()) {
-				data = v8::Undefined(socket->_task->getIsolate());
-				callback->Call(callback, 1, &data);
+				if (!callback.IsEmpty()) {
+					data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer->base), v8::String::kNormalString, readSize);
+					callback->Call(callback, 1, &data);
+				}
 			}
 		}
 	}
