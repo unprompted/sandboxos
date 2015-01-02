@@ -29,7 +29,7 @@ public:
 	void setHostname(const char* hostname) override;
 
 private:
-	bool verifyPeerCertificate(const char* hostname);
+	bool verifyPeerCertificate();
 	bool verifyHostname(X509* certificate, const char* hostname);
 	bool wildcardMatch(const char* pattern, const char* name);
 
@@ -38,6 +38,7 @@ private:
 	BIO* _bioOut = 0;
 	SSL* _ssl = 0;
 	SSL_CTX* _context = 0;
+	enum { kUndetermined, kAccept, kConnect } _direction;
 };
 
 Tls_openssl::Tls_openssl(const char* key, const char* certificate) {
@@ -74,6 +75,7 @@ Tls_openssl::~Tls_openssl() {
 }
 
 void Tls_openssl::startAccept() {
+	_direction = kAccept;
 	_ssl = SSL_new(_context);
 	SSL_set_bio(_ssl, _bioIn, _bioOut);
 	SSL_accept(_ssl);
@@ -81,6 +83,7 @@ void Tls_openssl::startAccept() {
 }
 
 void Tls_openssl::startConnect() {
+	_direction = kConnect;
 	_ssl = SSL_new(_context);
 	SSL_set_bio(_ssl, _bioIn, _bioOut);
 	SSL_set_verify(_ssl, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
@@ -105,7 +108,7 @@ Tls::HandshakeResult Tls_openssl::handshake() {
 			}
 		}
 	}
-	if (result == kDone && _direction == Tls::kConnect && !verifyPeerCertificate()) {
+	if (result == kDone && _direction == kConnect && !verifyPeerCertificate()) {
 		result = kFailed;
 	}
 	return result;
