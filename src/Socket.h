@@ -1,11 +1,13 @@
 #ifndef INCLUDED_Socket
 #define INCLUDED_Socket
 
+#include <string>
 #include <uv.h>
 #include <v8.h>
 
 typedef int promiseid_t;
 class Task;
+class Tls;
 
 class Socket {
 public:
@@ -22,9 +24,15 @@ private:
 
 	Task* _task;
 	uv_tcp_t _socket;
+	Tls* _tls = 0;
+	promiseid_t _startTlsPromise = -1;
 	promiseid_t _closePromise = -1;
 	int _refCount = 1;
 	bool _connected = false;
+	std::string _peerName;
+
+	enum Direction { kUndetermined, kAccept, kConnect };
+	Direction _direction = kUndetermined;
 
 	static int _count;
 	static int _openCount;
@@ -34,6 +42,8 @@ private:
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;
 
+	static void startTls(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void stopTls(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void bind(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void connect(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void listen(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -57,6 +67,8 @@ private:
 	static void onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffer);
 	static void onWrite(uv_write_t* request, int status);
 	static void onRelease(const v8::WeakCallbackData<v8::Object, Socket>& data);
+
+	void processOutgoingTls();
 
 	void ref();
 	void release();

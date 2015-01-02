@@ -45,9 +45,6 @@ SecureSocket_openssl::SecureSocket_openssl(Task* task) {
 	_socket.data = this;
 	_task = task;
 	_promise = -1;
-
-	_bioIn = BIO_new(BIO_s_mem());
-	_bioOut = BIO_new(BIO_s_mem());
 }
 
 SecureSocket_openssl::~SecureSocket_openssl() {

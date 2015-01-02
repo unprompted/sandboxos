@@ -7,10 +7,6 @@
 #include "TaskStub.h"
 #include "TaskTryCatch.h"
 
-#if !defined (WIN32) && !defined (__MACH__)
-#include "SecureSocket_openssl.h"
-#endif
-
 #if defined (__MACH__)
 #include "SecureSocket_commoncrypto.h"
 #endif
@@ -157,9 +153,7 @@ void Task::activate() {
 	if (_trusted) {
 		global->Set(v8::String::NewFromUtf8(_isolate, "Database"), v8::FunctionTemplate::New(_isolate, Database::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
-#if !defined (WIN32) && !defined (__MACH__)
-		global->Set(v8::String::NewFromUtf8(_isolate, "SecureSocket"), v8::FunctionTemplate::New(_isolate, SecureSocket_openssl::create));
-#elif defined (__MACH__)
+#if defined (__MACH__)
 		global->Set(v8::String::NewFromUtf8(_isolate, "SecureSocket"), v8::FunctionTemplate::New(_isolate, SecureSocket_commoncrypto::create));
 #endif
 		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
