@@ -1,6 +1,6 @@
 #include "Tls.h"
 
-#if !defined (WIN32) && !defined (__MACH__)
+#if !defined (_WIN32) && !defined (__MACH__)
 #include <cstring>
 #include <locale>
 #include <openssl/bio.h>

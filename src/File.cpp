@@ -7,7 +7,7 @@
 #include <iostream>
 #include <uv.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <windows.h>
 #else
 #include <dirent.h>
@@ -91,7 +91,7 @@ void File::readDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	v8::Handle<v8::Array> array = v8::Array::New(args.GetIsolate(), 0);
 
-#ifdef WIN32
+#ifdef _WIN32
 	WIN32_FIND_DATA find;
 	std::string pattern = *v8::String::Utf8Value(directory);
 	pattern += "\\*";

@@ -19,7 +19,7 @@
 #include <v8.h>
 #include <v8-platform.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 static const int STDIN_FILENO = 0;
 #else
 #include <unistd.h>

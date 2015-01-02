@@ -6,7 +6,7 @@
 #include <v8.h>
 #include <v8-platform.h>
 
-#if !defined (WIN32) && !defined (__MACH__)
+#if !defined (_WIN32) && !defined (__MACH__)
 #include <signal.h>
 #include <sys/prctl.h>
 #include <unistd.h>
@@ -33,14 +33,14 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-#if !defined (WIN32)
+#if !defined (_WIN32)
 	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
 		perror("signal");
 	}
 #endif
 
 	if (isChild) {
-#if !defined (WIN32) && !defined (__MACH__)
+#if !defined (_WIN32) && !defined (__MACH__)
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 #endif
 		Task task;
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
 		task.activate();
 		task.run();
 	} else {
-#if !defined (WIN32) && !defined (__MACH__)
+#if !defined (_WIN32) && !defined (__MACH__)
 		setpgid(0, 0);
 #endif
 		Task task;
