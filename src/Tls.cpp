@@ -367,7 +367,7 @@ OSStatus Tls_commoncrypto::readCallback(SSLConnectionRef connection, void* data,
 	OSStatus result = noErr;
 	size_t bytes = std::min(tls->_inBuffer.size(), *dataLength);
 	if (bytes > 0) {
-		std::memcpy(data, &*tls->_inBuffer.begin(), bytes);
+		std::memcpy(data, tls->_inBuffer.data(), bytes);
 		tls->_inBuffer.erase(tls->_inBuffer.begin(), tls->_inBuffer.begin() + bytes);
 	}
 	if (bytes < *dataLength) {
@@ -380,7 +380,7 @@ OSStatus Tls_commoncrypto::readCallback(SSLConnectionRef connection, void* data,
 int Tls_commoncrypto::readEncrypted(char* buffer, size_t bytes) {
 	size_t size = std::min(bytes, _outBuffer.size());
 	if (size > 0) {
-		std::memcpy(buffer, &*_outBuffer.begin(), size);
+		std::memcpy(buffer, _outBuffer.data(), size);
 		_outBuffer.erase(_outBuffer.begin(), _outBuffer.begin() + size);
 	}
 	return size;
@@ -393,6 +393,303 @@ int Tls_commoncrypto::writeEncrypted(const char* buffer, size_t bytes) {
 
 Tls* Tls::create(const char* key, const char* certificate) {
 	return new Tls_commoncrypto(key, certificate);
+}
+#elif defined (_WIN32)
+#include <algorithm>
+#include <assert.h>
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#define SECURITY_WIN32
+#define NOMINMAX
+#include <windows.h>
+#include <schannel.h>
+#include <security.h>
+#undef SECURITY_WIN32
+#undef NOMINMAX
+
+class Tls_sspi : public Tls {
+public:
+	Tls_sspi(const char* key, const char* certificate);
+	~Tls_sspi();
+
+	void startConnect() override;
+	void startAccept() override;
+	void shutdown() override;
+	HandshakeResult handshake() override;
+
+	int readPlain(char* buffer, size_t bytes) override;
+	int writePlain(const char* buffer, size_t bytes) override;
+
+	int readEncrypted(char* buffer, size_t bytes) override;
+	int writeEncrypted(const char* buffer, size_t bytes) override;
+
+	void setHostname(const char* hostname) { _hostname = hostname; }
+
+private:
+	static void loadLibrary();
+	HandshakeResult handshakeInternal(bool initial);
+
+	static PSecurityFunctionTable _security;
+	SCHANNEL_CRED _credentials;
+	CredHandle _credentialsHandle;
+	CtxtHandle _context;
+	SecPkgContext_StreamSizes _sizes;
+
+	std::vector<char> _inBuffer;
+	std::vector<char> _outBuffer;
+	std::vector<char> _decryptedBuffer;
+	std::string _hostname;
+};
+
+PSecurityFunctionTable Tls_sspi::_security = 0;
+
+void Tls_sspi::loadLibrary() {
+	PSecurityFunctionTable (*table)();
+	HMODULE module = LoadLibrary("security.dll");
+	table = (PSecurityFunctionTable(*)())GetProcAddress(module, "InitSecurityInterfaceA");
+	assert(table && "failed to load security.dll");
+	_security = table();
+	assert(_security && "No function table in security.dll");
+}
+
+Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
+	static bool initialized = false;
+	if (!initialized) {
+		loadLibrary();
+		initialized = true;
+	}
+
+	ZeroMemory(&_credentials, sizeof(_credentials));
+	_credentials.dwVersion = SCHANNEL_CRED_VERSION;
+	_credentials.grbitEnabledProtocols = SP_PROT_SSL3;
+	_credentials.dwFlags |= SCH_CRED_NO_DEFAULT_CREDS;
+	SECURITY_STATUS status = _security->AcquireCredentialsHandleA(0, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, 0, &_credentials, 0, 0, &_credentialsHandle, 0);
+	assert(status == SEC_E_OK);
+}
+
+Tls_sspi::~Tls_sspi() {
+}
+
+void Tls_sspi::startAccept() {
+}
+
+void Tls_sspi::startConnect() {
+	handshakeInternal(true);
+}
+
+void Tls_sspi::shutdown() {
+/*
+	if (!_outBuffer.size()) {
+		SSLClose(_context);
+		_shutdown = false;
+	} else {
+		_shutdown = true;
+	}
+*/
+}
+
+Tls::HandshakeResult Tls_sspi::handshake() {
+	return handshakeInternal(false);
+}
+
+Tls::HandshakeResult Tls_sspi::handshakeInternal(bool initial) {
+	SecBufferDesc outBuffer;
+	SecBuffer outBuffers[1];
+	SecBufferDesc inBuffer;
+	SecBuffer inBuffers[2];
+	DWORD flags =
+		ISC_REQ_SEQUENCE_DETECT
+		| ISC_REQ_REPLAY_DETECT
+		| ISC_REQ_CONFIDENTIALITY
+		| ISC_RET_EXTENDED_ERROR
+		| ISC_REQ_ALLOCATE_MEMORY
+		| ISC_REQ_STREAM;
+	DWORD outFlags = 0;
+	outBuffers[0].pvBuffer = 0;
+	outBuffers[0].BufferType = SECBUFFER_TOKEN;
+	outBuffers[0].cbBuffer = 0;
+	outBuffer.cBuffers = 1;
+	outBuffer.pBuffers = outBuffers;
+	outBuffer.ulVersion = SECBUFFER_VERSION;
+	std::vector<char> buffer(_inBuffer);
+	inBuffers[0].pvBuffer = buffer.data();
+	inBuffers[0].cbBuffer = buffer.size();
+	inBuffers[0].BufferType = SECBUFFER_TOKEN;
+	inBuffers[1].pvBuffer = 0;
+	inBuffers[1].cbBuffer = 0;
+	inBuffers[1].BufferType = SECBUFFER_EMPTY;
+	inBuffer.cBuffers = 2;
+	inBuffer.pBuffers = inBuffers;
+	inBuffer.ulVersion = SECBUFFER_VERSION;
+
+	SECURITY_STATUS status = _security->InitializeSecurityContextA(
+		&_credentialsHandle,
+		initial ? 0 : &_context,
+		_hostname.size() ? const_cast<char*>(_hostname.c_str()) : 0,
+		flags,
+		0,
+		SECURITY_NATIVE_DREP,
+		&inBuffer,
+		0,
+		initial ? &_context : 0,
+		&outBuffer,
+		&outFlags,
+		0);
+
+	Tls::HandshakeResult result = Tls::kFailed;
+
+	size_t extra = 0;
+	for (int i = 0; i < inBuffer.cBuffers; ++i) {
+		if (inBuffers[i].BufferType == SECBUFFER_EXTRA && inBuffers[i].cbBuffer) {
+			extra += inBuffers[i].cbBuffer;
+		}
+	}
+	size_t missing = 0;
+	for (int i = 0; i < inBuffer.cBuffers; ++i) {
+		if (inBuffers[i].BufferType == SECBUFFER_MISSING && inBuffers[i].cbBuffer) {
+			missing += inBuffers[i].cbBuffer;
+		}
+	}
+
+	if (outBuffers[0].cbBuffer && outBuffers[0].pvBuffer) {
+		const char* data = reinterpret_cast<const char*>(outBuffers[0].pvBuffer);
+		_outBuffer.insert(_outBuffer.end(), data, data + outBuffers[0].cbBuffer);
+		_security->FreeContextBuffer(outBuffers[0].pvBuffer);
+	}
+
+	if (status == SEC_E_OK) {
+		result = Tls::kDone;
+	} else if (status == SEC_E_INCOMPLETE_MESSAGE
+		|| status == SEC_I_CONTINUE_NEEDED) {
+		result = Tls::kMore;
+	} else if (FAILED(status)) {
+		result = Tls::kFailed;
+	}
+
+	_inBuffer.erase(_inBuffer.begin(), _inBuffer.end() - extra);
+
+	if (result == Tls::kDone) {
+		status = _security->QueryContextAttributesA(&_context, SECPKG_ATTR_STREAM_SIZES, &_sizes);
+		if (FAILED(status)) {
+			result = Tls::kFailed;
+		}
+	}
+
+	return result;
+}
+
+int Tls_sspi::readPlain(char* buffer, size_t bytes) {
+	int result = Tls::kReadFailed;
+	if (bytes <= _decryptedBuffer.size()) {
+		std::memcpy(buffer, _decryptedBuffer.data(), bytes);
+		_decryptedBuffer.erase(_decryptedBuffer.begin(), _decryptedBuffer.begin() + bytes);
+		result = bytes;
+	} else if (_inBuffer.size()) {
+		SecBufferDesc bufferDesc;
+		SecBuffer buffers[4];
+		std::vector<char> data(_inBuffer);
+		buffers[0].pvBuffer = data.data();
+		buffers[0].cbBuffer = data.size();
+		buffers[0].BufferType = SECBUFFER_DATA;
+		buffers[1].BufferType = SECBUFFER_EMPTY;
+		buffers[2].BufferType = SECBUFFER_EMPTY;
+		buffers[3].BufferType = SECBUFFER_EMPTY;
+		bufferDesc.ulVersion = SECBUFFER_VERSION;
+		bufferDesc.cBuffers = 4;
+		bufferDesc.pBuffers = buffers;
+		SECURITY_STATUS status = _security->DecryptMessage(&_context, &bufferDesc, 0, 0);
+
+		if (status == SEC_I_CONTEXT_EXPIRED) {
+			_inBuffer.clear();
+			result = Tls::kReadZero;
+		} else if (status == SEC_E_INCOMPLETE_MESSAGE) {
+			result = 0;
+		} else if (status == SEC_E_OK) {
+			result = 0;
+			size_t extra = 0;
+			for (int i = 0; i < bufferDesc.cBuffers; ++i) {
+				if (buffers[i].BufferType == SECBUFFER_DATA) {
+					const char* decrypted = reinterpret_cast<const char*>(buffers[i].pvBuffer);
+					_decryptedBuffer.insert(_decryptedBuffer.end(), decrypted, decrypted + buffers[i].cbBuffer);
+				} else if (buffers[i].BufferType == SECBUFFER_EXTRA) {
+					extra += buffers[i].cbBuffer;
+				}
+			}
+			_inBuffer.erase(_inBuffer.begin(), _inBuffer.end() - extra);
+
+			size_t actual = std::min(_decryptedBuffer.size(), bytes);
+			if (actual > 0) {
+				std::memcpy(buffer, _decryptedBuffer.data(), actual);
+				_decryptedBuffer.erase(_decryptedBuffer.begin(), _decryptedBuffer.begin() + actual);
+				result = actual;
+			}
+		} else {
+			_inBuffer.clear();
+			result = Tls::kReadFailed;
+		}
+	} else {
+		size_t actual = std::min(_decryptedBuffer.size(), bytes);
+		if (actual > 0) {
+			std::memcpy(buffer, _decryptedBuffer.data(), actual);
+			_decryptedBuffer.erase(_decryptedBuffer.begin(), _decryptedBuffer.begin() + actual);
+			result = actual;
+		}
+	}
+	return result;
+}
+
+int Tls_sspi::writePlain(const char* buffer, size_t bytes) {
+	SecBufferDesc bufferDesc;
+	SecBuffer buffers[4];
+	std::vector<char> data(_sizes.cbHeader + _sizes.cbTrailer + bytes);
+	std::memcpy(data.data() + _sizes.cbHeader, buffer, bytes);
+
+	buffers[0].pvBuffer = data.data();
+	buffers[0].cbBuffer = _sizes.cbHeader;
+	buffers[0].BufferType = SECBUFFER_STREAM_HEADER;
+
+	buffers[1].pvBuffer = data.data() + _sizes.cbHeader;
+	buffers[1].cbBuffer = bytes;
+	buffers[1].BufferType = SECBUFFER_DATA;
+
+	buffers[2].pvBuffer = data.data() + _sizes.cbHeader + bytes;
+	buffers[2].cbBuffer = _sizes.cbTrailer;
+	buffers[2].BufferType = SECBUFFER_STREAM_TRAILER;
+
+	buffers[3].BufferType = SECBUFFER_EMPTY;
+
+	bufferDesc.ulVersion = SECBUFFER_VERSION;
+	bufferDesc.cBuffers = 4;
+	bufferDesc.pBuffers = buffers;
+	SECURITY_STATUS status = _security->EncryptMessage(&_context, 0, &bufferDesc, 0);
+	for (int i = 0; i < bufferDesc.cBuffers; ++i) {
+		if (buffers[i].BufferType != SECBUFFER_EMPTY && buffers[i].pvBuffer && buffers[i].cbBuffer) {
+			const char* bufferData = reinterpret_cast<const char*>(buffers[i].pvBuffer);
+			_outBuffer.insert(_outBuffer.end(), bufferData, bufferData + buffers[i].cbBuffer);
+		}
+	}
+	return 0;
+}
+
+int Tls_sspi::readEncrypted(char* buffer, size_t bytes) {
+	size_t size = std::min(bytes, _outBuffer.size());
+	if (size > 0) {
+		std::memcpy(buffer, _outBuffer.data(), size);
+		_outBuffer.erase(_outBuffer.begin(), _outBuffer.begin() + size);
+	}
+	return size;
+}
+
+int Tls_sspi::writeEncrypted(const char* buffer, size_t bytes) {
+	_inBuffer.insert(_inBuffer.end(), buffer, buffer + bytes);
+	return bytes;
+}
+
+Tls* Tls::create(const char* key, const char* certificate) {
+	return new Tls_sspi(key, certificate);
 }
 #else
 Tls* Tls::create(const char* key, const char* certificate) {
