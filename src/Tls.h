@@ -5,9 +5,6 @@
 
 class Tls {
 public:
-	typedef int (ReadCallback)(Tls* connection, char* buffer, size_t bytes);
-	typedef int (WriteCallback)(Tls* connection, const char* buffer, size_t bytes);
-
 	static Tls* create(const char* key, const char* certificate);
 	virtual ~Tls() {}
 
