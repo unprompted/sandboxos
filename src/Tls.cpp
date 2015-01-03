@@ -201,10 +201,14 @@ Tls* Tls::create(const char* key, const char* certificate) {
 	return new Tls_openssl(key, certificate);
 }
 #elif defined (__MACH__)
+#include <Security/SecIdentity.h>
+#include <Security/SecImportExport.h>
 #include <Security/SecureTransport.h>
 #include <cstring>
 #include <locale>
 #include <vector>
+
+extern "C" SecIdentityRef SecIdentityCreate(CFAllocatorRef allocator, SecCertificateRef certificate, SecKeyRef privateKey);
 
 class Tls_commoncrypto : public Tls {
 public:
@@ -228,6 +232,7 @@ private:
 	static OSStatus writeCallback(SSLConnectionRef connection, const void* data, size_t* dataLength);
 	static OSStatus readCallback(SSLConnectionRef connection, void* data, size_t* dataLength);
 
+	CFArrayRef _certificate = 0;
 	SSLContextRef _context = 0;
 	std::vector<char> _inBuffer;
 	std::vector<char> _outBuffer;
@@ -236,35 +241,50 @@ private:
 };
 
 Tls_commoncrypto::Tls_commoncrypto(const char* key, const char* certificate) {
-	/*_context = SSL_CTX_new(SSLv23_method());
-	SSL_CTX_set_default_verify_paths(_context);
-	_bioIn = BIO_new(BIO_s_mem());
-	_bioOut = BIO_new(BIO_s_mem());
+	SecKeyRef keyItem = 0;
+	SecCertificateRef certificateItem = 0;
+	SecIdentityRef identityItem = 0;
 
 	if (key) {
-		BIO* bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, key);
-		EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(bio, 0, 0, 0);
-		SSL_CTX_use_PrivateKey(_context, privateKey);
-		BIO_free(bio);
+		CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(key), std::strlen(key), kCFAllocatorDefault);
+		CFArrayRef keyItems = 0;
+		SecExternalFormat format = kSecFormatPEMSequence;
+		SecExternalItemType itemType = kSecItemTypePrivateKey;
+		OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &keyItems);
+		if (status == noErr && CFArrayGetCount(keyItems) > 0) {
+			keyItem = (SecKeyRef)CFArrayGetValueAtIndex(keyItems, 0);
+		}
 	}
 
 	if (certificate) {
-		BIO* bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, certificate);
-		X509* x509 = PEM_read_bio_X509(bio, 0, 0, 0);
-		SSL_CTX_use_certificate(_context, x509);
-		BIO_free(bio);
-	}*/
+		CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(certificate), std::strlen(certificate), kCFAllocatorDefault);
+		CFArrayRef certificateItems = 0;
+		SecExternalFormat format = kSecFormatPEMSequence;
+		SecExternalItemType itemType = kSecItemTypeCertificate;
+		OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &certificateItems);
+		if (status == noErr && CFArrayGetCount(certificateItems) > 0) {
+			certificateItem = (SecCertificateRef)CFArrayGetValueAtIndex(certificateItems, 0);
+		}
+	}
+
+	if (keyItem && certificateItem) {
+		identityItem = SecIdentityCreate(kCFAllocatorDefault, certificateItem, keyItem);
+	}
+
+	_certificate = CFArrayCreate(kCFAllocatorDefault, (const void**)&identityItem, 1, &kCFTypeArrayCallBacks);
 }
 
 Tls_commoncrypto::~Tls_commoncrypto() {
+	CFRelease(_certificate);
 	CFRelease(_context);
 	_context = 0;
 }
 
 void Tls_commoncrypto::startAccept() {
 	_context = SSLCreateContext(0, kSSLServerSide, kSSLStreamType);
+	if (_certificate) {
+		SSLSetCertificate(_context, _certificate);
+	}
 	SSLSetIOFuncs(_context, readCallback, writeCallback);
 	SSLSetConnection(_context, this);
 	handshake();
