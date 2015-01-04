@@ -70,6 +70,8 @@ if sys.platform == 'linux2':
 source = [s for s in Glob('build/src/*.cpp') if not os.path.basename(str(s)).startswith("SecureSocket_")]
 if sys.platform == 'darwin':
 	env.Append(FRAMEWORKS=['CoreFoundation', 'Security'])
+elif sys.platform == 'win32':
+	env.Append(LIBS=['Crypt32'])
 env.Program('sandboxos', source)
 
 def listAllFiles(root):

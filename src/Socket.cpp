@@ -71,8 +71,8 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 			v8::String::Utf8Value keyUtf8(keyString);
 			v8::String::Utf8Value certificateUtf8(certificateString);
 
-			const char* key = *keyUtf8;
-			const char* certificate = *certificateUtf8;
+			const char* key = args.Length() > 0 ? *keyUtf8 : 0;
+			const char* certificate = args.Length() > 1 ? *certificateUtf8 : 0;
 			socket->_tls = Tls::create(key, certificate);
 			if (socket->_tls) {
 				socket->_tls->setHostname(socket->_peerName.c_str());
