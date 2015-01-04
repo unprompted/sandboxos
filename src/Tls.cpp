@@ -437,7 +437,6 @@ private:
 	CtxtHandle _context;
 	PCCERT_CONTEXT _certificate = 0;
 	SecPkgContext_StreamSizes _sizes;
-	HCRYPTPROV _provider = 0;
 	enum { kUndetermined, kConnect, kAccept } _direction = kUndetermined;
 	bool _initial = false;
 
@@ -458,8 +457,6 @@ void Tls_sspi::loadLibrary() {
 	assert(_security && "No function table in security.dll");
 }
 
-#include <iostream>
-
 Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
 	static bool initialized = false;
 	if (!initialized) {
@@ -467,9 +464,9 @@ Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
 		initialized = true;
 	}
 
-	std::vector<BYTE> keyBuffer;
-	std::vector<BYTE> keyBlob;
-
+	ZeroMemory(&_credentialsHandle, sizeof(_credentialsHandle));
+	ZeroMemory(&_context, sizeof(_context));
+	ZeroMemory(&_sizes, sizeof(_sizes));
 
 	if (certificate) {
 		std::vector<BYTE> certificateBuffer;
@@ -483,16 +480,18 @@ Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
 
 		if (certificateBuffer.size()) {
 			_certificate = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, certificateBuffer.data(), certificateBuffer.size());
-			std::cout << "certificate = " << _certificate << "\n";
 		}
 	}
 
-	if (key) {
+	if (_certificate && key) {
+		std::vector<BYTE> keyBuffer;
+		std::vector<BYTE> keyBlob;
+
 		DWORD size = 0;
 		if (CryptStringToBinary(key, 0, CRYPT_STRING_BASE64HEADER, 0, &size, 0, 0)) {
 			keyBuffer.resize(size);
 			if (!CryptStringToBinary(key, 0, CRYPT_STRING_BASE64HEADER, keyBuffer.data(), &size, 0, 0)) {
-				std::cout << "CryptStringToBinary failed\n";
+				std::cerr << "CryptStringToBinary failed: " << GetLastError() << "\n";
 				keyBuffer.resize(0);
 			}
 		}
@@ -501,45 +500,40 @@ Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
 		if (CryptDecodeObjectEx(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, PKCS_RSA_PRIVATE_KEY, keyBuffer.data(), keyBuffer.size(), 0, 0, 0, &size)) {
 			keyBlob.resize(size);
 			if (!CryptDecodeObjectEx(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, PKCS_RSA_PRIVATE_KEY, keyBuffer.data(), keyBuffer.size(), 0, 0, keyBlob.data(), &size)) {
-				std::cout << "CryptDecodeObjectEx failed\n";
+				std::cerr << "CryptDecodeObjectEx failed: " << GetLastError() << "\n";
 				keyBlob.resize(0);
 			}
 		}
 
 		const char* container = "_tmp0";
 
-		_provider = 0;
-		if (!CryptAcquireContext(&_provider, container, MS_DEF_RSA_SCHANNEL_PROV, PROV_RSA_SCHANNEL, CRYPT_NEWKEYSET)) {
-			if (GetLastError() != NTE_EXISTS || !CryptAcquireContext(&_provider, container, MS_DEF_RSA_SCHANNEL_PROV, PROV_RSA_SCHANNEL, 0)) {
-				std::cout << "unable to acquire context\n";
+		HCRYPTPROV provider = 0;
+		if (!CryptAcquireContext(&provider, container, MS_DEF_RSA_SCHANNEL_PROV, PROV_RSA_SCHANNEL, CRYPT_NEWKEYSET)) {
+			if (GetLastError() != NTE_EXISTS || !CryptAcquireContext(&provider, container, MS_DEF_RSA_SCHANNEL_PROV, PROV_RSA_SCHANNEL, 0)) {
+				std::cerr << "CryptAcquireContext failed: " << GetLastError() << "\n";
 			}
 		}
 
 		HANDLE store = CertOpenStore(CERT_STORE_PROV_SYSTEM,
 			X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-			_provider,
+			provider,
 			CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_NO_CRYPT_RELEASE_FLAG | CERT_STORE_OPEN_EXISTING_FLAG,
 			L"MY");
 		if (!store) {
-			std::cout << "no store\n";
+			std::cerr << "CertOpenStore failed: " << GetLastError() << "\n";
 		}
 
-		PCCERT_CONTEXT storeContext;
-		if (!CertAddCertificateContextToStore(store, _certificate, CERT_STORE_ADD_REPLACE_EXISTING, &storeContext)) {
-			std::cout << "add failed\n";
+		if (!CertAddCertificateContextToStore(store, _certificate, CERT_STORE_ADD_REPLACE_EXISTING, 0)) {
+			std::cerr << "CertAddCertificateContextToStore failed: " << GetLastError() << "\n";
 		}
-		//_certificate = storeContext;
-		std::cout << "now certificate is " << _certificate << "\n";
+		CertCloseStore(store, 0);
 
-		std::cout << "blob: " << keyBlob.size() << "\n";
 		HCRYPTKEY cryptKey = 0;
-		if (!CryptImportKey(_provider, keyBlob.data(), keyBlob.size(), 0, 0, &cryptKey)) {
-			std::cout << "CryptImportKey failed\n";
-			std::cout << GetLastError() << "\n";
-		} else {
-			//CryptDestroyKey(cryptKey);
-			std::cout << "key => " << cryptKey << "\n";
+		if (CryptImportKey(provider, keyBlob.data(), keyBlob.size(), 0, 0, &cryptKey)) {
+			CryptDestroyKey(cryptKey);
 			cryptKey = 0;
+		} else {
+			std::cerr << "CryptImportKey failed: " << GetLastError() << "\n";
 		}
 
 		WCHAR wname[32];
@@ -553,28 +547,29 @@ Tls_sspi::Tls_sspi(const char* key, const char* certificate) {
 		info.dwKeySpec = AT_KEYEXCHANGE;
 
 		if (!CertSetCertificateContextProperty(_certificate, CERT_KEY_PROV_INFO_PROP_ID, 0, reinterpret_cast<const void*>(&info))) {
-			std::cout << "CertSetCertificateContextProperty failed\n";
+			std::cerr << "CertSetCertificateContextProperty failed: " << GetLastError() << "\n";
 		}
-		/*if (!CertSetCertificateContextProperty(_certificate, CERT_KEY_PROV_HANDLE_PROP_ID, 0, reinterpret_cast<const void*>(&_provider))) {
-			std::cout << "CertSetCertificateContextProperty failed\n";
-		}*/
+		CryptReleaseContext(provider, 0);
 	}
 }
 
 Tls_sspi::~Tls_sspi() {
+	_security->FreeCredentialsHandle(&_credentialsHandle);
+	_security->DeleteSecurityContext(&_context);
+	CertFreeCertificateContext(_certificate);
 }
 
 void Tls_sspi::startAccept() {
 	_direction = kAccept;
 	_initial = true;
-	SCHANNEL_CRED _credentials;
-	ZeroMemory(&_credentials, sizeof(_credentials));
-	_credentials.dwVersion = SCHANNEL_CRED_VERSION;
-	_credentials.cCreds = 1;
-	_credentials.paCred = &_certificate;
-	SECURITY_STATUS status = _security->AcquireCredentialsHandleA(0, UNISP_NAME_A, SECPKG_CRED_INBOUND, 0, &_credentials, 0, 0, &_credentialsHandle, 0);
+	SCHANNEL_CRED credentials;
+	ZeroMemory(&credentials, sizeof(credentials));
+	credentials.dwVersion = SCHANNEL_CRED_VERSION;
+	credentials.cCreds = 1;
+	credentials.paCred = &_certificate;
+	SECURITY_STATUS status = _security->AcquireCredentialsHandleA(0, UNISP_NAME_A, SECPKG_CRED_INBOUND, 0, &credentials, 0, 0, &_credentialsHandle, 0);
 	if (status != SEC_E_OK) {
-		std::cout << "AcquireCredentialsHandleA => " << status << " " << GetLastError() << "\n";
+		std::cerr << "AcquireCredentialsHandleA failed: " << status << " " << GetLastError() << "\n";
 	}
 	handshakeInternal(true);
 }
@@ -582,26 +577,58 @@ void Tls_sspi::startAccept() {
 void Tls_sspi::startConnect() {
 	_direction = kConnect;
 	_initial = true;
-	SCHANNEL_CRED _credentials;
-	ZeroMemory(&_credentials, sizeof(_credentials));
-	_credentials.dwVersion = SCHANNEL_CRED_VERSION;
-	_credentials.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
-	SECURITY_STATUS status = _security->AcquireCredentialsHandleA(0, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, 0, &_credentials, 0, 0, &_credentialsHandle, 0);
+	SCHANNEL_CRED credentials;
+	ZeroMemory(&credentials, sizeof(credentials));
+	credentials.dwVersion = SCHANNEL_CRED_VERSION;
+	credentials.dwFlags = SCH_CRED_NO_DEFAULT_CREDS;
+	SECURITY_STATUS status = _security->AcquireCredentialsHandleA(0, UNISP_NAME_A, SECPKG_CRED_OUTBOUND, 0, &credentials, 0, 0, &_credentialsHandle, 0);
 	if (status != SEC_E_OK) {
-		std::cout << "AcquireCredentialsHandleA => " << status << " " << GetLastError() << "\n";
+		std::cerr << "AcquireCredentialsHandleA failed: " << status << " " << GetLastError() << "\n";
 	}
 	handshakeInternal(true);
 }
 
 void Tls_sspi::shutdown() {
-/*
-	if (!_outBuffer.size()) {
-		SSLClose(_context);
-		_shutdown = false;
-	} else {
-		_shutdown = true;
+	DWORD type = SCHANNEL_SHUTDOWN;
+	SecBufferDesc bufferDesc;
+	SecBuffer buffers[1];
+	buffers[0].pvBuffer = &type;
+	buffers[0].BufferType = SECBUFFER_TOKEN;
+	buffers[0].cbBuffer = sizeof(type);
+	bufferDesc.cBuffers = 1;
+	bufferDesc.pBuffers = buffers;
+	bufferDesc.ulVersion = SECBUFFER_TOKEN;
+
+	SECURITY_STATUS status = _security->ApplyControlToken(&_context, &bufferDesc);
+	if (!FAILED(status)) {
+		buffers[0].pvBuffer = 0;
+		buffers[0].BufferType = SECBUFFER_TOKEN;
+		buffers[0].cbBuffer = 0;
+		bufferDesc.cBuffers = 1;
+		bufferDesc.pBuffers = buffers;
+		bufferDesc.ulVersion = SECBUFFER_VERSION;
+
+		DWORD outFlags = 0;
+
+		status = _security->InitializeSecurityContextA(
+			&_credentialsHandle,
+			&_context,
+			0,
+			ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_RET_EXTENDED_ERROR | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM,
+			0,
+			0,
+			0,
+			0,
+			&_context,
+			&bufferDesc,
+			&outFlags,
+			0);
+
+		if (!FAILED(status) && buffers[0].pvBuffer && buffers[0].cbBuffer) {
+			const char* data = reinterpret_cast<const char*>(buffers[0].pvBuffer);
+			_outBuffer.insert(_outBuffer.end(), data, data + buffers[0].cbBuffer);
+		}
 	}
-*/
 }
 
 Tls::HandshakeResult Tls_sspi::handshake() {
@@ -647,7 +674,6 @@ Tls::HandshakeResult Tls_sspi::handshakeInternal(bool initial) {
 			&outBuffer,
 			&outFlags,
 			0);
-		std::cout << _direction << " ISC " << buffer.size() << " " << _outBuffer.size() << " => " << status << " " << initial << " " << FAILED(status) << "\n";
 	} else if (_direction = kAccept) {
 		status = _security->AcceptSecurityContext(
 			&_credentialsHandle,
@@ -659,7 +685,6 @@ Tls::HandshakeResult Tls_sspi::handshakeInternal(bool initial) {
 			&outBuffer,
 			&outFlags,
 			0);
-		std::cout << _direction << " ASC " << buffer.size() << " " << _outBuffer.size() << " => " << std::hex << status << std::dec << " " << initial << " " << FAILED(status) << "\n";
 	}
 
 	if (!FAILED(status)) {
@@ -763,6 +788,8 @@ int Tls_sspi::readPlain(char* buffer, size_t bytes) {
 			std::memcpy(buffer, _decryptedBuffer.data(), actual);
 			_decryptedBuffer.erase(_decryptedBuffer.begin(), _decryptedBuffer.begin() + actual);
 			result = actual;
+		} else {
+			result = 0;
 		}
 	}
 	return result;
