@@ -92,6 +92,8 @@ function FileSystem(options) {
 				return fs.ensureDirectoryTreeExists(path + "/..").then(function() { this.ensureDirectoryTreeExists(path); });
 			} else if (e == -17) {
 				// EEXIST
+			} else {
+				throw e;
 			}
 		});
 	}
@@ -117,6 +119,23 @@ function makePackageFileSystem(packageName, permissions) {
 		} else {
 			return new FileSystem({root: "packages/" + (packageName || this.taskName), permissions: {read: true}});
 		}
+	}
+}
+function makePackageDatabase(path) {
+	var taskName = this.taskName;
+	var normalizedPath = normalize(path || "");
+	if (isValidName(taskName)
+		&& (normalizedPath.charAt(0) != '.' || normalizedPath.charAt(1) != '.')) {
+		var options = {root: "data/" + taskName, permissions: {read: true, write: true}};
+		return new FileSystem(options).ensureDirectoryTreeExists(normalizedPath).then(function() {
+			var database = new Database("data/" + taskName + "/" + normalizedPath);
+			return {
+				get: database.get.bind(database),
+				set: database.set.bind(database),
+				remove: database.remove.bind(database),
+				getAll: database.getAll.bind(database),
+			};
+		});
 	}
 }
 
@@ -146,5 +165,6 @@ function copy(source, target) {
 exports = {
 	getPackageData: makePackageDataFileSystem,
 	getPackage: makePackageFileSystem,
+	getPackageDatabase: makePackageDatabase,
 	copy: copy,
 };
