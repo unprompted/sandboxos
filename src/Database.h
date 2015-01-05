@@ -28,10 +28,10 @@ private:
 	static Database* get(v8::Handle<v8::Object> databaseObject);
 	static void onRelease(const v8::WeakCallbackData<v8::Object, Database>& data);
 
-	static void getter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-	static void setter(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
-	static void deleter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Boolean>& info);
-	static void enumerator(const v8::PropertyCallbackInfo<v8::Array>& info);
+	static void get(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void set(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void remove(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void getAll(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	bool open(v8::Isolate* isolate, const char* path);
 

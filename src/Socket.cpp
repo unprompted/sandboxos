@@ -333,6 +333,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 			socket->_connected = false;
 			v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 			if (!callback.IsEmpty()) {
+				std::cout << "readSize <= 0 (" << readSize << ")\n";
 				data = v8::Undefined(socket->_task->getIsolate());
 				callback->Call(callback, 1, &data);
 			}
@@ -356,6 +357,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 						char plain[8192];
 						int result = socket->_tls->readPlain(plain, sizeof(plain));
 						if (result > 0) {
+							std::cout << "result > 0\n";
 							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 							if (!callback.IsEmpty()) {
 								data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
@@ -365,6 +367,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 							socket->close();
 							break;
 						} else if (result == Tls::kReadZero) {
+							std::cout << "kReadZero\n";
 							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 							if (!callback.IsEmpty()) {
 								data = v8::Undefined(socket->_task->getIsolate());
@@ -380,6 +383,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 					socket->processOutgoingTls();
 				}
 			} else {
+				std::cout << "!tls\n";
 				v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 				if (!callback.IsEmpty()) {
 					data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(buffer->base), v8::String::kNormalString, readSize);

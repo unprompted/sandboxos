@@ -4,23 +4,25 @@ mkdir testdb
 
 cat > test.js << EOF
 var db = new Database("testdb");
-if (db.a) {
+if (db.get("a")) {
 	exit(1);
 }
-db.a = 1;
-if (db.a != 1) {
+db.set("a", 1);
+if (db.get("a") != 1) {
 	exit(1);
 }
-db.b = 2;
-db.c = 3;
+db.set("b", 2);
+db.set("c", 3);
 
 var expected = ['a', 'b', 'c'];
-for (var i in db) {
-	if (expected.indexOf(i) == -1) {
-		print("Did not find " + i + " in db.");
+var have = db.getAll();
+for (var i = 0; i < have.length; i++) {
+	var item = have[i];
+	if (expected.indexOf(item) == -1) {
+		print("Did not find " + item + " in db.");
 		exit(2);
 	} else {
-		expected.splice(expected.indexOf(i), 1);
+		expected.splice(expected.indexOf(item), 1);
 	}
 }
 if (expected.length) {

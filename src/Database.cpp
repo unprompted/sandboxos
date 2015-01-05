@@ -14,7 +14,10 @@ Database::Database(Task* task) {
 
 	v8::Local<v8::ObjectTemplate> databaseTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	databaseTemplate->SetInternalFieldCount(1);
-	databaseTemplate->SetNamedPropertyHandler(getter, setter, 0, deleter, enumerator);
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "get"), v8::FunctionTemplate::New(task->getIsolate(), get));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "set"), v8::FunctionTemplate::New(task->getIsolate(), set));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "remove"), v8::FunctionTemplate::New(task->getIsolate(), remove));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "getAll"), v8::FunctionTemplate::New(task->getIsolate(), getAll));
 
 	v8::Local<v8::Object> databaseObject = databaseTemplate->NewInstance();
 	databaseObject->SetInternalField(0, v8::External::New(task->getIsolate(), this));
@@ -80,33 +83,33 @@ bool Database::open(v8::Isolate* isolate, const char* path) {
 	return result == MDB_SUCCESS;
 }
 
-void Database::getter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
-	if (Database* database = Database::get(info.This())) {
+void Database::get(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Database* database = Database::get(args.This())) {
 		int result = mdb_txn_begin(database->_environment, 0, MDB_RDONLY, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
 			MDB_val value;
-			v8::String::Utf8Value keyString(property.As<v8::String>());
+			v8::String::Utf8Value keyString(args[0].As<v8::String>());
 			key.mv_data = *keyString;
 			key.mv_size = keyString.length();
 			if (mdb_get(database->_transaction, database->_database, &key, &value) == MDB_SUCCESS) {
-				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), reinterpret_cast<const char*>(value.mv_data), v8::String::kNormalString, value.mv_size));
+				args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), reinterpret_cast<const char*>(value.mv_data), v8::String::kNormalString, value.mv_size));
 			}
 			mdb_txn_reset(database->_transaction);
 		}
 	}
 }
 
-void Database::setter(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info) {
-	if (Database* database = Database::get(info.This())) {
+void Database::set(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Database* database = Database::get(args.This())) {
 		int result = mdb_txn_begin(database->_environment, 0, 0, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
 			MDB_val data;
-			v8::String::Utf8Value keyString(property.As<v8::String>());
+			v8::String::Utf8Value keyString(args[0].As<v8::String>());
 			key.mv_data = *keyString;
 			key.mv_size = keyString.length();
-			v8::String::Utf8Value valueString(value->ToString(info.GetIsolate()));
+			v8::String::Utf8Value valueString(args[1]->ToString(args.GetIsolate()));
 			data.mv_data = *valueString;
 			data.mv_size = valueString.length();
 			result = mdb_put(database->_transaction, database->_database, &key, &data, 0);
@@ -116,12 +119,12 @@ void Database::setter(v8::Local<v8::String> property, v8::Local<v8::Value> value
 	}
 }
 
-void Database::deleter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Boolean>& info) {
-	if (Database* database = Database::get(info.This())) {
+void Database::remove(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Database* database = Database::get(args.This())) {
 		int result = mdb_txn_begin(database->_environment, 0, 0, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
-			v8::String::Utf8Value keyString(property.As<v8::String>());
+			v8::String::Utf8Value keyString(args[0].As<v8::String>());
 			key.mv_data = *keyString;
 			key.mv_size = keyString.length();
 			result = mdb_del(database->_transaction, database->_database, &key, 0);
@@ -131,8 +134,8 @@ void Database::deleter(v8::Local<v8::String> property, const v8::PropertyCallbac
 	}
 }
 
-void Database::enumerator(const v8::PropertyCallbackInfo<v8::Array>& info) {
-	if (Database* database = Database::get(info.This())) {
+void Database::getAll(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Database* database = Database::get(args.This())) {
 		int result = mdb_txn_begin(database->_environment, 0, MDB_RDONLY, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_cursor* cursor;
@@ -143,15 +146,15 @@ void Database::enumerator(const v8::PropertyCallbackInfo<v8::Array>& info) {
 				if (mdb_stat(database->_transaction, database->_database, &statistics) == 0) {
 					expectedCount = statistics.ms_entries;
 				}
-				v8::Local<v8::Array> array = v8::Array::New(info.GetIsolate(), expectedCount);
+				v8::Local<v8::Array> array = v8::Array::New(args.GetIsolate(), expectedCount);
 
 				MDB_val key;
 				int index = 0;
 				while ((result = mdb_cursor_get(cursor, &key, 0, MDB_NEXT)) == 0) {
-					array->Set(index++, v8::String::NewFromUtf8(info.GetIsolate(), reinterpret_cast<const char*>(key.mv_data), v8::String::kNormalString, key.mv_size));
+					array->Set(index++, v8::String::NewFromUtf8(args.GetIsolate(), reinterpret_cast<const char*>(key.mv_data), v8::String::kNormalString, key.mv_size));
 				}
 				if (result == MDB_NOTFOUND) {
-					info.GetReturnValue().Set(array);
+					args.GetReturnValue().Set(array);
 				} else {
 					database->checkError("mdb_cursor_get", result);
 				}
