@@ -158,24 +158,26 @@ function handleConnection(client) {
 	}
 
 	client.read(function(data) {
-		inputBuffer += data;
-		var more = true;
-		while (more) {
-			if (lineByLine) {
-				more = false;
-				var end = inputBuffer.indexOf('\n');
-				var realEnd = end;
-				while  (end > 0 && inputBuffer[end - 1] == '\r') {
-					--end;
+		if (data) {
+			inputBuffer += data;
+			var more = true;
+			while (more) {
+				if (lineByLine) {
+					more = false;
+					var end = inputBuffer.indexOf('\n');
+					var realEnd = end;
+					while  (end > 0 && inputBuffer[end - 1] == '\r') {
+						--end;
+					}
+					if (end != -1) {
+						var line = inputBuffer.slice(0, end);
+						inputBuffer = inputBuffer.slice(realEnd + 1);
+						more = handleLine(line, realEnd + 1);
+					}
+				} else {
+					more = handleLine(inputBuffer, inputBuffer.length);
+					inputBuffer = "";
 				}
-				if (end != -1) {
-					var line = inputBuffer.slice(0, end);
-					inputBuffer = inputBuffer.slice(realEnd + 1);
-					more = handleLine(line, realEnd + 1);
-				}
-			} else {
-				more = handleLine(inputBuffer, inputBuffer.length);
-				inputBuffer = "";
 			}
 		}
 	});

@@ -96,7 +96,7 @@ function sessionHandler(request, response, session) {
 			gFileSystem.readFile(file.path).then(function(data) {
 				response.writeHead(200, {"Content-Type": file.type, "Connection": "close"});
 				response.end(data);
-			}).then(function(e) {
+			}).catch(function(e) {
 				response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end("500 Internal Server Error\n" + e.toString());
 			});
