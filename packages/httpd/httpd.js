@@ -69,8 +69,13 @@ function Response(client) {
 		404: 'File not found',
 		500: 'Internal server error',
 	};
+	var _started = false;
+	var _finished = false;
 	return {
 		writeHead: function(status) {
+			if (_started) {
+				throw new Error("Response.writeHead called multiple times.");
+			}
 			var reason;
 			var headers;
 			if (arguments.length == 3) {
@@ -80,20 +85,32 @@ function Response(client) {
 				reason = kStatusText[status];
 				headers = arguments[1];
 			}
-			client.write("HTTP/1.0 " + status + " " + reason + "\n");
+			var headerString = "HTTP/1.0 " + status + " " + reason + "\n";
 			for (var i in headers) {
-				client.write(i + ": " + headers[i] + "\n");
+				headerString += i + ": " + headers[i] + "\n";
 			}
-			client.write("\n");
+			headerString += "\n";
+			_started = true;
+			client.write(headerString);
 		},
-		/*write: function(data) {
-			client.write(data);
-		},*/
 		end: function(data) {
+			if (_finished) {
+				throw new Error("Response.end called multiple times.");
+			}
 			if (data) {
 				client.write(data);
 			}
+			_finished = true;
 			client.shutdown();
+		},
+		reportError: function(error) {
+			if (!_started) {
+				client.write("HTTP/1.0 500 Internal Server Error\nContent-Type: text/plain\n\n");
+			}
+			if (!_finished) {
+				client.write("500 Internal Server Error\n\n" + error.stackTrace);
+				client.shutdown();
+			}
 		},
 		isConnected: function() { return client.isConnected; },
 	};
@@ -107,7 +124,9 @@ function handleRequest(request, response) {
 	}
 
 	if (handler) {
-		handler.invoke(request, response);
+		handler.invoke(request, response).catch(function(error) {
+			response.reportError(error);
+		});
 	} else {
 		response.writeHead(200, {"Content-Type": "text/plain; encoding=utf-8", "Connection": "close"});
 		response.end("No handler found for request: " + request.uri);
@@ -123,7 +142,7 @@ function handleConnection(client) {
 	var body;
 
 	function finish() {
-		handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client));
+		handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client))
 	}
 
 	function handleLine(line, length) {
