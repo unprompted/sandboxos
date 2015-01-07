@@ -218,27 +218,33 @@ socket.bind("0.0.0.0", 12345).then(function() {
 	runServer(socket);
 });
 
-/*
-function runSecureServer(socket) {
-	var privateKey = File.readFile("privatekey.pem");
-	var certificate = File.readFile("certificate.pem")
-	var listenResult = socket.listen(kBacklog, function() {
-		var client = socket.accept();
-		handleConnection(client);
-		client.startTls(privateKey, certificate).catch(function(e) {
-			print("tls failed: " + e);
-		});
-	});
-	if (listenResult !== 0) {
-		throw new Error("listen failed: " + listenResult);
-	}
-}
+imports.filesystem.getPackageData().then(function(fs) {
+	return Promise.all([
+		fs.readFile("privatekey.pem"),
+		fs.readFile("certificate.pem"),
+	]);
+}).then(function(files) {
+	var privateKey = files[0];
+	var certificate = files[1];
 
-var secureSocket = new Socket();
-secureSocket.bind("0.0.0.0", 12346).then(function() {
-	runSecureServer(secureSocket);
+	if (privateKey && certificate) {
+		var secureSocket = new Socket();
+		secureSocket.bind("0.0.0.0", 12346).then(function() {
+			var listenResult = secureSocket.listen(kBacklog, function() {
+				var client = secureSocket.accept();
+				handleConnection(client);
+				client.startTls(privateKey, certificate).catch(function(e) {
+					print("tls failed: " + e);
+				});
+			});
+			if (listenResult !== 0) {
+				throw new Error("listen failed: " + listenResult);
+			}
+		});
+	}
+}).catch(function(error) {
+	print("httpd => " + error);
 });
-*/
 
 exports = {
 	all: all,
