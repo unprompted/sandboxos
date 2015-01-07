@@ -1,5 +1,10 @@
 var gHandlers = [];
 
+function logError(error) {
+	print("ERROR " + error);
+	imports.log.append("ERROR " + error);
+}
+
 function addHandler(handler) {
 	var added = false;
 	for (var i in gHandlers) {
@@ -111,6 +116,7 @@ function Response(client) {
 				client.write("500 Internal Server Error\n\n" + error.stackTrace);
 				client.shutdown();
 			}
+			logError(client.peerName + " - - [" + new Date() + "] " + error);
 		},
 		isConnected: function() { return client.isConnected; },
 	};
@@ -142,7 +148,12 @@ function handleConnection(client) {
 	var body;
 
 	function finish() {
-		handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client))
+		var response = new Response(client);
+		try {
+			handleRequest(new Request(request[0], request[1], request[2], headers, body, client), response)
+		} catch (error) {
+			response.reportError(error);
+		}
 	}
 
 	function handleLine(line, length) {
@@ -163,7 +174,7 @@ function handleConnection(client) {
 					body = "";
 					return true;
 				} else {
-					handleRequest(new Request(request[0], request[1], request[2], headers, body, client), new Response(client));
+					finish();
 					return false;
 				}
 			}
@@ -175,6 +186,10 @@ function handleConnection(client) {
 			}
 		}
 	}
+
+	client.onError(function(error) {
+		imports.log.append("ERROR " + client.peerName + " - - [" + new Date() + "] " + error);
+	});
 
 	client.read(function(data) {
 		if (data) {
@@ -203,19 +218,19 @@ function handleConnection(client) {
 }
 
 var kBacklog = 8;
-
-function runServer(socket) {
-	var listenResult = socket.listen(kBacklog, function() {
-		handleConnection(socket.accept());
-	});
-	if (listenResult !== 0) {
-		throw new Error("listen failed: " + listenResult);
-	}
-}
+var kHost = "0.0.0.0"
+var kHttpPort = 12345;
+var kHttpsPort = 12346;
 
 var socket = new Socket();
-socket.bind("0.0.0.0", 12345).then(function() {
-	runServer(socket);
+socket.bind(kHost, kHttpPort).then(function() {
+	var listenResult = socket.listen(kBacklog, function() {
+		socket.accept().then(handleConnection).catch(function(error) {
+			logError("[" + new Date() + "] " + error);
+		});
+	});
+}).catch(function(error) {
+	logError("[" + new Date() + "] " + error);
 });
 
 imports.filesystem.getPackageData().then(function(fs) {
@@ -229,21 +244,21 @@ imports.filesystem.getPackageData().then(function(fs) {
 
 	if (privateKey && certificate) {
 		var secureSocket = new Socket();
-		secureSocket.bind("0.0.0.0", 12346).then(function() {
-			var listenResult = secureSocket.listen(kBacklog, function() {
-				var client = secureSocket.accept();
-				handleConnection(client);
-				client.startTls(privateKey, certificate).catch(function(e) {
-					print("tls failed: " + e);
+		return secureSocket.bind(kHost, kHttpsPort).then(function() {
+			secureSocket.listen(kBacklog, function() {
+				secureSocket.accept().then(function(client) {
+					handleConnection(client);
+					client.startTls(privateKey, certificate).catch(function(error) {
+						logError("[" + new Date() + "] [" + client.peerName + "] " + error);
+					});
+				}).catch(function(error) {
+					logError("[" + new Date() + "] " + error);
 				});
 			});
-			if (listenResult !== 0) {
-				throw new Error("listen failed: " + listenResult);
-			}
 		});
 	}
 }).catch(function(error) {
-	print("httpd => " + error);
+	logError("[" + new Date() + "] " + error);
 });
 
 exports = {

@@ -28,6 +28,8 @@ public:
 
 	void setHostname(const char* hostname) override;
 
+	bool getError(char* buffer, size_t bytes) override;
+
 private:
 	bool verifyPeerCertificate();
 	bool verifyHostname(X509* certificate, const char* hostname);
@@ -195,6 +197,14 @@ bool Tls_openssl::verifyHostname(X509* certificate, const char* hostname) {
 		}
 	}
 	return verified;
+}
+
+bool Tls_openssl::getError(char* buffer, size_t bytes) {
+	unsigned long error = ERR_get_error();
+	if (error != 0) {
+		ERR_error_string_n(error, buffer, bytes);
+	}
+	return error != 0;
 }
 
 Tls* Tls::create(const char* key, const char* certificate) {

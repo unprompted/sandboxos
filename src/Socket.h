@@ -41,6 +41,7 @@ private:
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onConnect;
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onRead;
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onError;
 
 	static void startTls(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void stopTls(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -51,6 +52,7 @@ private:
 	static void close(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void shutdown(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void read(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void onError(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void write(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
@@ -69,6 +71,8 @@ private:
 	static void onRelease(const v8::WeakCallbackData<v8::Object, Socket>& data);
 
 	void processOutgoingTls();
+	void reportTlsErrors();
+	void reportError(const char* error);
 
 	void ref();
 	void release();

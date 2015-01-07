@@ -30,6 +30,8 @@ public:
 	virtual int writeEncrypted(const char* buffer, size_t bytes) = 0;
 
 	virtual void setHostname(const char* hostname) = 0;
+
+	virtual bool getError(char* buffer, size_t bytes) { return false; }
 };
 
 #endif

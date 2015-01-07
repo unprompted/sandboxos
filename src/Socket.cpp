@@ -32,6 +32,7 @@ Socket::Socket(Task* task) {
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "shutdown"), v8::FunctionTemplate::New(task->getIsolate(), shutdown));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "onError"), v8::FunctionTemplate::New(task->getIsolate(), onError));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write));
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName);
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "isConnected"), isConnected);
@@ -60,6 +61,23 @@ void Socket::close() {
 			_onRead.Reset();
 		}
 		uv_close(reinterpret_cast<uv_handle_t*>(&_socket), onClose);
+	}
+}
+
+void Socket::reportError(const char* error) {
+	v8::Handle<v8::Value> exception = v8::Exception::Error(v8::String::NewFromUtf8(_task->getIsolate(), error));
+	if (!_onError.IsEmpty()) {
+		v8::Handle<v8::Function> callback = v8::Local<v8::Function>::New(_task->getIsolate(), _onError);
+		callback->Call(callback, 1, &exception);
+	} else {
+		_task->getIsolate()->ThrowException(exception);
+	}
+}
+
+void Socket::reportTlsErrors() {
+	char buffer[4096];
+	while (_tls && _tls->getError(buffer, sizeof(buffer))) {
+		reportError(buffer);
 	}
 }
 
@@ -123,9 +141,11 @@ void Socket::processOutgoingTls() {
 
 			int writeResult = uv_write(request, reinterpret_cast<uv_stream_t*>(&_socket), &writeBuffer, 1, onWrite);
 			if (writeResult != 0) {
-				std::cerr << "uv_write1 failed " << uv_strerror(writeResult) << "\n";
+				std::string error = "uv_write: " + std::string(uv_strerror(writeResult));
+				reportError(error.c_str());
 			}
 		} else {
+			reportTlsErrors();
 			break;
 		}
 	}
@@ -242,9 +262,18 @@ void Socket::onConnect(uv_connect_t* request, int status) {
 void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		int backlog = args[0]->ToInteger()->Value();
-		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
-		socket->_onConnect = callback;
-		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection)));
+		if (socket->_onConnect.IsEmpty()) {
+			v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
+			socket->_onConnect = callback;
+			int result = uv_listen(reinterpret_cast<uv_stream_t*>(&socket->_socket), backlog, onNewConnection);
+			if (result != 0) {
+				std::string error = "uv_listen: " + std::string(uv_strerror(result));
+				args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), error.c_str(), v8::String::kNormalString, error.size())));
+			}
+			args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), result));
+		} else {
+			args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "listen: Already listening.")));
+		}
 	}
 }
 
@@ -264,14 +293,19 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::HandleScope handleScope(args.GetIsolate());
 		Socket* client = new Socket(socket->_task);
 		client->_direction = kAccept;
+		promiseid_t promise = socket->_task->allocatePromise();
+		v8::Handle<v8::Value> promiseObject = socket->_task->getPromise(promise);
 		v8::Handle<v8::Object> result = v8::Local<v8::Object>::New(args.GetIsolate(), client->_object);
-		args.GetReturnValue().Set(result);
-		client->release();
-		if (uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&client->_socket)) == 0) {
+		int status = uv_accept(reinterpret_cast<uv_stream_t*>(&socket->_socket), reinterpret_cast<uv_stream_t*>(&client->_socket));
+		if (status == 0) {
 			client->_connected = true;
+			socket->_task->resolvePromise(promise, result);
 		} else {
-			std::cerr << "uv_accept failed\n";
+			std::string error = "uv_accept: " + std::string(uv_strerror(status));
+			socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(args.GetIsolate(), error.c_str(), v8::String::kNormalString, error.size()));
 		}
+		args.GetReturnValue().Set(promiseObject);
+		client->release();
 	}
 }
 
@@ -309,12 +343,24 @@ void Socket::shutdown(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
+void Socket::onError(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	if (Socket* socket = Socket::get(args.This())) {
+		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
+		socket->_onError = callback;
+	}
+}
+
 void Socket::read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.This())) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
 		socket->_onRead = callback;
-		if (uv_read_start(reinterpret_cast<uv_stream_t*>(&socket->_socket), allocateBuffer, onRead) != 0) {
-			std::cerr << "uv_read_start failed\n";
+		int result = uv_read_start(reinterpret_cast<uv_stream_t*>(&socket->_socket), allocateBuffer, onRead);
+		promiseid_t promise = socket->_task->allocatePromise();
+		if (result != 0) {
+			std::string error = "uv_read_start: " + std::string(uv_strerror(result));
+			socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str(), v8::String::kNormalString, error.size()));
+		} else {
+			socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
 		}
 	}
 }
@@ -339,6 +385,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 			socket->close();
 		} else {
 			if (socket->_tls) {
+				socket->reportTlsErrors();
 				socket->_tls->writeEncrypted(buffer->base, readSize);
 				if (socket->_startTlsPromise != -1) {
 					Tls::HandshakeResult result = socket->_tls->handshake();
@@ -349,7 +396,12 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 					} else if (result == Tls::kFailed) {
 						promiseid_t promise = socket->_startTlsPromise;
 						socket->_startTlsPromise = -1;
-						socket->_task->rejectPromise(promise, v8::Undefined(socket->_task->getIsolate()));
+						char buffer[8192];
+						if (socket->_tls->getError(buffer, sizeof(buffer))) {
+							socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), buffer));
+						} else {
+							socket->_task->rejectPromise(promise, v8::Undefined(socket->_task->getIsolate()));
+						}
 					}
 				} else {
 					while (true) {
@@ -362,6 +414,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 								callback->Call(callback, 1, &data);
 							}
 						} else if (result == Tls::kReadFailed) {
+							socket->reportTlsErrors();
 							socket->close();
 							break;
 						} else if (result == Tls::kReadZero) {
@@ -399,9 +452,17 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		if (!value.IsEmpty() && value->IsString()) {
 			if (socket->_tls) {
 				v8::String::Utf8Value utf8(value);
+				socket->reportTlsErrors();
 				int result = socket->_tls->writePlain(*utf8, utf8.length());
+				char buffer[8192];
+				if (result <= 0 && socket->_tls->getError(buffer, sizeof(buffer))) {
+					socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(args.GetIsolate(), buffer));
+				} else if (result < utf8.length()) {
+					socket->_task->rejectPromise(promise, v8::Integer::New(socket->_task->getIsolate(), result));
+				} else {
+					socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), result));
+				}
 				socket->processOutgoingTls();
-				socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), result));
 			} else {
 				int valueLength = value->Utf8Length();
 				char* rawBuffer = new char[sizeof(uv_write_t) + valueLength];
@@ -414,8 +475,10 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 				buffer.len = valueLength;
 
 				request->data = reinterpret_cast<void*>(promise);
-				if (uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &buffer, 1, onWrite) != 0) {
-					std::cerr << "uv_write2 failed " << valueLength << "\n";
+				int result = uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &buffer, 1, onWrite);
+				if (result != 0) {
+					std::string error = "uv_write: " + std::string(uv_strerror(result));
+					socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(args.GetIsolate(), error.c_str(), v8::String::kNormalString, error.size()));
 				}
 			}
 		} else {
@@ -429,7 +492,12 @@ void Socket::onWrite(uv_write_t* request, int status) {
 		v8::HandleScope handleScope(socket->_task->getIsolate());
 		promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
 		if (promise != -1) {
-			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
+			if (status == 0) {
+				socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
+			} else {
+				std::string error = "uv_write: " + std::string(uv_strerror(status));
+				socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str(), v8::String::kNormalString, error.size()));
+			}
 		}
 	}
 	delete[] reinterpret_cast<char*>(request);
