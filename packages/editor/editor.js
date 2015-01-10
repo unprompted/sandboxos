@@ -62,6 +62,19 @@ function getWorkspace(auth, packageName, create) {
 	});
 }
 
+function copyToWorkspace(auth, from, to) {
+	return Promise.all([
+		imports.filesystem.getPackage(from),
+		imports.filesystem.getPackageData().then(function(fs) {
+			return fs.ensureDirectoryTreeExists(auth.session.name + "/" + to).then(function() {
+				return fs.chroot(auth.session.name + "/" + to);
+			});
+		}),
+	]).then(function(filesystems) {
+		return imports.filesystem.copy(filesystems[0], filesystems[1]);
+	});
+}
+
 function sessionHandler(request, response, auth) {
 	var handled = false;
 	var match;
@@ -71,8 +84,24 @@ function sessionHandler(request, response, auth) {
 			match = file;
 		}
 	}
-	if (new RegExp("^/editor/[^/]+/$").exec(request.uri)) {
-		match = {path: "package.html", type: "text/html"};
+	if (!match) {
+		match = new RegExp("^/editor/([^/]+)/$").exec(request.uri);
+		if (match) {
+			var clone = decodeForm(request.query).clone;
+			if (clone) {
+				print("cloning " + clone + " to " + match[1]);
+				return copyToWorkspace(auth, clone, match[1]).then(function(result) {
+					packageFs.readFile("package.html").then(function(contents) {
+						response.writeHead(200, {"Content-Type": match.type, "Connection": "close", "Content-Length": contents.length});
+						response.end(contents);
+					});
+				}).catch(function(error) {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.end(JSON.stringify(error.toString()));
+				});
+			}
+			match = {path: "package.html", type: "text/html"};
+		}
 	}
 	if (match) {
 		packageFs.readFile(match.path).then(function(contents) {
@@ -151,18 +180,9 @@ function sessionHandler(request, response, auth) {
 					response.end(JSON.stringify(error.toString()));
 				});
 			} else if (action == "copyToWorkspace") {
-				Promise.all([
-					imports.filesystem.getPackage(packageName),
-					imports.filesystem.getPackageData().then(function(fs) {
-						return fs.ensureDirectoryTreeExists(auth.session.name + "/" + packageName).then(function() {
-							return fs.chroot(auth.session.name + "/" + packageName);
-						});
-					}),
-				]).then(function(filesystems) {
-					return imports.filesystem.copy(filesystems[0], filesystems[1]);
-				}).then(function(v) {
+				copyToWorkspace(auth, packageName, packageName).then(function(result) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-					response.end("copied");
+					response.end(JSON.stringify(result));
 				}).catch(function(error) {
 					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end(JSON.stringify(error.toString()));

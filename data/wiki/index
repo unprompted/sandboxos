@@ -1,90 +1,50 @@
-= Building an Operating System for the Web =
+= SandboxOS =
 
 I embedded a JavaScript engine in a C++ application and used it to make some webapps.  I made a wiki with it.  That is what you are looking at.  It's not especially good, but the interesting part is that you, as a visitor to this web site, have the power to rewrite the wiki webapp itself into something better.
 
-{{{
-#!html
-<div style="width: 300px; float: left; padding: 1em">
-	<h1>Security +</h1>
-	<p>Webapps here are built out of smaller tasks.</p>
-	<p>Each task runs in its own process just like tabs in the <a href="http://www.chromium.org/developers/design-documents/sandbox">Google Chrome</a> web browser.</p>
-	<p>Each task declares and is granted access to only what resources it needs just like <a href="http://www.veracode.com/resources/android-ios-security">apps on a mobile device</a>.</p>
-	<p>Sensible limits on access to resources will prevent any one task from negatively affecting others.</p>
-</div>
-<div style="width: 300px; float: left; padding: 1em">
-	<h1>Sharing</h1>
-	<p>This is open source.  Browse or branch it <a href="https://github.com/unprompted/sandboxos">from here</a>.</p>
-	<p>All tasks are yours to improve.  Clone any task on this server or your own, make it better, and then share what you made, all from a browser.</p>
-	<p>Let's get many instances of this all talking to each other just like popular social networks don't.</p>
-</div>
-<div style="width: 300px; float: left; padding: 1em">
-	<h1>= Power?</h1>
-	<p>This is another experimental approach at executing on the <a href="http://en.wikipedia.org/wiki/Unix_philosophy">UNIX philosophy</a>.</p>
-	<p>This can become an extension of your web browser, but since it's a separate application under your control, it can have extra access to system resources while still benefitting your browser(s) of choice.</p>
-	<p>Make the web browser the next terminal.</p>
-</div>
-<div style="width: 300px; float: left; padding: 1em">
-	<h1>// The Architecture</h1>
-	<table border="0">
-		<tr>
-			<td colspan="5">Web Browsers (Chrome, Firefox, ...)</td>
-		</tr>
-		<tr>
-			<td style="background-color: #ccf">httpd</td>
-			<td style="background-color: #ccf">auth</td>
-			<td style="background-color: #ccf">wiki</td>
-			<td style="background-color: #ccf">chat</td>
-			<td style="background-color: #ccf">...<div><small>(more JavaScript tasks)</small></div></td>
-		</tr>
-		<tr>
-			<td colspan="5" style="background-color: #ccf">system.js<div><small>(core task)</small></div></td>
-		</tr>
-		<tr>
-			<td colspan="5" style="background-color: #ccf">sandboxos<div><small>(working title, small C++ program that mediates tasks running JavaScript code with the layers below)</small></div></td>
-		</tr>
-		<tr>
-			<td colspan="5"><a href="https://code.google.com/p/v8/">V8</a><div><small>(Google's open source JavaScript engine)</small></div></td>
-		</tr>
-		<tr>
-			<td colspan="5"><a href="https://github.com/libuv/libuv">libuv</a><div><small>(cross platform asynchronous I/O library)</small></div></td>
-		</tr>
-		<tr>
-			<td>Linux</td>
-			<td>Windows</td>
-			<td>OS X</td>
-			<td>Android</td>
-			<td>iOS<div><small>(jailbroken only?)</small></div></td>
-		</tr>
-		<tr>
-			<td colspan="3">PC</td>
-			<td colspan="2">Mobile Device</td>
-		</tr>
-	</table>
-</div>
-<div style="clear: both"></div>
-}}}
+== Goals ==
+I've tried writing lofty descriptions about why I think this is cool, but I'm bad at that part.
 
-= How to Get Started =
+Goals include:
+
+=== 1. Make it easy to run servers. ===
+ * SandboxOS can be made to run on lots of platforms.
+ * SandboxOS can be made trivial to install.  I want to put it in app stores.
+ * SandboxOS is an app store in itself, so think "installing blogging software == installing a mobile game".  And then think of a webapp that is 10x better than that.
+=== 2. Make a thing that is by default pretty secure. ===
+ * Actual access to most system resources (filesystem + network, currently) is restricted to a few apps that hand it out in very limited ways.
+ * Apps will only get access to resources when granted by the user.  Think iOS or Android.
+ * The idea is that it can be made as secure as Google Chrome.  It currently uses V8 and process isolation, but there's a lot more to do.  In the end I want to trust installing random apps as much as or more than I trust visiting shady web sites.
+ * But security is nothing if you can't do cool stuff.  I want to make weird social music players and things to manipulate photos on my phone from my desktop.
+=== 3. Free software idealism ===
+ * This is Wikipedia but for apps?
+ * Make distributed versions of things that Google/Apple/Facebook dominate?
+ * Something about software architecture and making small tools that fit together to do neat things.
+=== 4. Fun ===
+ * I get a kick out of making all of this stuff from scratch.  The stack is getting pretty high, and it's just getting started.
+ * This hopefully lowers the barrier to entry to making little webapps, since you can use my server and make something with ~2 files that you edited like something on Google Docs.
+
+== How to Get Started ==
 
 {{{
 #!html
 <ol>
 <li>Visit the <a href="/tasks">/tasks</a> page.</li>
 <li>Pick a task (hint: consider <b>helloworld</b>, <b>wiki</b>, or <b>chat</b>).  Click edit.  You will probably have to log in at this point.</li>
-<li>Clone it.</li>
 <li>Make modifications.</li>
-<li>Visit the task's frontend in a web browser and refresh it to see your changes.</li>
-<li>Ask questions.  Either stick them here on the wiki somewhere, or email me at <a href="mailto:sandbox@unprompted.com">sandbox@unprompted.com</a>.</li>
+<li>Click install.</li>
+<li>Visit your updated task's URL and see it updated.</li>
+<li>Ask questions.  Either stick them here on the wiki somewhere, or email <a href="mailto:sandbox@unprompted.com">Cory</a>.</li>
 </ol>
 }}}
 
 It should be difficult to do anything too disruptive, and there are backups if you do.  '''Don't worry about breaking things.'''
 
-It's easy to make things fail silently.  I will be working on improving that.  '''Use the log task.'''
+It's easy to make things fail silently.  I'm starting to improve that.  '''Use the log task.'''
 
 There are probably ways to do bad things if you try hard.  '''Please don't be mean.'''
 
-= TODO =
+== TODO ==
 In no particular order:
  * Set limits for everything.  n anonymous users can each make m tasks with p MB of storage and can make q HTTP request per second.
  * Make some sort of TODO / bug tracker to replace this task list.

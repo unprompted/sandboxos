@@ -134,6 +134,21 @@ function handleNewData(data) {
 
 		$("#tasks").append(div);
 	}
+
+	div = document.createElement("div");
+	$(div).addClass("package");
+	var aDiv = document.createElement("a");
+	$(aDiv).text("Create a new task");
+	$(aDiv).attr("href", "#");
+	$(aDiv).addClass("link");
+	$(aDiv).click(function() {
+		var name = prompt("Enter name of new task:");
+		if (name) {
+			window.location.href = "/editor/" + encodeURIComponent(name) + "/?clone=helloworld";
+		}
+	});
+	$(div).append(aDiv);
+	$("#tasks").append(div);
 }
 
 function refresh() {
