@@ -18,8 +18,7 @@ static const int STDERR_FILENO = 2;
 #include <unistd.h>
 #endif
 
-TaskStub::TaskStub(v8::Isolate* isolate, v8::Handle<v8::Object> taskObject)
-:	_taskObject(isolate, taskObject) {
+TaskStub::TaskStub() {
 	std::memset(&_process, 0, sizeof(_process));
 }
 
@@ -46,7 +45,8 @@ TaskStub* TaskStub::createParent(Task* task, uv_file file) {
 	parentTemplate->SetInternalFieldCount(1);
 
 	v8::Handle<v8::Object> parentObject = parentTemplate->NewInstance();
-	TaskStub* parentStub = new TaskStub(task->_isolate, v8::Local<v8::Object>::New(task->_isolate, parentObject));
+	TaskStub* parentStub = new TaskStub();
+	parentStub->_taskObject.Reset(task->_isolate, v8::Local<v8::Object>::New(task->_isolate, parentObject));
 	parentObject->SetInternalField(0, v8::External::New(task->_isolate, parentStub));
 	parentStub->_owner = task;
 	parentStub->_id = Task::kParentId;
@@ -67,19 +67,22 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	Task* parent = Task::get(args.GetIsolate());
 	v8::HandleScope scope(args.GetIsolate());
 
+	TaskStub* stub = new TaskStub();
+	v8::Handle<v8::External> data = v8::External::New(args.GetIsolate(), stub);
+
 	v8::Handle<v8::ObjectTemplate> taskTemplate = v8::ObjectTemplate::New(args.GetIsolate());
-	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "trusted"), getTrusted, setTrusted);
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "setImports"), v8::FunctionTemplate::New(args.GetIsolate(), setImports));
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "getExports"), v8::FunctionTemplate::New(args.GetIsolate(), getExports));
-	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "onExit"), getOnExit, setOnExit);
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "activate"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::activate));
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute));
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill));
-	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "statistics"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::statistics));
+	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "trusted"), getTrusted, setTrusted, data);
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "setImports"), v8::FunctionTemplate::New(args.GetIsolate(), setImports, data));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "getExports"), v8::FunctionTemplate::New(args.GetIsolate(), getExports, data));
+	taskTemplate->SetAccessor(v8::String::NewFromUtf8(args.GetIsolate(), "onExit"), getOnExit, setOnExit, data);
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "activate"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::activate, data));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "execute"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::execute, data));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "kill"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::kill, data));
+	taskTemplate->Set(v8::String::NewFromUtf8(args.GetIsolate(), "statistics"), v8::FunctionTemplate::New(args.GetIsolate(), TaskStub::statistics, data));
 	taskTemplate->SetInternalFieldCount(1);
 
 	v8::Handle<v8::Object> taskObject = taskTemplate->NewInstance();
-	TaskStub* stub = new TaskStub(args.GetIsolate(), taskObject);
+	stub->_taskObject.Reset(args.GetIsolate(), taskObject);
 	taskObject->SetInternalField(0, v8::External::New(args.GetIsolate(), stub));
 	stub->_owner = parent;
 
@@ -156,18 +159,18 @@ void TaskStub::onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data)
 }
 
 void TaskStub::getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
-	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), false /*TaskStub::get(args.This())->_task->_trusted)*/));
+	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), false /*TaskStub::get(args.Data())->_task->_trusted)*/));
 }
 
 void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		bool trusted = value->BooleanValue();
 		stub->_stream.send(kSetTrusted, reinterpret_cast<char*>(&trusted), sizeof(trusted));
 	}
 }
 
 void TaskStub::getExports(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		TaskTryCatch tryCatch(stub->_owner);
 		v8::HandleScope scope(args.GetIsolate());
 
@@ -178,7 +181,7 @@ void TaskStub::getExports(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::setImports(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		std::vector<char> buffer;
 		Serialize::store(Task::get(args.GetIsolate()), buffer, args[0]);
 		stub->_stream.send(kSetImports, &*buffer.begin(), buffer.size());
@@ -186,20 +189,20 @@ void TaskStub::setImports(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::getOnExit(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
-	TaskTryCatch tryCatch(TaskStub::get(args.This())->_owner);
+	TaskTryCatch tryCatch(TaskStub::get(args.Data())->_owner);
 	v8::HandleScope scope(args.GetIsolate());
-	args.GetReturnValue().Set(v8::Local<v8::Function>::New(args.GetIsolate(), TaskStub::get(args.This())->_onExit));
+	args.GetReturnValue().Set(v8::Local<v8::Function>::New(args.GetIsolate(), TaskStub::get(args.Data())->_onExit));
 }
 
 void TaskStub::setOnExit(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
-	TaskTryCatch tryCatch(TaskStub::get(args.This())->_owner);
+	TaskTryCatch tryCatch(TaskStub::get(args.Data())->_owner);
 	v8::HandleScope scope(args.GetIsolate());
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), v8::Handle<v8::Function>::Cast(value));
-	TaskStub::get(args.This())->_onExit = function;
+	TaskStub::get(args.Data())->_onExit = function;
 }
 
-TaskStub* TaskStub::get(v8::Handle<v8::Object> object) {
-	return reinterpret_cast<TaskStub*>(v8::Handle<v8::External>::Cast(object->GetInternalField(0))->Value());
+TaskStub* TaskStub::get(v8::Handle<v8::Value> object) {
+	return reinterpret_cast<TaskStub*>(v8::Handle<v8::External>::Cast(object)->Value());
 }
 
 v8::Handle<v8::Object> TaskStub::getTaskObject() {
@@ -207,7 +210,7 @@ v8::Handle<v8::Object> TaskStub::getTaskObject() {
 }
 
 void TaskStub::activate(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		TaskTryCatch tryCatch(stub->_owner);
 		v8::HandleScope scope(args.GetIsolate());
 		v8::String::Utf8Value fileName(args[0]->ToString(args.GetIsolate()));
@@ -216,7 +219,7 @@ void TaskStub::activate(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		TaskTryCatch tryCatch(stub->_owner);
 		v8::HandleScope scope(args.GetIsolate());
 
@@ -227,13 +230,13 @@ void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		stub->_stream.send(kKill, 0, 0);
 	}
 }
 
 void TaskStub::statistics(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (TaskStub* stub = TaskStub::get(args.This())) {
+	if (TaskStub* stub = TaskStub::get(args.Data())) {
 		TaskTryCatch tryCatch(stub->_owner);
 		v8::HandleScope scope(args.GetIsolate());
 

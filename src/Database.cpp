@@ -12,12 +12,14 @@ Database::Database(Task* task) {
 
 	_task = task;
 
+	v8::Handle<v8::External> data = v8::External::New(task->getIsolate(), this);
+
 	v8::Local<v8::ObjectTemplate> databaseTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	databaseTemplate->SetInternalFieldCount(1);
-	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "get"), v8::FunctionTemplate::New(task->getIsolate(), get));
-	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "set"), v8::FunctionTemplate::New(task->getIsolate(), set));
-	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "remove"), v8::FunctionTemplate::New(task->getIsolate(), remove));
-	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "getAll"), v8::FunctionTemplate::New(task->getIsolate(), getAll));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "get"), v8::FunctionTemplate::New(task->getIsolate(), get, data));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "set"), v8::FunctionTemplate::New(task->getIsolate(), set, data));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "remove"), v8::FunctionTemplate::New(task->getIsolate(), remove, data));
+	databaseTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "getAll"), v8::FunctionTemplate::New(task->getIsolate(), getAll, data));
 
 	v8::Local<v8::Object> databaseObject = databaseTemplate->NewInstance();
 	databaseObject->SetInternalField(0, v8::External::New(task->getIsolate(), this));
@@ -84,7 +86,7 @@ bool Database::open(v8::Isolate* isolate, const char* path) {
 }
 
 void Database::get(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Database* database = Database::get(args.This())) {
+	if (Database* database = Database::get(args.Data())) {
 		int result = mdb_txn_begin(database->_environment, 0, MDB_RDONLY, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
@@ -101,7 +103,7 @@ void Database::get(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Database::set(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Database* database = Database::get(args.This())) {
+	if (Database* database = Database::get(args.Data())) {
 		int result = mdb_txn_begin(database->_environment, 0, 0, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
@@ -120,7 +122,7 @@ void Database::set(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Database::remove(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Database* database = Database::get(args.This())) {
+	if (Database* database = Database::get(args.Data())) {
 		int result = mdb_txn_begin(database->_environment, 0, 0, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_val key;
@@ -135,7 +137,7 @@ void Database::remove(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Database::getAll(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Database* database = Database::get(args.This())) {
+	if (Database* database = Database::get(args.Data())) {
 		int result = mdb_txn_begin(database->_environment, 0, MDB_RDONLY, &database->_transaction);
 		if (!database->checkError("mdb_txn_begin", result)) {
 			MDB_cursor* cursor;
@@ -183,6 +185,6 @@ void Database::release() {
 	}
 }
 
-Database* Database::get(v8::Handle<v8::Object> databaseObject) {
-	return reinterpret_cast<Database*>(v8::Handle<v8::External>::Cast(databaseObject->GetInternalField(0))->Value());
+Database* Database::get(v8::Handle<v8::Value> databaseObject) {
+	return reinterpret_cast<Database*>(v8::Handle<v8::External>::Cast(databaseObject)->Value());
 }

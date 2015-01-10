@@ -1,0 +1,9 @@
+#!/bin/bash
+
+cat > test.js << EOF
+var task = new Task();
+task.activate.bind(null).apply();
+exit(0);
+EOF
+
+$SANDBOXOS test.js

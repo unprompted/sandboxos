@@ -25,7 +25,7 @@ private:
 
 	static int _count;
 
-	static Database* get(v8::Handle<v8::Object> databaseObject);
+	static Database* get(v8::Handle<v8::Value> databaseObject);
 	static void onRelease(const v8::WeakCallbackData<v8::Object, Database>& data);
 
 	static void get(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -33,9 +33,9 @@ private:
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onExit;
 
-	TaskStub(v8::Isolate* isolate, v8::Handle<v8::Object> taskObject);
+	TaskStub();
 
-	static TaskStub* get(v8::Handle<v8::Object> object);
+	static TaskStub* get(v8::Handle<v8::Value> object);
 
 	static void getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);

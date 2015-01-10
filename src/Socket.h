@@ -57,7 +57,7 @@ private:
 	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
-	static Socket* get(v8::Handle<v8::Object> socketObject);
+	static Socket* get(v8::Handle<v8::Value> socketObject);
 	static void onClose(uv_handle_t* handle);
 	static void onShutdown(uv_shutdown_t* request, int status);
 	static void onResolvedForBind(uv_getaddrinfo_t* resolver, int status, struct addrinfo* result);

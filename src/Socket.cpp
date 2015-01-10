@@ -21,21 +21,23 @@ Socket::Socket(Task* task) {
 	v8::HandleScope scope(task->getIsolate());
 	++_count;
 
+	v8::Handle<v8::External> data = v8::External::New(task->getIsolate(), this);
+
 	v8::Local<v8::ObjectTemplate> socketTemplate = v8::ObjectTemplate::New(task->getIsolate());
 	socketTemplate->SetInternalFieldCount(1);
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "connect"), v8::FunctionTemplate::New(task->getIsolate(), connect));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "startTls"), v8::FunctionTemplate::New(task->getIsolate(), startTls));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "stopTls"), v8::FunctionTemplate::New(task->getIsolate(), stopTls));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "shutdown"), v8::FunctionTemplate::New(task->getIsolate(), shutdown));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "onError"), v8::FunctionTemplate::New(task->getIsolate(), onError));
-	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write));
-	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName);
-	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "isConnected"), isConnected);
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "bind"), v8::FunctionTemplate::New(task->getIsolate(), bind, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "connect"), v8::FunctionTemplate::New(task->getIsolate(), connect, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "listen"), v8::FunctionTemplate::New(task->getIsolate(), listen, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "accept"), v8::FunctionTemplate::New(task->getIsolate(), accept, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "startTls"), v8::FunctionTemplate::New(task->getIsolate(), startTls, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "stopTls"), v8::FunctionTemplate::New(task->getIsolate(), stopTls, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "shutdown"), v8::FunctionTemplate::New(task->getIsolate(), shutdown, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "close"), v8::FunctionTemplate::New(task->getIsolate(), close, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "read"), v8::FunctionTemplate::New(task->getIsolate(), read, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "onError"), v8::FunctionTemplate::New(task->getIsolate(), onError, data));
+	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write, data));
+	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName, 0, data);
+	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "isConnected"), isConnected, 0, data);
 
 	v8::Local<v8::Object> socketObject = socketTemplate->NewInstance();
 	socketObject->SetInternalField(0, v8::External::New(task->getIsolate(), this));
@@ -82,7 +84,7 @@ void Socket::reportTlsErrors() {
 }
 
 void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		if (!socket->_tls) {
 			v8::Handle<v8::String> keyString = args[0]->ToString(args.GetIsolate());
 			v8::Handle<v8::String> certificateString = args[1]->ToString(args.GetIsolate());
@@ -112,7 +114,7 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Socket::stopTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		if (socket->_tls) {
 			socket->processOutgoingTls();
 			delete socket->_tls;
@@ -152,7 +154,7 @@ void Socket::processOutgoingTls() {
 }
 
 void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		v8::String::Utf8Value node(args[0]->ToString());
 		v8::String::Utf8Value port(args[1]->ToString());
 
@@ -196,7 +198,7 @@ void Socket::onResolvedForBind(uv_getaddrinfo_t* resolver, int status, struct ad
 }
 
 void Socket::connect(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		socket->_direction = kConnect;
 		v8::String::Utf8Value node(args[0]->ToString());
 		v8::String::Utf8Value port(args[1]->ToString());
@@ -260,7 +262,7 @@ void Socket::onConnect(uv_connect_t* request, int status) {
 }
 
 void Socket::listen(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		int backlog = args[0]->ToInteger()->Value();
 		if (socket->_onConnect.IsEmpty()) {
 			v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[1].As<v8::Function>());
@@ -289,7 +291,7 @@ void Socket::onNewConnection(uv_stream_t* server, int status) {
 }
 
 void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		v8::HandleScope handleScope(args.GetIsolate());
 		Socket* client = new Socket(socket->_task);
 		client->_direction = kAccept;
@@ -310,7 +312,7 @@ void Socket::accept(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		if (socket->_closePromise == -1) {
 			socket->_closePromise = socket->_task->allocatePromise();
 			args.GetReturnValue().Set(socket->_task->getPromise(socket->_closePromise));
@@ -320,7 +322,7 @@ void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Socket::shutdown(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		if (socket->_tls) {
 			socket->_tls->shutdown();
 			socket->processOutgoingTls();
@@ -344,14 +346,14 @@ void Socket::shutdown(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 void Socket::onError(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
 		socket->_onError = callback;
 	}
 }
 
 void Socket::read(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > callback(args.GetIsolate(), args[0].As<v8::Function>());
 		socket->_onRead = callback;
 		int result = uv_read_start(reinterpret_cast<uv_stream_t*>(&socket->_socket), allocateBuffer, onRead);
@@ -445,7 +447,7 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 }
 
 void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
-	if (Socket* socket = Socket::get(args.This())) {
+	if (Socket* socket = Socket::get(args.Data())) {
 		promiseid_t promise = socket->_task->allocatePromise();
 		args.GetReturnValue().Set(socket->_task->getPromise(promise));
 		v8::Handle<v8::String> value = args[0].As<v8::String>();
@@ -533,7 +535,7 @@ void Socket::onShutdown(uv_shutdown_t* request, int status) {
 }
 
 void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
-	if (Socket* socket = Socket::get(info.This())) {
+	if (Socket* socket = Socket::get(info.Data())) {
 		struct sockaddr_in6 addr;
 		int nameLength = sizeof(addr);
 		if (uv_tcp_getpeername(&socket->_socket, reinterpret_cast<sockaddr*>(&addr), &nameLength) == 0) {
@@ -552,7 +554,7 @@ void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallb
 }
 
 void Socket::isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
-	if (Socket* socket = Socket::get(info.This())) {
+	if (Socket* socket = Socket::get(info.Data())) {
 		info.GetReturnValue().Set(v8::Boolean::New(socket->_task->getIsolate(), socket->_connected));
 	}
 }
@@ -566,8 +568,8 @@ void Socket::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-Socket* Socket::get(v8::Handle<v8::Object> socketObject) {
-	return reinterpret_cast<Socket*>(v8::Handle<v8::External>::Cast(socketObject->GetInternalField(0))->Value());
+Socket* Socket::get(v8::Handle<v8::Value> socketObject) {
+	return reinterpret_cast<Socket*>(v8::Handle<v8::External>::Cast(socketObject)->Value());
 }
 
 void Socket::ref() {
