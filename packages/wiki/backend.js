@@ -44,17 +44,21 @@ function decodeForm(encoded) {
 	return result;
 }
 
+function escapeAttribute(line) {
+	return line.replace(/[<>&"']/g, function(c) {	return {'<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+
 function wikiToHtmlLine(line) {
 	return line
 		.replace(/[<>&]/g, function(c) {	return {'<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; })
-		.replace(/'''(.*?)'''/, "<b>$1</b>")
-		.replace(/''(.*?)''/, "<em>$1</em>")
+		.replace(/'''(.*?)'''/g, "<b>$1</b>")
+		.replace(/''(.*?)''/g, "<em>$1</em>")
 		.replace(/\[(\S+) ([^\]]+)\]/g, '<a href="$1">$2</a>')
 		.replace(/~~([^~]+)~~/g, "<strike>$1</strike>");
 }
 
 function wikiToHtml(text) {
-	var lines = text.split(/\r?\n/);
+	var lines = (text || "").split(/\r?\n/);
 	var result = [];
 	result.push("<p>");
 	var justStartedNewParagraph = true;
@@ -62,6 +66,7 @@ function wikiToHtml(text) {
 	var inBlock = false;
 	var shebang = false;
 	var inRawHtml = false;
+	var firstLineInBlock = false;
 	for (var i in lines) {
 		var line = lines[i];
 		if (inBlock && !shebang) {
@@ -70,11 +75,28 @@ function wikiToHtml(text) {
 			if (inRawHtml) {
 				result.push("<p>\n");
 			} else {
-				result.push("<blockquote>\n");
+				var mode;
+				if (line.substring(0, 2) == "#!") {
+					mode = line.substring(2).trim();
+					result.push('<div class="code" data-mode="' + escapeAttribute(mode) + '">');
+				} else {
+					result.push('<div class="code">');
+					result.push(line);
+				}
 			}
 		} else if (inBlock && inRawHtml && line != "}}}") {
+			if (!firstLineInBlock) {
+				result.push("\n");
+			}
+			firstLineInBlock = false;
 			result.push(line);
-		} else if (line.trim().length == 0) {
+		} else if (inBlock && line != "}}}") {
+			if (!firstLineInBlock) {
+				result.push("\n");
+			}
+			firstLineInBlock = false;
+			result.push(line);
+		} else if (line.trim().length === 0) {
 			if (!justStartedNewParagraph) {
 				result.push("</p>\n");
 				result.push("<p>");
@@ -93,14 +115,15 @@ function wikiToHtml(text) {
 					result.push("\n</ul>\n");
 					inList = false;
 				}
-				var match;
-				if (match = new RegExp(/^(=+) (.*) \1$/).exec(line)) {
+				var match = new RegExp(/^(=+) (.*) \1$/).exec(line);
+				if (match) {
 					var level = (1 + match[1].length).toString();
 					result.push("<h" + level + ">" + match[2] + "</h" + level + ">\n");
 				} else if (line == "----") {
 					result.push("<hr>\n");
 				} else if (line == "{{{") {
 					inBlock = true;
+					firstLineInBlock = true;
 					shebang = false;
 				} else if (inBlock && line == "}}}") {
 					inBlock = false;
@@ -108,7 +131,7 @@ function wikiToHtml(text) {
 						result.push("</p>\n");
 						inRawHtml = false;
 					} else {
-						result.push("</blockquote>\n");
+						result.push("</div>\n");
 					}
 				} else {
 					result.push(wikiToHtmlLine(line));
@@ -119,12 +142,21 @@ function wikiToHtml(text) {
 	return result.join("");
 }
 
+function makeIndex(pages) {
+	pages.sort();
+	return pages.map(function(page) { return "[/wiki/" + page + " " + page + "]"; }).join(" ");
+}
+
 function render(response, fileName, isEdit) {
 	Promise.all([
 		packageFs.readFile(isEdit ? "edit.html" : "index.html"),
 		wikiFs.readFile(fileName),
+		wikiFs.listDirectory("."),
 	]).then(function(data) {
-		var html = data[0].replace(/\$\(CONTENTS\)/g, isEdit ? data[1] : wikiToHtml(data[1])).replace(/\$\(PAGE\)/g, fileName);
+		var html = data[0]
+			.replace(/\$\(INDEX\)/g, wikiToHtml(makeIndex(data[2])))
+			.replace(/\$\(CONTENTS\)/g, isEdit ? data[1] : wikiToHtml(data[1]))
+			.replace(/\$\(PAGE\)/g, fileName);
 		response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
 		response.end(html);
 	}).catch(function(e) {

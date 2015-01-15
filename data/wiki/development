@@ -1,0 +1,62 @@
+= SandboxOS App Development Guide =
+This is a brief introduction on developing SandboxOS apps targeted at people who are already familiar with web development.
+
+== Packages ==
+A package is a directory of files.  '''package.json''' is the only file with special meaning.
+
+Here is an example package.json:
+{{{
+#!json
+{
+	"name": "chat",
+	"start": "backend.js",
+	"imports": ["auth", "httpd", "filesystem"],
+	"href": "/chat",
+	"description": "A basic multi-user chat example."
+}
+}}}
+
+ * '''name''': identifies the package.  If it is not unique, any existing installed package of the same name will be replaced when installing the package.
+ * '''start''': specifies the JavaScript file which is the entry point of the task.  When a new process is started for this package, this script is executed within it.
+ * '''imports''': list of package/task names which this package wants to be able to access.
+ * '''href''': link to the task's entry page used by [/tasks /tasks].
+ * '''description''': human-readable description of the package, displayed by [/tasks /tasks].
+
+== Promises ==
+
+JavaScript promises are used heavily.  Invoking any method on another task will return a Promise object.  Execution will return immediately but go asynchronous.  That usually looks like this:
+{{{
+#!javascript
+imports.email.sendMessage(message).then(function(result) {
+	// When sendMessage completes, result is the return value.
+}).catch(function(error) {
+	// If sendMessage fails (or calling it somehow fails), error is the reason.
+});
+// sendMessage returns immediately and execution continues on.
+}}}
+
+This is a completely inadequate explanation of the nuances involved, but it's a starting point.  Promises can be created and chained and combined in interesting ways.
+
+== Inter-Task Communication ==
+Tasks have access to the exported functions on any task declared in their package imports.
+
+In addition, functions passed between tasks can be called by the receiving task or passed along further.
+
+Here is an untested, made-up example with two hypothetical tasks, '''math''' and '''test''':
+
+'''math.js''':
+{{{
+#!javascript
+exports = {
+	sum: function(a, b) { return a + b; },
+	multiply: function(a, b) { return a * b; },
+};
+}}}
+
+'''test.js''':
+{{{
+#!javascript
+imports.math.sum(4, 5).then(function(result) {
+	// result === 9
+});
+}}}

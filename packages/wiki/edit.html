@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 	<head>
 		<title>Edit Wiki Page - $(PAGE)</title>
@@ -6,7 +7,7 @@
 		<h1>Edit Wiki Page - $(PAGE)</h1>
 		<form method="POST" action="/wiki/$(PAGE)">
 			<a href="/wiki/$(PAGE)">Cancel</a>
-			<input type="submit" value="Submit"></input>
+			<input type="submit" value="Submit">
 			<textarea name="contents" style="width: 100%" rows="40">$(CONTENTS)</textarea>
 		</form>
 	</body>
