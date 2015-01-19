@@ -17,7 +17,7 @@ function receive() {
 		for (var i in data.lines) {
 			if (typeof data.lines[i] == "string") {
 				print(data.lines[i]);
-			} else if (data.lines[i].action == "clear") {
+			} else if (data.lines[i] && data.lines[i].action == "clear") {
 				$("#terminal").val("");
 			} else {
 				print(JSON.stringify(data.lines[i]));

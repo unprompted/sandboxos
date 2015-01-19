@@ -1,0 +1,7 @@
+{
+	"name": "network",
+	"start": "network.js",
+	"trusted": true,
+	"imports": ["auth"],
+	"description": "A task for maintaining persistent network connections."
+}

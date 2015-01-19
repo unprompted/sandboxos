@@ -87,7 +87,7 @@ function getTerminal(session) {
 	return gTerminals[session.name];
 }
 
-function sessionHandler(request, response, session) {
+function sessionHandler(request, response, auth) {
 	var found = false;
 	for (var i in kStaticFiles) {
 		if (kStaticFiles[i].uri == request.uri) {
@@ -104,11 +104,15 @@ function sessionHandler(request, response, session) {
 		}
 	}
 	if (!found) {
-		var terminal = getTerminal(session);
+		var terminal = getTerminal(auth.session);
 		if (request.uri == "/terminal/send") {
 			var command = request.body;
 			terminal.print("> " + command);
-			imports.shell.evaluate(terminal.exportInterface(), command);
+			imports.auth.getCredentials(request.headers, "shell").then(function(credentials) {
+				return imports.shell.evaluate(terminal.exportInterface(), command, credentials);
+			}).catch(function(error) {
+				terminal.print(error);
+			});
 			response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 			response.end("OK");
 		} else if (request.uri == "/terminal/receive") {
@@ -121,9 +125,9 @@ function sessionHandler(request, response, session) {
 }
 
 function handler(request, response) {
-	imports.auth.query(request.headers).then(function(authResponse) {
-		if (authResponse) {
-			sessionHandler(request, response, authResponse.session);
+	imports.auth.query(request.headers).then(function(auth) {
+		if (auth) {
+			sessionHandler(request, response, auth);
 		} else {
 			response.writeHead(303, {"Location": "/login?return=/terminal", "Connection": "close"});
 			response.end();

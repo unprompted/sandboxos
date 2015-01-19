@@ -110,16 +110,19 @@ function splitArgs(command) {
 	return result;
 }
 
-function evaluate(terminal, command) {
+function evaluate(terminal, command, credentials) {
 	try {
 		var argv = splitArgs(command || "");
 		if (argv.length) {
 			if (kBuiltin[argv[0]]) {
 				kBuiltin[argv[0]](terminal, argv);
 			} else if (gRegistered[argv[0]]) {
-				gRegistered[argv[0]](terminal, argv).catch(function(error) {
+				var handler = gRegistered[argv[0]];
+				imports.auth.transferCredentials(credentials, handler.taskName).then(function(childCredentials) {
+					return handler.callback(terminal, argv, childCredentials);
+				}).catch(function(error) {
 					terminal.print(error.stackTrace);
-					terminal.print("while executing: " + command);
+						terminal.print("while executing: " + command);
 				});
 			} else {
 				terminal.print("Bad command or filename.");
@@ -132,7 +135,7 @@ function evaluate(terminal, command) {
 }
 
 function register(command, callback) {
-	gRegistered[command] = callback;
+	gRegistered[command] = {callback: callback, taskName: this.taskName};
 }
 
 exports = {

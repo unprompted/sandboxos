@@ -1,0 +1,7 @@
+{
+	"name": "irc",
+	"start": "irc.js",
+	"trusted": true,
+	"imports": ["auth", "shell", "network"],
+	"description": "A work in progress IRC client."
+}

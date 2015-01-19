@@ -1,5 +1,6 @@
 {
 	"name": "shell",
 	"start": "shell.js",
+	"imports": ["auth"],
 	"description": "A very basic command shell."
 }

@@ -111,4 +111,48 @@ imports.system.registerTaskStatusChanged(function(taskName, taskStatus) {
 	gWatchers.length = 0;
 });
 
+imports.shell.register("task", function(terminal, argv) {
+	var showUsage = false;
+	if (argv.length == 3) {
+		if (argv[1] == "start") {
+			imports.system.startTask(argv[2]).then(function() {
+				terminal.print("Task " + argv[2] + " started.");
+			}).catch(function(error) {
+				terminal.print(error);
+			});
+		} else if (argv[1] == "stop") {
+			imports.system.stopTask(argv[2]).then(function() {
+				terminal.print("Task " + argv[2] + " stopped.");
+			}).catch(function(error) {
+				terminal.print(error);
+			});
+		} else if (argv[1] == "restart") {
+			imports.system.restartTask(argv[2]).then(function() {
+				terminal.print("Task " + argv[2] + " restarted");
+			}).catch(function(error) {
+				terminal.print(error);
+			});
+		} else {
+			showUsage = true;
+		}
+	} else if (argv.length == 2 && argv[1] == "list") {
+		Promise.all([
+			imports.system.getPackageList(),
+			imports.system.getTasks(),
+		]).then(function(data) {
+			terminal.print("packages: " + JSON.stringify(data[0]));
+			terminal.print("tasks: " + JSON.stringify(data[1]));
+		}).catch(function(error) {
+			terminal.print(error);
+		});
+	} else {
+		showUsage = true;
+	}
+	
+	if (showUsage) {
+		terminal.print("Usage: task start|stop|restart taskName");
+		terminal.print("   or: task list");
+	}
+});
+
 imports.httpd.get('/tasks', handle);

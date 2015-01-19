@@ -253,6 +253,7 @@ void Socket::onConnect(uv_connect_t* request, int status) {
 	if (promise != -1) {
 		Socket* socket = reinterpret_cast<Socket*>(request->handle->data);
 		if (status == 0) {
+			socket->_connected = true;
 			socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), status));
 		} else {
 			std::string error("uv_tcp_connect: " + std::string(uv_strerror(status)));

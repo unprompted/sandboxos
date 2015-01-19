@@ -24,11 +24,11 @@ function getCookies(headers) {
 	var cookies = {};
 
 	if (headers.cookie) {
-		var cookies = headers.cookie.split(/,|;/);
-		for (var i in cookies) {
-			var equals = cookies[i].indexOf("=");
-			var name = cookies[i].substring(0, equals).trim();
-			var value = cookies[i].substring(equals + 1).trim();
+		var parts = headers.cookie.split(/,|;/);
+		for (var i in parts) {
+			var equals = parts[i].indexOf("=");
+			var name = parts[i].substring(0, equals).trim();
+			var value = parts[i].substring(equals + 1).trim();
 			cookies[name] = value;
 		}
 	}
@@ -182,14 +182,24 @@ function query(headers) {
 	}
 }
 
+function makeToken(session, task) {
+	var now = new Date();
+	var random = Math.random();
+	var token = hashPassword(task + ":" + session + ":" + random + ":" + now.toString());
+	gTokens[token] = {session: session, granted: now, random: random, task: task};
+	return {user: gSessions[session].name, token: token};
+}
+
 function getCredentials(headers, task) {
 	var session = getCookies(headers).session;
 	if (session && gSessions[session]) {
-		var now = new Date();
-		var random = Math.random();
-		var token = hashPassword(task + ":" + session + ":" + random + ":" + now.toString());
-		gTokens[token] = {session: session, granted: now, random: random, task: task};
-		return {user: gSessions[session].name, token: token};
+		return makeToken(session, task);
+	}
+}
+
+function transferCredentials(credentials, task) {
+	if (verifyCredentials.bind(this)(credentials)) {
+		return makeToken(gTokens[credentials.token].session, task);
 	}
 }
 
@@ -200,6 +210,10 @@ function verifyCredentials(credentials) {
 		&& gSessions[gTokens[credentials.token].session].name == credentials.user) {
 		return {permissions: getPermissions(gTokens[credentials.token].session)};
 	} else {
+		print(this.taskName);
+		print(credentials);
+		print(gTokens[credentials.token]);
+		print(gSessions[gTokens[credentials.token].session]);
 		throw new Error("Access denied.");
 	}
 }
@@ -210,4 +224,5 @@ exports = {
 	query: query,
 	getCredentials: getCredentials,
 	verifyCredentials: verifyCredentials,
+	transferCredentials: transferCredentials,
 };
