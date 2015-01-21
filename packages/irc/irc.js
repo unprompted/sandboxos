@@ -20,6 +20,17 @@ Connection.get = function(credentials, name, terminal) {
 	});
 };
 
+Connection.parseFrom = function(from) {
+	var result = {full: from};
+	var match = new RegExp(/:?(?:(.*)\!(.*)@)?(.*)/).exec(from);
+	if (match) {
+		result.nick = match[1];
+		result.user = match[2];
+		result.host = match[3];
+	}
+	return result;
+};
+
 Connection.prototype.connect = function(host, port) {
 	var connection = this;
 	return this.connection.connect(host, port).then(function() {
@@ -61,7 +72,6 @@ Connection.prototype.status = function() {
 	});
 };
 
-
 Connection.prototype.refresh = function() {
 	this.connection.onError(this.onError.bind(this));
 	return this.connection.read(this.onRead.bind(this));
@@ -78,6 +88,18 @@ Connection.prototype.onReadLine = function(line) {
 	}
 	if (argv[0] == "PING") {
 		this.write("PONG :" + argv[1]);
+	} else if (argv[1] == "PRIVMSG") {
+		var from = Connection.parseFrom(argv[0]);
+		this.terminal.print({styled: [
+			{style: "color: #888", value: new Date().toString()},
+			{style: "color: #448", value: " ["},
+			{style: "color: #fff", value: argv[2]},
+			{style: "color: #448", value: "] "},
+			{style: "color: #44f", value: "<"},
+			{style: "color: #fff", value: from.nick},
+			{style: "color: #44f", value: "> "},
+			{style: "color: #fff", value: argv[3]},
+		]});
 	} else {
 		this.terminal.print(line);
 	}
@@ -93,6 +115,21 @@ function irc(terminal, argv, credentials) {
 				return connection.connect(argv[1], parseInt(argv[2]) || 6667);
 			}).then(function() {
 				terminal.print("Connected to " + argv[1] + ":" + (parseInt(argv[2]) || 6667));
+			});
+		} else if (argv[0] == "msg") {
+			return Connection.get(networkCredentials, connectionName, terminal).then(function(connection) {
+				return connection.write("PRIVMSG " + argv[1] + " :" + argv.slice(2).join(" "));
+			}).then(function() {
+				terminal.print({styled: [
+					{style: "color: #888", value: new Date().toString()},
+					{style: "color: #448", value: " ["},
+					{style: "color: #fff", value: argv[1]},
+					{style: "color: #448", value: "] "},
+					{style: "color: #44f", value: "<"},
+					{style: "color: #fff", value: "you???"},
+					{style: "color: #44f", value: "> "},
+					{style: "color: #fff", value: argv[2]},
+				]});
 			});
 		} else if (argv[0] == "send") {
 			return Connection.get(networkCredentials, connectionName, terminal).then(function(connection) {

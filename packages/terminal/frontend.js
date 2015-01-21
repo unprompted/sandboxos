@@ -4,7 +4,25 @@ function enter(event) {
 	if (event.keyCode == 13) {
 		send();
 		event.preventDefault();
+	} else if (event.keyCode == 186
+		&& !event.metaKey
+		&& !event.altKey
+		&& !event.ctrlKey
+		&& !event.shiftKey) {
+		var value = $("#input").val();
+		if (value && value[value.length - 1] == '\\') {
+			$("#input").val(value.substring(0, value.length - 1) + ";");
+			event.preventDefault();
+		} else {
+			storeTarget(value);
+			$("#input").val("");
+			event.preventDefault();
+		}
 	}
+}
+
+function storeTarget(target) {
+	$("#target").text(target || "");
 }
 
 function receive() {
@@ -17,8 +35,10 @@ function receive() {
 		for (var i in data.lines) {
 			if (typeof data.lines[i] == "string") {
 				print(data.lines[i]);
+			} else if (data.lines[i] && data.lines[i].styled) {
+				printStyled(data.lines[i].styled);
 			} else if (data.lines[i] && data.lines[i].action == "clear") {
-				$("#terminal").val("");
+				document.getElementById("terminal").innerText = "";
 			} else {
 				print(JSON.stringify(data.lines[i]));
 			}
@@ -30,11 +50,35 @@ function receive() {
 	});
 }
 
-function print(line) {
-	if (document.getElementById("terminal").value) {
-		document.getElementById("terminal").value += "\n";
+function escape(line) {
+	return line.replace(/[&<>]/g, function(c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]; });
+}
+
+function autoNewLine() {
+	if (document.getElementById("terminal").innerHTML) {
+		document.getElementById("terminal").innerHTML += "<br/>\n";
 	}
-	document.getElementById("terminal").value += line;
+}
+
+function print(line) {
+	autoNewLine();
+	document.getElementById("terminal").innerHTML += escape(line);
+	autoScroll();
+}
+
+function printStyled(styled) {
+	autoNewLine();
+	var terminal = document.getElementById("terminal");
+	for (var i = 0; i < styled.length; i++) {
+		var node = document.createElement("span");
+		node.setAttribute("style", styled[i].style);
+		node.innerText = styled[i].value;
+		terminal.appendChild(node);
+	}
+	autoScroll();
+}
+
+function autoScroll() {
 	var textarea = $(document.getElementById("terminal"));
 	textarea.scrollTop(textarea[0].scrollHeight - textarea.height());
 }
@@ -42,7 +86,9 @@ function print(line) {
 function send(command) {
 	var value = command;
 	if (!command) {
-		value = $("#input").val();
+		var target = $("#target").text();
+		var prefix = target ? target + " " : "";
+		value = prefix + $("#input").val();
 		$("#input").val("");
 	}
 	$.ajax({

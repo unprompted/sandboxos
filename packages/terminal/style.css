@@ -16,6 +16,7 @@ body {
 
 #terminal {
 	flex: 1;
+	font-family: monospace;
 	background-color: #000;
 	color: #0f0;
 	border: 1px solid #040;
@@ -40,4 +41,8 @@ body {
 	color: #0f0;
 	border: 1px solid #040;
 	outline: none;
+}
+
+#target {
+	font-family: monospace;
 }
