@@ -5,6 +5,7 @@ function Connection(key) {
 	this.key = key;
 	this.connection = null;
 	this.buffer = "";
+	this.nickname = null;
 	return this;
 }
 
@@ -131,6 +132,12 @@ Connection.prototype.printMessage = function(nick, target, message) {
 	}
 };
 
+Connection.prototype.onCtcp = function(from, to, message) {
+	if (message == "VERSION") {
+		this.write("NOTICE " + from.nick + " :\u0001VERSION SandboxOS IRC 0.1\u0001");
+	}
+}
+
 Connection.prototype.onReadLine = function(line) {
 	var colon = line.indexOf(' :');
 	var argv;
@@ -140,11 +147,17 @@ Connection.prototype.onReadLine = function(line) {
 	} else {
 		argv = line.split(" ");
 	}
+	if (parseInt(argv[1]) || argv[1] == "NICK") {
+		this.nickname = argv[2];
+	}
 	if (argv[0] == "PING") {
 		this.write("PONG :" + argv[1]);
 	} else if (argv[1] == "PRIVMSG") {
 		var from = Connection.parseFrom(argv[0]);
 		this.printMessage(from.nick, argv[2], argv[3]);
+		if (argv[3].charCodeAt(0) === 1 && argv[3].charCodeAt(argv[3].length - 1) === 1) {
+			this.onCtcp(from, argv[2], argv[3].substring(1, argv[3].length - 1));
+		}
 	} else {
 		this.terminal.print(line);
 	}
@@ -164,7 +177,7 @@ function irc(terminal, argv, credentials) {
 		} else if (argv[0] == "msg") {
 			return Connection.get(networkCredentials, connectionName, terminal).then(function(connection) {
 				return connection.write("PRIVMSG " + argv[1] + " :" + argv.slice(2).join(" ")).then(function() {
-					connection.printMessage("you???", argv[1], argv.slice(2).join(" "));
+					connection.printMessage(connection.nickname, argv[1], argv.slice(2).join(" "));
 				});
 			});
 		} else if (argv[0] == "send") {
