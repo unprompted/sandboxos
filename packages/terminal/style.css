@@ -23,6 +23,7 @@ body {
 	outline: none;
 	width: 100%;
 	resize: none;
+	overflow: auto;
 }
 
 .input {

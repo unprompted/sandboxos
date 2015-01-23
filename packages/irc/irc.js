@@ -73,8 +73,62 @@ Connection.prototype.status = function() {
 };
 
 Connection.prototype.refresh = function() {
+	var connection = this;
 	this.connection.onError(this.onError.bind(this));
+	this.connection.isConnected().then(function(status) {
+		if (status) {
+			connection.write("PONG :" + new Date().getTime());
+		}
+	});
 	return this.connection.read(this.onRead.bind(this));
+};
+
+Connection.prototype.printMessage = function(nick, target, message) {
+	if (message.charCodeAt(0) === 1 && message.charCodeAt(message.length - 1) === 1) {
+		message = message.substring(1, message.length - 1);
+		var space = message.indexOf(' ');
+		var command = message;
+		var payload = "";
+		if (space != -1) {
+			command = message.substring(0, space);
+			payload = message.substring(space + 1);
+		}
+		if (command == "ACTION") {
+			this.terminal.print({styled: [
+				{style: "color: #888", value: new Date().toString()},
+				{style: "color: #448", value: " ["},
+				{style: "color: #fff", value: target},
+				{style: "color: #448", value: "] "},
+				{style: "color: #44f", value: "* "},
+				{style: "color: #fff", value: nick},
+				{style: "color: #44f", value: " "},
+				{style: "color: #ccc", value: payload},
+			]});
+		} else {
+			this.terminal.print({styled: [
+				{style: "color: #888", value: new Date().toString()},
+				{style: "color: #448", value: " ["},
+				{style: "color: #fff", value: target},
+				{style: "color: #448", value: "] "},
+				{style: "color: #44f", value: " <"},
+				{style: "color: #fff", value: nick},
+				{style: "color: #44f", value: "> "},
+				{style: "color: #4f4", value: "CTCP "},
+				{style: "color: #ccc", value: message},
+			]});
+		}
+	} else {
+		this.terminal.print({styled: [
+			{style: "color: #888", value: new Date().toString()},
+			{style: "color: #448", value: " ["},
+			{style: "color: #fff", value: target},
+			{style: "color: #448", value: "] "},
+			{style: "color: #44f", value: "<"},
+			{style: "color: #fff", value: nick},
+			{style: "color: #44f", value: "> "},
+			{style: "color: #ccc", value: message},
+		]});
+	}
 };
 
 Connection.prototype.onReadLine = function(line) {
@@ -90,16 +144,7 @@ Connection.prototype.onReadLine = function(line) {
 		this.write("PONG :" + argv[1]);
 	} else if (argv[1] == "PRIVMSG") {
 		var from = Connection.parseFrom(argv[0]);
-		this.terminal.print({styled: [
-			{style: "color: #888", value: new Date().toString()},
-			{style: "color: #448", value: " ["},
-			{style: "color: #fff", value: argv[2]},
-			{style: "color: #448", value: "] "},
-			{style: "color: #44f", value: "<"},
-			{style: "color: #fff", value: from.nick},
-			{style: "color: #44f", value: "> "},
-			{style: "color: #fff", value: argv[3]},
-		]});
+		this.printMessage(from.nick, argv[2], argv[3]);
 	} else {
 		this.terminal.print(line);
 	}
@@ -118,18 +163,9 @@ function irc(terminal, argv, credentials) {
 			});
 		} else if (argv[0] == "msg") {
 			return Connection.get(networkCredentials, connectionName, terminal).then(function(connection) {
-				return connection.write("PRIVMSG " + argv[1] + " :" + argv.slice(2).join(" "));
-			}).then(function() {
-				terminal.print({styled: [
-					{style: "color: #888", value: new Date().toString()},
-					{style: "color: #448", value: " ["},
-					{style: "color: #fff", value: argv[1]},
-					{style: "color: #448", value: "] "},
-					{style: "color: #44f", value: "<"},
-					{style: "color: #fff", value: "you???"},
-					{style: "color: #44f", value: "> "},
-					{style: "color: #fff", value: argv[2]},
-				]});
+				return connection.write("PRIVMSG " + argv[1] + " :" + argv.slice(2).join(" ")).then(function() {
+					connection.printMessage("you???", argv[1], argv.slice(2).join(" "));
+				});
 			});
 		} else if (argv[0] == "send") {
 			return Connection.get(networkCredentials, connectionName, terminal).then(function(connection) {

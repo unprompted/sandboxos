@@ -104,6 +104,8 @@ function send(command) {
 $(document).ready(function() {
 	$("#input").keydown(enter);
 	$("#input").focus();
-	send("hello");
-	receive();
+	setTimeout(function() {
+		send("hello");
+		receive();
+	}, 1000);
 });

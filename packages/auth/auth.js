@@ -199,7 +199,12 @@ function getCredentials(headers, task) {
 
 function transferCredentials(credentials, task) {
 	if (verifyCredentials.bind(this)(credentials)) {
-		return makeToken(gTokens[credentials.token].session, task);
+		var key = JSON.stringify([credentials.user, this.taskName, task]);
+		print(key);
+		if (!gTokens[key]) {
+			gTokens[key] = makeToken(gTokens[credentials.token].session, task);
+		}
+		return gTokens[key];
 	}
 }
 
