@@ -89,7 +89,6 @@ if env['package'] and sys.platform == 'win32':
 		'LICENSE',
 		'SConstruct',
 		'sandboxos.exe',
-		'sandboxos.pdb',
 	]
 	files += listAllFiles('src')
 	files += listAllFiles('packages')
