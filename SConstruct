@@ -28,13 +28,13 @@ env.Append(CPPPATH=[
 ])
 if sys.platform == 'win32':
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'libuv', 'advapi32', 'winmm', 'wsock32', 'ws2_32', 'psapi', 'iphlpapi'])
-	env.Append(CXXFLAGS=['/EHsc', '/MTd', '/Zi', '/Gy'])
-	env.Append(CFLAGS=['/EHsc', '/MTd', '/Zi', '/Gy'])
+	env.Append(CXXFLAGS=['/EHsc', '/MT', '/Zi', '/Gy'])
+	env.Append(CFLAGS=['/EHsc', '/MT', '/Zi', '/Gy'])
 	env.Append(LIBPATH=[
-		os.path.join(v8, 'build/Debug/lib'),
-		os.path.join(uv, 'Debug/lib'),
+		os.path.join(v8, 'build/Release/lib'),
+		os.path.join(uv, 'Release/lib'),
 	])
-	env.Append(LINKFLAGS=['/DEBUG', '/OPT:REF', '/OPT:ICF'])
+	env.Append(LINKFLAGS=['/RELEASE', '/OPT:REF', '/OPT:ICF'])
 elif sys.platform == 'darwin':
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv'])
 	env.Append(CXXFLAGS=['--std=c++11', '-g', '-Wall', '-stdlib=libstdc++'])
