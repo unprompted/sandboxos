@@ -17,6 +17,10 @@ public:
 
 	void startConnect() override;
 	void startAccept() override;
+
+	bool addTrustedCertificate(const char* certificate) override;
+	int getPeerCertificate(char* buffer, size_t size) override;
+
 	void shutdown() override;
 	HandshakeResult handshake() override;
 
@@ -88,13 +92,30 @@ void Tls_openssl::startConnect() {
 	_direction = kConnect;
 	_ssl = SSL_new(_context);
 	SSL_set_bio(_ssl, _bioIn, _bioOut);
-	SSL_set_verify(_ssl, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+
 	SSL_connect(_ssl);
 	handshake();
 }
 
 void Tls_openssl::shutdown() {
 	SSL_shutdown(_ssl);
+}
+
+bool Tls_openssl::addTrustedCertificate(const char* certificate) {
+	bool result = false;
+	BIO* bio = BIO_new_mem_buf(const_cast<char*>(certificate), -1);
+	X509* x509 = PEM_read_bio_X509(bio, 0, 0, 0);
+	BIO_free(bio);
+
+	if (x509) {
+		X509_STORE* store = SSL_CTX_get_cert_store(_context);
+		if (store && X509_STORE_add_cert(store, x509) == 1) {
+			result = true;
+		}
+		X509_free(x509);
+	}
+
+	return result;
 }
 
 Tls::HandshakeResult Tls_openssl::handshake() {
@@ -149,13 +170,30 @@ void Tls_openssl::setHostname(const char* hostname) {
 	_hostname = hostname;
 }
 
+int Tls_openssl::getPeerCertificate(char* buffer, size_t size) {
+	int result = -1;
+	X509* certificate = SSL_get_peer_certificate(_ssl);
+	BIO* bio = BIO_new(BIO_s_mem());
+	PEM_write_bio_X509(bio, certificate);
+	BUF_MEM* mem;
+	BIO_get_mem_ptr(bio, &mem);
+	if (mem->length <= size) {
+		std::memcpy(buffer, mem->data, mem->length);
+		result = mem->length;
+	}
+	BIO_free(bio);
+	return result;
+}
+
 bool Tls_openssl::verifyPeerCertificate() {
 	bool verified = false;
 	X509* certificate = SSL_get_peer_certificate(_ssl);
 	if (certificate) {
-		if (SSL_get_verify_result(_ssl) == X509_V_OK
-			&& verifyHostname(certificate, _hostname.c_str())) {
-			verified = true;
+
+		if (SSL_get_verify_result(_ssl) == X509_V_OK) {
+			if (verifyHostname(certificate, _hostname.c_str())) {
+				verified = true;
+			}
 		}
 		X509_free(certificate);
 	}
@@ -196,6 +234,23 @@ bool Tls_openssl::verifyHostname(X509* certificate, const char* hostname) {
 			}
 		}
 	}
+
+	if (!verified) {
+		int index = X509_NAME_get_index_by_NID(X509_get_subject_name(certificate), NID_commonName, -1);
+		if (index >= 0) {
+			X509_NAME_ENTRY* entry = X509_NAME_get_entry(X509_get_subject_name(certificate), index);
+			if (entry) {
+				ASN1_STRING* asn1 = X509_NAME_ENTRY_get_data(entry);
+				if (asn1) {
+					const char* commonName = reinterpret_cast<const char*>(ASN1_STRING_data(asn1));
+					if (static_cast<size_t>(ASN1_STRING_length(asn1)) == std::strlen(commonName)) {
+						verified = wildcardMatch(commonName, hostname);
+					}
+				}
+			}
+		}
+	}
+
 	return verified;
 }
 

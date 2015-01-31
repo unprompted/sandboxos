@@ -55,6 +55,7 @@ private:
 	static void onError(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void write(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void getPeerName(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+	static void getPeerCertificate(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 	static void isConnected(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 	static Socket* get(v8::Handle<v8::Value> socketObject);

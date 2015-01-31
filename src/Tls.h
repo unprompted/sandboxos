@@ -12,6 +12,9 @@ public:
 	virtual void startConnect() = 0;
 	virtual void shutdown() = 0;
 
+	virtual bool addTrustedCertificate(const char* certificate) { return false; }
+	virtual int getPeerCertificate(char* buffer, size_t bytes) { return -1; }
+
 	enum HandshakeResult {
 		kDone,
 		kMore,

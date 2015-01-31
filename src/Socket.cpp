@@ -37,6 +37,7 @@ Socket::Socket(Task* task) {
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "onError"), v8::FunctionTemplate::New(task->getIsolate(), onError, data));
 	socketTemplate->Set(v8::String::NewFromUtf8(task->getIsolate(), "write"), v8::FunctionTemplate::New(task->getIsolate(), write, data));
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerName"), getPeerName, 0, data);
+	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "peerCertificate"), getPeerCertificate, 0, data);
 	socketTemplate->SetAccessor(v8::String::NewFromUtf8(task->getIsolate(), "isConnected"), isConnected, 0, data);
 
 	v8::Local<v8::Object> socketObject = socketTemplate->NewInstance();
@@ -88,12 +89,18 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		if (!socket->_tls) {
 			v8::Handle<v8::String> keyString = args[0]->ToString(args.GetIsolate());
 			v8::Handle<v8::String> certificateString = args[1]->ToString(args.GetIsolate());
+			v8::Handle<v8::String> trustedCertificateString = args[2]->ToString(args.GetIsolate());
 			v8::String::Utf8Value keyUtf8(keyString);
 			v8::String::Utf8Value certificateUtf8(certificateString);
+			v8::String::Utf8Value trustedCertificateUtf8(trustedCertificateString);
 
 			const char* key = args.Length() > 0 ? *keyUtf8 : 0;
 			const char* certificate = args.Length() > 1 ? *certificateUtf8 : 0;
+			const char* trustedCertificate = args.Length() > 2 ? *trustedCertificateUtf8 : 0;
 			socket->_tls = Tls::create(key, certificate);
+			if (trustedCertificate) {
+				socket->_tls->addTrustedCertificate(trustedCertificate);
+			}
 			if (socket->_tls) {
 				socket->_tls->setHostname(socket->_peerName.c_str());
 				if (socket->_direction == kAccept) {
@@ -549,6 +556,19 @@ void Socket::getPeerName(v8::Local<v8::String> property, const v8::PropertyCallb
 				if (uv_ip4_name(reinterpret_cast<struct sockaddr_in*>(&addr), name, sizeof(name)) == 0) {
 					info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), name));
 				}
+			}
+		}
+	}
+}
+
+void Socket::getPeerCertificate(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+	if (Socket* socket = Socket::get(info.Data())) {
+		if (socket->_tls) {
+			std::vector<char> buffer(128 * 1024);
+			int result = socket->_tls->getPeerCertificate(buffer.data(), buffer.size());
+			std::cout << result << "\n";
+			if (result > 0) {
+				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), buffer.data(), v8::String::kNormalString, result));
 			}
 		}
 	}
