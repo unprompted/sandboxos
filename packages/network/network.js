@@ -56,8 +56,8 @@ Connection.prototype.onError = function(callback) {
 	this.onErrorCallback = callback;
 }
 
-Connection.prototype.write = function(command) {
-	return this.socket.write(command + "\r\n");
+Connection.prototype.write = function(data) {
+	return this.socket.write(data);
 };
 
 Connection.prototype.close = function() {
@@ -71,24 +71,25 @@ Connection.prototype.close = function() {
 };
 
 Connection.prototype.export = function() {
-	return {
-		isConnected: this.isConnected.bind(this),
-		connect: this.connect.bind(this),
-		write: this.write.bind(this),
-		read: this.read.bind(this),
-		onError: this.onError.bind(this),
-		close: this.close.bind(this),
-	};
+	if (!this._export) {
+		this._export = {
+			isConnected: this.isConnected.bind(this),
+			connect: this.connect.bind(this),
+			write: this.write.bind(this),
+			read: this.read.bind(this),
+			onError: this.onError.bind(this),
+			close: this.close.bind(this),
+		};
+	}
+	return this._export;
 };
 
-function getConnection(credentials, connectionName) {
-	return imports.auth.verifyCredentials(credentials).then(function(permissions) {
-		var key = JSON.stringify([credentials.name, connectionName]);
-		if (!gConnections[key]) {
-			gConnections[key] = new Connection(key);
-		}
-		return gConnections[key].export();
-	});
+function getConnection(connectionName) {
+	var key = JSON.stringify([this.taskName, connectionName]);
+	if (!gConnections[key]) {
+		gConnections[key] = new Connection(key);
+	}
+	return gConnections[key].export();
 }
 
 exports = {
