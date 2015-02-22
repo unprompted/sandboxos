@@ -259,7 +259,7 @@ v8::Handle<v8::Value> Task::invokeExport(TaskStub* from, Task* to, exportid_t ex
 		}
 		result = function->Call(v8::Handle<v8::Object>::Cast(arguments->Get(0)), argumentArray.size(), argumentPointer);
 	} else {
-		std::cout << "That's not an export we have\n";
+		std::cout << to->_scriptName << ": That's not an export we have (exportId=" << exportId << ", exports = " << to->_exports.size() << ")\n";
 	}
 	from->getStream().send(kReleaseImport, reinterpret_cast<char*>(&exportId), sizeof(exportId));
 	return result;

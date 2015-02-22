@@ -18,7 +18,19 @@ static const int STDERR_FILENO = 2;
 #include <unistd.h>
 #endif
 
+bool TaskStub::_determinedExecutable = false;
+char TaskStub::_executable[1024];
+
+void TaskStub::initialize() {
+	if (!_determinedExecutable) {
+		size_t size = sizeof(_executable);
+		uv_exepath(_executable, &size);
+		_determinedExecutable = true;
+	}
+}
+
 TaskStub::TaskStub() {
+	initialize();
 	std::memset(&_process, 0, sizeof(_process));
 }
 
@@ -98,12 +110,8 @@ void TaskStub::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 	stub->_id = id;
 
-	char executable[1024];
-	size_t size = sizeof(executable);
-	uv_exepath(executable, &size);
-
 	char arg1[] = "--child";
-	char* argv[] = { executable, arg1, 0 };
+	char* argv[] = { _executable, arg1, 0 };
 
 	uv_pipe_t* pipe = reinterpret_cast<uv_pipe_t*>(&stub->_stream.getStream());
 	std::memset(pipe, 0, sizeof(*pipe));

@@ -16,6 +16,7 @@ public:
 
 	static void create(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static TaskStub* createParent(Task* task, uv_file file);
+	static void initialize();
 
 	taskid_t getId() { return _id; }
 	Task* getOwner() { return _owner; }
@@ -32,6 +33,9 @@ private:
 	uv_process_t _process;
 
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _onExit;
+
+	static bool _determinedExecutable;
+	static char _executable[1024];
 
 	TaskStub();
 
