@@ -10,15 +10,30 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-class Tls_openssl : public Tls {
+class TlsContext_openssl : public TlsContext {
 public:
-	Tls_openssl(const char* key, const char* certificate);
-	~Tls_openssl();
+	TlsContext_openssl();
+	~TlsContext_openssl() override;
+	TlsSession* createSession() override;
+	bool setCertificate(const char* certificate) override;
+	bool setPrivateKey(const char* privateKey) override;
+	bool addTrustedCertificate(const char* certificate) override;
 
+	SSL_CTX* getContext() { return _context; }
+
+private:
+	SSL_CTX* _context = 0;
+};
+
+class TlsSession_openssl : public TlsSession {
+public:
+	TlsSession_openssl(TlsContext_openssl* context);
+	~TlsSession_openssl();
+
+	void setHostname(const char* hostname) override;
 	void startConnect() override;
 	void startAccept() override;
 
-	bool addTrustedCertificate(const char* certificate) override;
 	int getPeerCertificate(char* buffer, size_t size) override;
 
 	void shutdown() override;
@@ -30,8 +45,6 @@ public:
 	int readEncrypted(char* buffer, size_t bytes) override;
 	int writeEncrypted(const char* buffer, size_t bytes) override;
 
-	void setHostname(const char* hostname) override;
-
 	bool getError(char* buffer, size_t bytes) override;
 
 private:
@@ -39,69 +52,51 @@ private:
 	bool verifyHostname(X509* certificate, const char* hostname);
 	bool wildcardMatch(const char* pattern, const char* name);
 
-	std::string _hostname;
+	TlsContext_openssl* _context = 0;
 	BIO* _bioIn = 0;
 	BIO* _bioOut = 0;
 	SSL* _ssl = 0;
-	SSL_CTX* _context = 0;
+	std::string _hostname;
 	enum { kUndetermined, kAccept, kConnect } _direction = kUndetermined;
 };
 
-Tls_openssl::Tls_openssl(const char* key, const char* certificate) {
+TlsSession* TlsContext_openssl::createSession() {
+	return new TlsSession_openssl(this);
+}
+
+TlsContext_openssl::TlsContext_openssl() {
 	SSL_library_init();
 	SSL_load_error_strings();
 
 	_context = SSL_CTX_new(SSLv23_method());
 	SSL_CTX_set_default_verify_paths(_context);
-	_bioIn = BIO_new(BIO_s_mem());
-	_bioOut = BIO_new(BIO_s_mem());
-
-	if (key) {
-		BIO* bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, key);
-		EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(bio, 0, 0, 0);
-		SSL_CTX_use_PrivateKey(_context, privateKey);
-		BIO_free(bio);
-	}
-
-	if (certificate) {
-		BIO* bio = BIO_new(BIO_s_mem());
-		BIO_puts(bio, certificate);
-		X509* x509 = PEM_read_bio_X509(bio, 0, 0, 0);
-		SSL_CTX_use_certificate(_context, x509);
-		BIO_free(bio);
-	}
 }
 
-Tls_openssl::~Tls_openssl() {
-	if (_ssl) {
-		SSL_free(_ssl);
-	}
+TlsContext_openssl::~TlsContext_openssl() {
 	SSL_CTX_free(_context);
 }
 
-void Tls_openssl::startAccept() {
-	_direction = kAccept;
-	_ssl = SSL_new(_context);
-	SSL_set_bio(_ssl, _bioIn, _bioOut);
-	SSL_accept(_ssl);
-	handshake();
+bool TlsContext_openssl::setCertificate(const char* certificate) {
+	int result = 0;
+	BIO* bio = BIO_new(BIO_s_mem());
+	BIO_puts(bio, certificate);
+	X509* x509 = PEM_read_bio_X509(bio, 0, 0, 0);
+	result = SSL_CTX_use_certificate(_context, x509);
+	BIO_free(bio);
+	return result == 1;
 }
 
-void Tls_openssl::startConnect() {
-	_direction = kConnect;
-	_ssl = SSL_new(_context);
-	SSL_set_bio(_ssl, _bioIn, _bioOut);
-
-	SSL_connect(_ssl);
-	handshake();
+bool TlsContext_openssl::setPrivateKey(const char* privateKey) {
+	int result = 0;
+	BIO* bio = BIO_new(BIO_s_mem());
+	BIO_puts(bio, privateKey);
+	EVP_PKEY* key = PEM_read_bio_PrivateKey(bio, 0, 0, 0);
+	result = SSL_CTX_use_PrivateKey(_context, key);
+	BIO_free(bio);
+	return result == 1;
 }
 
-void Tls_openssl::shutdown() {
-	SSL_shutdown(_ssl);
-}
-
-bool Tls_openssl::addTrustedCertificate(const char* certificate) {
+bool TlsContext_openssl::addTrustedCertificate(const char* certificate) {
 	bool result = false;
 	BIO* bio = BIO_new_mem_buf(const_cast<char*>(certificate), -1);
 	X509* x509 = PEM_read_bio_X509(bio, 0, 0, 0);
@@ -118,8 +113,49 @@ bool Tls_openssl::addTrustedCertificate(const char* certificate) {
 	return result;
 }
 
-Tls::HandshakeResult Tls_openssl::handshake() {
-	Tls::HandshakeResult result = kDone;
+TlsContext* TlsContext::create() {
+	return new TlsContext_openssl();
+}
+
+TlsSession_openssl::TlsSession_openssl(TlsContext_openssl* context) {
+	_context = context;
+	_bioIn = BIO_new(BIO_s_mem());
+	_bioOut = BIO_new(BIO_s_mem());
+}
+
+TlsSession_openssl::~TlsSession_openssl() {
+	if (_ssl) {
+		SSL_free(_ssl);
+	}
+}
+
+void TlsSession_openssl::setHostname(const char* hostname) {
+	_hostname = hostname;
+}
+
+void TlsSession_openssl::startAccept() {
+	_direction = kAccept;
+	_ssl = SSL_new(_context->getContext());
+	SSL_set_bio(_ssl, _bioIn, _bioOut);
+	SSL_accept(_ssl);
+	handshake();
+}
+
+void TlsSession_openssl::startConnect() {
+	_direction = kConnect;
+	_ssl = SSL_new(_context->getContext());
+	SSL_set_bio(_ssl, _bioIn, _bioOut);
+
+	SSL_connect(_ssl);
+	handshake();
+}
+
+void TlsSession_openssl::shutdown() {
+	SSL_shutdown(_ssl);
+}
+
+TlsSession::HandshakeResult TlsSession_openssl::handshake() {
+	TlsSession::HandshakeResult result = kDone;
 	if (!SSL_is_init_finished(_ssl)) {
 		int value = SSL_do_handshake(_ssl);
 		if (value <= 0) {
@@ -137,7 +173,7 @@ Tls::HandshakeResult Tls_openssl::handshake() {
 	return result;
 }
 
-int Tls_openssl::readPlain(char* buffer, size_t bytes) {
+int TlsSession_openssl::readPlain(char* buffer, size_t bytes) {
 	int result = SSL_read(_ssl, buffer, bytes);
 	if (result <= 0) {
 		int error = SSL_get_error(_ssl, result);
@@ -154,23 +190,19 @@ int Tls_openssl::readPlain(char* buffer, size_t bytes) {
 	return result;
 }
 
-int Tls_openssl::writePlain(const char* buffer, size_t bytes) {
+int TlsSession_openssl::writePlain(const char* buffer, size_t bytes) {
 	return SSL_write(_ssl, buffer, bytes);
 }
 
-int Tls_openssl::readEncrypted(char* buffer, size_t bytes) {
+int TlsSession_openssl::readEncrypted(char* buffer, size_t bytes) {
 	return BIO_read(_bioOut, buffer, bytes);
 }
 
-int Tls_openssl::writeEncrypted(const char* buffer, size_t bytes) {
+int TlsSession_openssl::writeEncrypted(const char* buffer, size_t bytes) {
 	return BIO_write(_bioIn, buffer, bytes);
 }
 
-void Tls_openssl::setHostname(const char* hostname) {
-	_hostname = hostname;
-}
-
-int Tls_openssl::getPeerCertificate(char* buffer, size_t size) {
+int TlsSession_openssl::getPeerCertificate(char* buffer, size_t size) {
 	int result = -1;
 	X509* certificate = SSL_get_peer_certificate(_ssl);
 	BIO* bio = BIO_new(BIO_s_mem());
@@ -185,7 +217,7 @@ int Tls_openssl::getPeerCertificate(char* buffer, size_t size) {
 	return result;
 }
 
-bool Tls_openssl::verifyPeerCertificate() {
+bool TlsSession_openssl::verifyPeerCertificate() {
 	bool verified = false;
 	X509* certificate = SSL_get_peer_certificate(_ssl);
 	if (certificate) {
@@ -200,7 +232,7 @@ bool Tls_openssl::verifyPeerCertificate() {
 	return verified;
 }
 
-bool Tls_openssl::wildcardMatch(const char* pattern, const char* name) {
+bool TlsSession_openssl::wildcardMatch(const char* pattern, const char* name) {
 	while (*pattern && *name) {
 		if (*pattern == '*') {
 			for (const char* p = name; *p; ++p) {
@@ -219,7 +251,7 @@ bool Tls_openssl::wildcardMatch(const char* pattern, const char* name) {
 	return *pattern == 0 && *name == 0;
 }
 
-bool Tls_openssl::verifyHostname(X509* certificate, const char* hostname) {
+bool TlsSession_openssl::verifyHostname(X509* certificate, const char* hostname) {
 	bool verified = false;
 	void* names = X509_get_ext_d2i(certificate, NID_subject_alt_name, 0, 0);
 	if (names) {
@@ -254,17 +286,14 @@ bool Tls_openssl::verifyHostname(X509* certificate, const char* hostname) {
 	return verified;
 }
 
-bool Tls_openssl::getError(char* buffer, size_t bytes) {
+bool TlsSession_openssl::getError(char* buffer, size_t bytes) {
 	unsigned long error = ERR_get_error();
 	if (error != 0) {
 		ERR_error_string_n(error, buffer, bytes);
 	}
 	return error != 0;
 }
-
-Tls* Tls::create(const char* key, const char* certificate) {
-	return new Tls_openssl(key, certificate);
-}
+#if 0 // XXX
 #elif defined (__MACH__)
 #include <Security/SecIdentity.h>
 #include <Security/SecImportExport.h>
@@ -910,8 +939,9 @@ int Tls_sspi::writeEncrypted(const char* buffer, size_t bytes) {
 Tls* Tls::create(const char* key, const char* certificate) {
 	return new Tls_sspi(key, certificate);
 }
+#endif // XXX
 #else
-Tls* Tls::create(const char* key, const char* certificate) {
+TlsContext* TlsContext::create() {
 	return 0;
 }
 #endif

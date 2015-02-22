@@ -3,6 +3,7 @@
 #include "Task.h"
 #include "TaskTryCatch.h"
 #include "Tls.h"
+#include "TlsContextWrapper.h"
 
 #include <assert.h>
 #include <cstring>
@@ -10,6 +11,7 @@
 
 int Socket::_count = 0;
 int Socket::_openCount = 0;
+TlsContext* Socket::_defaultTlsContext = 0;
 
 struct SocketResolveData {
 	uv_getaddrinfo_t resolver;
@@ -87,20 +89,23 @@ void Socket::reportTlsErrors() {
 void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.Data())) {
 		if (!socket->_tls) {
-			v8::Handle<v8::String> keyString = args[0]->ToString(args.GetIsolate());
-			v8::Handle<v8::String> certificateString = args[1]->ToString(args.GetIsolate());
-			v8::Handle<v8::String> trustedCertificateString = args[2]->ToString(args.GetIsolate());
-			v8::String::Utf8Value keyUtf8(keyString);
-			v8::String::Utf8Value certificateUtf8(certificateString);
-			v8::String::Utf8Value trustedCertificateUtf8(trustedCertificateString);
+			TlsContext* context = 0;
 
-			const char* key = args.Length() > 0 ? *keyUtf8 : 0;
-			const char* certificate = args.Length() > 1 ? *certificateUtf8 : 0;
-			const char* trustedCertificate = args.Length() > 2 ? *trustedCertificateUtf8 : 0;
-			socket->_tls = Tls::create(key, certificate);
-			if (trustedCertificate) {
-				socket->_tls->addTrustedCertificate(trustedCertificate);
+			if (args.Length() > 0) {
+				if (TlsContextWrapper* wrapper = TlsContextWrapper::get(args[0])) {
+					context = wrapper->getContext();
+				}
+			} else {
+				if (!_defaultTlsContext) {
+					_defaultTlsContext = TlsContext::create();
+				}
+				context = _defaultTlsContext;
 			}
+
+			if (context) {
+				socket->_tls = context->createSession();
+			}
+
 			if (socket->_tls) {
 				socket->_tls->setHostname(socket->_peerName.c_str());
 				if (socket->_direction == kAccept) {
@@ -112,7 +117,7 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 				socket->processOutgoingTls();
 				args.GetReturnValue().Set(socket->_task->getPromise(socket->_startTlsPromise));
 			} else {
-				args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "TLS not supported")));
+				args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "Failed to get TLS context")));
 			}
 		} else {
 			args.GetIsolate()->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(args.GetIsolate(), "startTls with TLS already started")));
@@ -398,12 +403,12 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 				socket->reportTlsErrors();
 				socket->_tls->writeEncrypted(buffer->base, readSize);
 				if (socket->_startTlsPromise != -1) {
-					Tls::HandshakeResult result = socket->_tls->handshake();
-					if (result == Tls::kDone) {
+					TlsSession::HandshakeResult result = socket->_tls->handshake();
+					if (result == TlsSession::kDone) {
 						promiseid_t promise = socket->_startTlsPromise;
 						socket->_startTlsPromise = -1;
 						socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
-					} else if (result == Tls::kFailed) {
+					} else if (result == TlsSession::kFailed) {
 						promiseid_t promise = socket->_startTlsPromise;
 						socket->_startTlsPromise = -1;
 						char buffer[8192];
@@ -423,11 +428,11 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 								data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
 								callback->Call(callback, 1, &data);
 							}
-						} else if (result == Tls::kReadFailed) {
+						} else if (result == TlsSession::kReadFailed) {
 							socket->reportTlsErrors();
 							socket->close();
 							break;
-						} else if (result == Tls::kReadZero) {
+						} else if (result == TlsSession::kReadZero) {
 							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
 							if (!callback.IsEmpty()) {
 								data = v8::Undefined(socket->_task->getIsolate());

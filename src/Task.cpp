@@ -6,6 +6,7 @@
 #include "Socket.h"
 #include "TaskStub.h"
 #include "TaskTryCatch.h"
+#include "TlsContextWrapper.h"
 
 #include <algorithm>
 #include <assert.h>
@@ -150,6 +151,7 @@ void Task::activate() {
 		global->Set(v8::String::NewFromUtf8(_isolate, "Database"), v8::FunctionTemplate::New(_isolate, Database::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Task"), v8::FunctionTemplate::New(_isolate, TaskStub::create));
+		global->Set(v8::String::NewFromUtf8(_isolate, "TlsContext"), v8::FunctionTemplate::New(_isolate, TlsContextWrapper::create));
 		File::configure(_isolate, global);
 	}
 

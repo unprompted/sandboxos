@@ -7,7 +7,8 @@
 
 typedef int promiseid_t;
 class Task;
-class Tls;
+class TlsContext;
+class TlsSession;
 
 class Socket {
 public:
@@ -24,7 +25,7 @@ private:
 
 	Task* _task;
 	uv_tcp_t _socket;
-	Tls* _tls = 0;
+	TlsSession* _tls = 0;
 	promiseid_t _startTlsPromise = -1;
 	promiseid_t _closePromise = -1;
 	int _refCount = 1;
@@ -36,6 +37,8 @@ private:
 
 	static int _count;
 	static int _openCount;
+
+	static TlsContext* _defaultTlsContext;
 
 	v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object> > _object;
 

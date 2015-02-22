@@ -243,12 +243,16 @@ imports.filesystem.getPackageData().then(function(fs) {
 	var certificate = files[1];
 
 	if (privateKey && certificate) {
+		var tls = new TlsContext();
+		tls.setPrivateKey(privateKey);
+		tls.setCertificate(certificate);
+
 		var secureSocket = new Socket();
 		return secureSocket.bind(kHost, kHttpsPort).then(function() {
 			secureSocket.listen(kBacklog, function() {
 				secureSocket.accept().then(function(client) {
 					handleConnection(client);
-					client.startTls(privateKey, certificate).catch(function(error) {
+					client.startTls(tls).catch(function(error) {
 						logError("[" + new Date() + "] [" + client.peerName + "] " + error);
 					});
 				}).catch(function(error) {
