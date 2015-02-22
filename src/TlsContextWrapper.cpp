@@ -3,6 +3,8 @@
 #include "Task.h"
 #include "Tls.h"
 
+#include <assert.h>
+
 void TlsContextWrapper::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::HandleScope handleScope(args.GetIsolate());
 	if (TlsContextWrapper* wrapper = new TlsContextWrapper(Task::get(args.GetIsolate()))) {
@@ -43,6 +45,11 @@ void TlsContextWrapper::close() {
 	}
 }
 
+void TlsContextWrapper::onRelease(const v8::WeakCallbackData<v8::Object, TlsContextWrapper>& data) {
+	data.GetParameter()->_object.Reset();
+	delete data.GetParameter();
+}
+
 TlsContextWrapper* TlsContextWrapper::get(v8::Handle<v8::Value> value) {
 	TlsContextWrapper* result = 0;
 
@@ -65,9 +72,16 @@ TlsContextWrapper* TlsContextWrapper::get(const v8::FunctionCallbackInfo<v8::Val
 }
 
 void TlsContextWrapper::ref() {
+	if (++_refCount == 1) {
+		_object.ClearWeak();
+	}
 }
 
 void TlsContextWrapper::release() {
+	assert(_refCount >= 1);
+	if (--_refCount == 0) {
+		_object.SetWeak(this, onRelease);
+	}
 }
 
 void TlsContextWrapper::setCertificate(const v8::FunctionCallbackInfo<v8::Value>& args) {

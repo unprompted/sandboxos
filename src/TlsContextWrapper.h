@@ -17,6 +17,8 @@ public:
 	static void setPrivateKey(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void addTrustedCertificate(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+	static void onRelease(const v8::WeakCallbackData<v8::Object, TlsContextWrapper>& data);
+
 	TlsContext* getContext() { return _context; }
 
 private:
