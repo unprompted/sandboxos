@@ -293,7 +293,6 @@ bool TlsSession_openssl::getError(char* buffer, size_t bytes) {
 	}
 	return error != 0;
 }
-#if 0 // XXX
 #elif defined (__MACH__)
 #include <Security/SecIdentity.h>
 #include <Security/SecImportExport.h>
@@ -304,10 +303,28 @@ bool TlsSession_openssl::getError(char* buffer, size_t bytes) {
 
 extern "C" SecIdentityRef SecIdentityCreate(CFAllocatorRef allocator, SecCertificateRef certificate, SecKeyRef privateKey);
 
-class Tls_commoncrypto : public Tls {
+class TlsContext_osx : public  TlsContext {
 public:
-	Tls_commoncrypto(const char* key, const char* certificate);
-	~Tls_commoncrypto();
+	~TlsContext_osx() override;
+	TlsSession* createSession() override;
+	bool setCertificate(const char* certificate);
+	bool setPrivateKey(const char* privateKey);
+	bool addTrustedCertificate(const char* certificate);
+
+	SecKeyRef& getPrivateKey() { return _privateKey; }
+	SecCertificateRef& getCertificate() { return _certificate; }
+	CFArrayRef getTrustedCertificates() { return _trustedCertificates; }
+
+private:
+	SecKeyRef _privateKey = 0;
+	SecCertificateRef _certificate = 0;
+	CFMutableArrayRef _trustedCertificates = 0;
+};
+
+class TlsSession_osx : public TlsSession {
+public:
+	TlsSession_osx(TlsContext_osx* context);
+	~TlsSession_osx();
 
 	void startConnect() override;
 	void startAccept() override;
@@ -320,108 +337,156 @@ public:
 	int readEncrypted(char* buffer, size_t bytes) override;
 	int writeEncrypted(const char* buffer, size_t bytes) override;
 
-	void setHostname(const char* hostname) { _hostname = hostname; }
+	void setHostname(const char* hostname) override { _hostname = hostname; }
+	virtual int getPeerCertificate(char* buffer, size_t bytes) override;
 
 private:
 	static OSStatus writeCallback(SSLConnectionRef connection, const void* data, size_t* dataLength);
 	static OSStatus readCallback(SSLConnectionRef connection, void* data, size_t* dataLength);
 
-	CFArrayRef _certificate = 0;
-	SSLContextRef _context = 0;
+	TlsContext_osx* _context = 0;
+	SSLContextRef _session = 0;
 	std::vector<char> _inBuffer;
 	std::vector<char> _outBuffer;
 	std::string _hostname;
 	bool _shutdown = false;
 };
 
-Tls_commoncrypto::Tls_commoncrypto(const char* key, const char* certificate) {
-	SecKeyRef keyItem = 0;
-	SecCertificateRef certificateItem = 0;
-	SecIdentityRef identityItem = 0;
-
-	if (key) {
-		CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(key), std::strlen(key), kCFAllocatorDefault);
-		CFArrayRef keyItems = 0;
-		SecExternalFormat format = kSecFormatPEMSequence;
-		SecExternalItemType itemType = kSecItemTypePrivateKey;
-		OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &keyItems);
-		if (status == noErr && CFArrayGetCount(keyItems) > 0) {
-			keyItem = (SecKeyRef)CFArrayGetValueAtIndex(keyItems, 0);
-		}
+TlsContext_osx::~TlsContext_osx() {
+	if (_privateKey) {
+		CFRelease(_privateKey);
+		_privateKey = 0;
 	}
-
-	if (certificate) {
-		CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(certificate), std::strlen(certificate), kCFAllocatorDefault);
-		CFArrayRef certificateItems = 0;
-		SecExternalFormat format = kSecFormatPEMSequence;
-		SecExternalItemType itemType = kSecItemTypeCertificate;
-		OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &certificateItems);
-		if (status == noErr && CFArrayGetCount(certificateItems) > 0) {
-			certificateItem = (SecCertificateRef)CFArrayGetValueAtIndex(certificateItems, 0);
-		}
-	}
-
-	if (keyItem && certificateItem) {
-		identityItem = SecIdentityCreate(kCFAllocatorDefault, certificateItem, keyItem);
-	}
-
-	_certificate = CFArrayCreate(kCFAllocatorDefault, (const void**)&identityItem, 1, &kCFTypeArrayCallBacks);
-}
-
-Tls_commoncrypto::~Tls_commoncrypto() {
-	CFRelease(_certificate);
-	CFRelease(_context);
-	_context = 0;
-}
-
-void Tls_commoncrypto::startAccept() {
-	_context = SSLCreateContext(0, kSSLServerSide, kSSLStreamType);
 	if (_certificate) {
-		SSLSetCertificate(_context, _certificate);
+		CFRelease(_certificate);
+		_certificate = 0;
 	}
-	SSLSetIOFuncs(_context, readCallback, writeCallback);
-	SSLSetConnection(_context, this);
+	if (_trustedCertificates) {
+		CFRelease(_trustedCertificates);
+		_trustedCertificates = 0;
+	}
+}
+
+TlsSession* TlsContext_osx::createSession() {
+	return new TlsSession_osx(this);
+}
+
+bool TlsContext_osx::setCertificate(const char* certificate) {
+	if (_certificate) {
+		CFRelease(_certificate);
+		_certificate = 0;
+	}
+	CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(certificate), std::strlen(certificate), kCFAllocatorDefault);
+	CFArrayRef items = 0;
+	SecExternalFormat format = kSecFormatPEMSequence;
+	SecExternalItemType itemType = kSecItemTypeCertificate;
+	OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &items);
+	if (status == noErr && CFArrayGetCount(items) > 0) {
+		_certificate = (SecCertificateRef)CFArrayGetValueAtIndex(items, 0);
+	}
+	return _certificate != 0;
+}
+
+bool TlsContext_osx::setPrivateKey(const char* privateKey) {
+	if (_privateKey) {
+		CFRelease(_privateKey);
+		_privateKey = 0;
+	}
+
+	CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(privateKey), std::strlen(privateKey), kCFAllocatorDefault);
+	CFArrayRef items = 0;
+	SecExternalFormat format = kSecFormatPEMSequence;
+	SecExternalItemType itemType = kSecItemTypePrivateKey;
+	OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &items);
+	if (status == noErr && CFArrayGetCount(items) > 0) {
+		_privateKey = (SecKeyRef)CFArrayGetValueAtIndex(items, 0);
+	}
+	return _privateKey != 0;
+}
+
+bool TlsContext_osx::addTrustedCertificate(const char* certificate) {
+	if (!_trustedCertificates) {
+		_trustedCertificates = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
+	}
+	SecCertificateRef certificateItem = 0;
+	CFDataRef data = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault, reinterpret_cast<const UInt8*>(certificate), std::strlen(certificate), kCFAllocatorDefault);
+	CFArrayRef items = 0;
+	SecExternalFormat format = kSecFormatPEMSequence;
+	SecExternalItemType itemType = kSecItemTypeCertificate;
+	OSStatus status = SecItemImport(data, 0, &format, &itemType, 0, 0, 0, &items);
+	if (status == noErr && CFArrayGetCount(items) > 0) {
+		certificateItem = (SecCertificateRef)CFArrayGetValueAtIndex(items, 0);
+	}
+	if (certificateItem) {
+		CFArrayAppendValue(_trustedCertificates, certificateItem);
+	}
+	return certificateItem != 0;
+}
+
+TlsSession_osx::TlsSession_osx(TlsContext_osx* context) {
+	_context = context;
+}
+
+TlsSession_osx::~TlsSession_osx() {
+	if (_session) {
+		CFRelease(_session);
+		_session = 0;
+	}
+}
+
+void TlsSession_osx::startAccept() {
+	_session = SSLCreateContext(0, kSSLServerSide, kSSLStreamType);
+	if (_context->getCertificate() && _context->getPrivateKey()) {
+		SecIdentityRef identity = SecIdentityCreate(kCFAllocatorDefault, _context->getCertificate(), _context->getPrivateKey());
+		CFArrayRef array = CFArrayCreate(kCFAllocatorDefault, (const void**)&identity, 1, &kCFTypeArrayCallBacks);
+		SSLSetCertificate(_session, array);
+	}
+	SSLSetIOFuncs(_session, readCallback, writeCallback);
+	SSLSetConnection(_session, this);
 	handshake();
 }
 
-void Tls_commoncrypto::startConnect() {
-	_context = SSLCreateContext(0, kSSLClientSide, kSSLStreamType);
-	SSLSetIOFuncs(_context, readCallback, writeCallback);
-	SSLSetConnection(_context, this);
-	SSLSetPeerDomainName(_context, _hostname.c_str(), _hostname.size());
+void TlsSession_osx::startConnect() {
+	_session = SSLCreateContext(0, kSSLClientSide, kSSLStreamType);
+	if (_context->getTrustedCertificates()) {
+		// XXX: SSLSetTrustedRoots(_session, _context->getTrustedCertificates(), false);
+	}
+	SSLSetIOFuncs(_session, readCallback, writeCallback);
+	SSLSetConnection(_session, this);
+	SSLSetPeerDomainName(_session, _hostname.c_str(), _hostname.size());
 	handshake();
 }
 
-void Tls_commoncrypto::shutdown() {
+void TlsSession_osx::shutdown() {
 	if (!_outBuffer.size()) {
-		SSLClose(_context);
+		SSLClose(_session);
 		_shutdown = false;
 	} else {
 		_shutdown = true;
 	}
 }
 
-Tls::HandshakeResult Tls_commoncrypto::handshake() {
-	Tls::HandshakeResult result = Tls::kFailed;
-	OSStatus status = SSLHandshake(_context);
+TlsSession::HandshakeResult TlsSession_osx::handshake() {
+	TlsSession::HandshakeResult result = TlsSession::kFailed;
+	OSStatus status = SSLHandshake(_session);
 	switch (status) {
 	case noErr:
-		result = Tls::kDone;
+		result = TlsSession::kDone;
 		break;
 	case errSSLWouldBlock:
-		result = Tls::kMore;
+		result = TlsSession::kMore;
 		break;
 	default:
-		result = Tls::kFailed;
+		result = TlsSession::kFailed;
 		break;
 	}
 	return result;
 }
 
-int Tls_commoncrypto::readPlain(char* buffer, size_t bytes) {
+int TlsSession_osx::readPlain(char* buffer, size_t bytes) {
 	int result = 0;
 	size_t processed = bytes;
-	OSStatus status = SSLRead(_context, buffer, bytes, &processed);
+	OSStatus status = SSLRead(_session, buffer, bytes, &processed);
 	if (status == noErr) {
 		result = processed;
 	} else if (status == errSSLWouldBlock) {
@@ -434,10 +499,10 @@ int Tls_commoncrypto::readPlain(char* buffer, size_t bytes) {
 	return result;
 }
 
-int Tls_commoncrypto::writePlain(const char* buffer, size_t bytes) {
+int TlsSession_osx::writePlain(const char* buffer, size_t bytes) {
 	int result = 0;
 	size_t processed;
-	OSStatus status = SSLWrite(_context, buffer, bytes, &processed);
+	OSStatus status = SSLWrite(_session, buffer, bytes, &processed);
 	if (status == noErr) {
 		result = processed;
 	} else {
@@ -446,18 +511,18 @@ int Tls_commoncrypto::writePlain(const char* buffer, size_t bytes) {
 	return result;
 }
 
-OSStatus Tls_commoncrypto::writeCallback(SSLConnectionRef connection, const void* data, size_t* dataLength) {
-	Tls_commoncrypto* tls = reinterpret_cast<Tls_commoncrypto*>(const_cast<void*>(connection));
+OSStatus TlsSession_osx::writeCallback(SSLConnectionRef connection, const void* data, size_t* dataLength) {
+	TlsSession_osx* tls = reinterpret_cast<TlsSession_osx*>(const_cast<void*>(connection));
 	tls->_outBuffer.insert(tls->_outBuffer.end(), reinterpret_cast<const char*>(data), reinterpret_cast<const char*>(data) + *dataLength);
 	if (tls->_shutdown && !tls->_outBuffer.size()) {
-		SSLClose(tls->_context);
+		SSLClose(tls->_session);
 		tls->_shutdown = false;
 	}
 	return noErr;
 }
 
-OSStatus Tls_commoncrypto::readCallback(SSLConnectionRef connection, void* data, size_t* dataLength) {
-	Tls_commoncrypto* tls = reinterpret_cast<Tls_commoncrypto*>(const_cast<void*>(connection));
+OSStatus TlsSession_osx::readCallback(SSLConnectionRef connection, void* data, size_t* dataLength) {
+	TlsSession_osx* tls = reinterpret_cast<TlsSession_osx*>(const_cast<void*>(connection));
 	OSStatus result = noErr;
 	size_t bytes = std::min(tls->_inBuffer.size(), *dataLength);
 	if (bytes > 0) {
@@ -471,7 +536,7 @@ OSStatus Tls_commoncrypto::readCallback(SSLConnectionRef connection, void* data,
 	return result;
 }
 
-int Tls_commoncrypto::readEncrypted(char* buffer, size_t bytes) {
+int TlsSession_osx::readEncrypted(char* buffer, size_t bytes) {
 	size_t size = std::min(bytes, _outBuffer.size());
 	if (size > 0) {
 		std::memcpy(buffer, _outBuffer.data(), size);
@@ -480,14 +545,35 @@ int Tls_commoncrypto::readEncrypted(char* buffer, size_t bytes) {
 	return size;
 }
 
-int Tls_commoncrypto::writeEncrypted(const char* buffer, size_t bytes) {
+int TlsSession_osx::writeEncrypted(const char* buffer, size_t bytes) {
 	_inBuffer.insert(_inBuffer.end(), buffer, buffer + bytes);
 	return bytes;
 }
 
-Tls* Tls::create(const char* key, const char* certificate) {
-	return new Tls_commoncrypto(key, certificate);
+int TlsSession_osx::getPeerCertificate(char* buffer, size_t size) {
+	int result = -1;
+	SecTrustRef trust = 0;
+	if (SSLCopyPeerTrust(_session, &trust) == noErr) {
+		if (SecTrustGetCertificateCount(trust) > 0) {
+			SecCertificateRef certificate = SecTrustGetCertificateAtIndex(trust, 0);
+			CFDataRef data = 0;
+			if (SecItemExport(certificate, kSecFormatX509Cert, kSecItemPemArmour, nil, &data) == noErr) {
+				size_t actualSize = CFDataGetLength(data);
+				if (actualSize <= size) {
+					CFDataGetBytes(data, CFRangeMake(0, actualSize), reinterpret_cast<UInt8*>(buffer));
+					result = actualSize;
+				}
+			}
+		}
+		CFRelease(trust);
+	}
+	return result;
 }
+
+TlsContext* TlsContext::create() {
+	return new TlsContext_osx();
+}
+#if 0 // XXX
 #elif defined (_WIN32)
 #include <algorithm>
 #include <assert.h>
