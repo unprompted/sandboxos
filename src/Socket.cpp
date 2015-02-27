@@ -91,7 +91,7 @@ void Socket::startTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		if (!socket->_tls) {
 			TlsContext* context = 0;
 
-			if (args.Length() > 0) {
+			if (args.Length() > 0 && !args[0].IsEmpty() && !args[0]->IsUndefined()) {
 				if (TlsContextWrapper* wrapper = TlsContextWrapper::get(args[0])) {
 					context = wrapper->getContext();
 				}
@@ -571,7 +571,6 @@ void Socket::getPeerCertificate(v8::Local<v8::String> property, const v8::Proper
 		if (socket->_tls) {
 			std::vector<char> buffer(128 * 1024);
 			int result = socket->_tls->getPeerCertificate(buffer.data(), buffer.size());
-			std::cout << result << "\n";
 			if (result > 0) {
 				info.GetReturnValue().Set(v8::String::NewFromUtf8(info.GetIsolate(), buffer.data(), v8::String::kNormalString, result));
 			}
