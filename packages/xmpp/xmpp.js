@@ -126,6 +126,7 @@ Connection.prototype.onConnect = function() {
 	});
 
 	return socket.read(function(data) {
+		print(data);
 		if (!data) {
 			return;
 		}
@@ -235,7 +236,9 @@ function xmpp(terminal, argv, credentials) {
 			var connectionName = argv[1];
 			if (argv[2] == "status") {
 				return Connection.get(credentials.user, connectionName, terminal).then(function(connection) {
-					return terminal.print("We seem to have a connection?");
+					return connection.connection.isConnected();
+				}).then(function(connected) {
+					return terminal.print(connected ? "We seem to have a connection?" : "We don't seem to be connected.");
 				});
 			} else if (argv[2] == "connect") {
 				return Connection.get(credentials.user, connectionName, terminal).then(function(connection) {
@@ -252,7 +255,7 @@ function xmpp(terminal, argv, credentials) {
 					} else {
 						connection.settings[argv[3]] = argv[4];
 					}
-					terminal.print(JSON.stringify(connection.settings, null, "  "));
+					terminal.print(JSON.stringify([connection.settings, null, "  "]));
 				});
 			}
 		}

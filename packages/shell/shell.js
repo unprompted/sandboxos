@@ -110,6 +110,17 @@ function splitArgs(command) {
 	return result;
 }
 
+function printError(terminal, error) {
+	if (error.stackTrace) {
+		terminal.print(error.stackTrace);
+	} else {
+		for (var i in error) {
+			terminal.print(i);
+		}
+		terminal.print(error.toString());
+	}
+}
+
 function evaluate(terminal, command, credentials) {
 	try {
 		var argv = splitArgs(command || "");
@@ -121,15 +132,15 @@ function evaluate(terminal, command, credentials) {
 				imports.auth.transferCredentials(credentials, handler.taskName).then(function(childCredentials) {
 					return handler.callback(terminal, argv, childCredentials);
 				}).catch(function(error) {
-					terminal.print(error.stackTrace);
-						terminal.print("while executing: " + command);
+					printError(terminal, error);
+					terminal.print("while executing: " + command);
 				});
 			} else {
 				terminal.print("Bad command or filename.");
 			}
 		}
 	} catch (error) {
-		terminal.print(error.toString());
+		printError(terminal, error);
 		terminal.print("while evaluating: " + command);
 	}
 }

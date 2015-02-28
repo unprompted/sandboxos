@@ -177,13 +177,15 @@ int TlsSession_openssl::readPlain(char* buffer, size_t bytes) {
 	int result = SSL_read(_ssl, buffer, bytes);
 	if (result <= 0) {
 		int error = SSL_get_error(_ssl, result);
-		if (error == SSL_ERROR_ZERO_RETURN) {
+		if (error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
+			result = 0;
+		} else if (error == SSL_ERROR_ZERO_RETURN) {
 			if ((SSL_get_shutdown(_ssl) & SSL_RECEIVED_SHUTDOWN) != 0) {
 				result = kReadZero;
 			} else {
 				result = 0;
 			}
-		} else if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE) {
+		} else {
 			result = kReadFailed;
 		}
 	}
