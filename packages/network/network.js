@@ -52,7 +52,7 @@ Connection.prototype.read = function(callback) {
 
 Connection.prototype.onError = function(callback) {
 	this.onErrorCallback = callback;
-}
+};
 
 Connection.prototype.write = function(data) {
 	return this.socket.write(data);
@@ -61,7 +61,6 @@ Connection.prototype.write = function(data) {
 Connection.prototype.close = function() {
 	var socket = this.socket;
 	this.socket = null;
-	delete gConnections[this.key];
 	if (socket) {
 		return socket.close();
 	}

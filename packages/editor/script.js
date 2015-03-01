@@ -216,6 +216,13 @@ function textChanged() {
 	updateModified(currentFileName);
 }
 
+function keyUp(event) {
+	if ((event.which || event.keyCode) == 73 && event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
+		install();
+		event.preventDefault();
+	}
+}
+
 $(document).ready(function() {
 	var parts = window.location.href.split("/");
 	$("#packageName").text(parts[parts.length - 2]);
@@ -228,4 +235,5 @@ $(document).ready(function() {
 	gEditor.setTheme("ace/theme/terminal");
 	gEditor.session.setUseSoftTabs(false);
 	gEditor.session.on("change", textChanged);
+	$(document).keyup(keyUp);
 });
