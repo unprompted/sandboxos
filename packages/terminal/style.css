@@ -24,6 +24,7 @@ body {
 	width: 100%;
 	resize: none;
 	overflow: auto;
+	word-wrap: break-word;
 }
 
 .input {

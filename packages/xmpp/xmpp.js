@@ -126,7 +126,6 @@ Connection.prototype.refresh = function() {
 
 Connection.prototype.onRead = function(data) {
 	var self = this;
-	print(data);
 	if (!data) {
 		return;
 	}
@@ -140,7 +139,7 @@ Connection.prototype.onRead = function(data) {
 			} else if (!self.authenticationFinished) {
 				socket.write("<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='DIGEST-MD5'/>");
 			} else {
-				socket.write("<iq type='set' id='bind0'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><resource>js2</resource></bind></iq>");
+				socket.write("<iq type='set' id='bind0'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><resource>" + self.settings.resource + "</resource></bind></iq>");
 			}
 		} else if (stanza.name == "proceed") {
 			if (!self.authenticationStarted) {
