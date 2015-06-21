@@ -1,0 +1,7 @@
+{
+	"name": "packagegraph",
+	"start": "packagegraph.js",
+	"imports": ["httpd", "filesystem", "tasks"],
+	"href": "/packagegraph",
+	"description": "A visualization of installed packages."
+}

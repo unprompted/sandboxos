@@ -104,6 +104,16 @@ function handle(request, response) {
 	}
 }
 
+function getTaskManifests() {
+	return imports.system.getTasks().then(function(tasks) {
+		var manifests = {};
+		for (var task in tasks) {
+			manifests[task] = tasks[task].manifest;
+		}
+		return manifests;
+	});
+}
+
 imports.system.registerTaskStatusChanged(function(taskName, taskStatus) {
 	for (var i in gWatchers) {
 		sendLatestStatus(gWatchers[i]);
@@ -156,3 +166,7 @@ imports.shell.register("task", function(terminal, argv) {
 });
 
 imports.httpd.get('/tasks', handle);
+
+exports = {
+	getTaskManifests: getTaskManifests,
+};
