@@ -370,7 +370,10 @@ Task* Task::get(v8::Isolate* isolate) {
 }
 
 promiseid_t Task::allocatePromise() {
-	promiseid_t promiseId = _nextPromise++;
+	promiseid_t promiseId;
+	do {
+		promiseId = _nextPromise++;
+	} while (_promises.find(promiseId) != _promises.end());
 	v8::Persistent<v8::Promise::Resolver, v8::NonCopyablePersistentTraits<v8::Promise::Resolver> > promise(_isolate, v8::Promise::Resolver::New(_isolate));
 	_promises[promiseId] = promise;
 	return promiseId;
@@ -423,7 +426,9 @@ exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
 	}
 
 	if (!found) {
-		exportId = _nextExport++;
+		do {
+			exportId = _nextExport++;
+		} while (_exports[_nextExport]);
 		ExportRecord* record = new ExportRecord(_isolate, function);
 		_exports[exportId] = record;
 	}
