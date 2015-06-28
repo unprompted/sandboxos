@@ -412,24 +412,24 @@ void Task::rejectPromise(promiseid_t promise, v8::Handle<v8::Value> value) {
 }
 
 exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
-	bool found = false;
 	exportid_t exportId = -1;
-	typedef std::map<exportid_t, ExportRecord*> ExportMap;
-	for (ExportMap::iterator it = _exports.begin(); it != _exports.end(); ++it) {
-		if (it->second
-			&& !it->second->_persistent.IsEmpty()
-			&& it->second->_persistent == function) {
-			found = true;
-			exportId = it->first;
-			break;
+	v8::Handle<v8::String> exportName = v8::String::NewFromUtf8(_isolate, "export");
+
+	v8::Local<v8::Value> value = function->GetHiddenValue(exportName);
+	if (!value.IsEmpty() && value->IsNumber())
+	{
+		exportid_t foundId = value->ToInteger(_isolate)->Int32Value();
+		if (_exports[foundId]) {
+			exportId = foundId;
 		}
 	}
 
-	if (!found) {
+	if (exportId == -1) {
 		do {
 			exportId = _nextExport++;
 		} while (_exports[_nextExport]);
 		ExportRecord* record = new ExportRecord(_isolate, function);
+		function->SetHiddenValue(exportName, v8::Integer::New(_isolate, exportId));
 		_exports[exportId] = record;
 	}
 
