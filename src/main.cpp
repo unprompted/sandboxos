@@ -15,7 +15,25 @@
 
 v8::Platform* gPlatform = 0;
 
+class NewArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
+public:
+	void* Allocate(size_t length) {
+		char* bytes = new char[length];
+		std::memset(bytes, 0, length);
+		return bytes;
+	}
+
+	void* AllocateUninitialized(size_t length) {
+		return new char[length];
+	}
+
+	void Free(void* data, size_t length) {
+		delete[] reinterpret_cast<char*>(data);
+	}
+};
+
 int main(int argc, char* argv[]) {
+	NewArrayBufferAllocator allocator;
 	uv_setup_args(argc, argv);
 	TaskStub::initialize();
 	v8::V8::InitializeICU();
@@ -23,6 +41,7 @@ int main(int argc, char* argv[]) {
 	v8::V8::InitializePlatform(gPlatform);
 	v8::V8::Initialize();
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
+	v8::V8::SetArrayBufferAllocator(&allocator);
 
 	bool isChild = false;
 	const char* systemTask = "packages/system/system.js";
