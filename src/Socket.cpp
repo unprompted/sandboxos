@@ -466,13 +466,23 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		v8::Handle<v8::String> value = args[0].As<v8::String>();
 		if (!value.IsEmpty() && value->IsString()) {
 			if (socket->_tls) {
-				v8::String::Utf8Value utf8(value);
 				socket->reportTlsErrors();
-				int result = socket->_tls->writePlain(*utf8, utf8.length());
+				int result;
+				int length;
+				if (value->ContainsOnlyOneByte()) {
+					length = value->Length();
+					std::vector<uint8_t> bytes(length);
+					value->WriteOneByte(bytes.data(), 0, bytes.size(), v8::String::NO_NULL_TERMINATION);
+					result = socket->_tls->writePlain(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+				} else {
+					v8::String::Utf8Value utf8(value);
+					length = utf8.length();
+					result = socket->_tls->writePlain(*utf8, utf8.length());
+				}
 				char buffer[8192];
 				if (result <= 0 && socket->_tls->getError(buffer, sizeof(buffer))) {
 					socket->_task->rejectPromise(promise, v8::String::NewFromUtf8(args.GetIsolate(), buffer));
-				} else if (result < utf8.length()) {
+				} else if (result < length) {
 					socket->_task->rejectPromise(promise, v8::Integer::New(socket->_task->getIsolate(), result));
 				} else {
 					socket->_task->resolvePromise(promise, v8::Integer::New(socket->_task->getIsolate(), result));

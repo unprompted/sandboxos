@@ -56,9 +56,17 @@ void File::writeFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::String::Utf8Value utf8FileName(fileName);
 	std::ofstream file(*utf8FileName, std::ios_base::out | std::ios_base::binary);
 
-	v8::String::Utf8Value utf8Contents(contents);
-	if (!file.write(*utf8Contents, utf8Contents.length())) {
-		args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
+	if (contents->ContainsOnlyOneByte()) {
+		std::vector<uint8_t> bytes(contents->Length());
+		contents->WriteOneByte(bytes.data(), 0, bytes.size(), v8::String::NO_NULL_TERMINATION);
+		if (!file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size())) {
+			args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
+		}
+	} else {
+		v8::String::Utf8Value utf8Contents(contents);
+		if (!file.write(*utf8Contents, utf8Contents.length())) {
+			args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), -1));
+		}
 	}
 }
 

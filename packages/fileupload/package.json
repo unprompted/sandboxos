@@ -1,0 +1,7 @@
+{
+	"name": "fileupload",
+	"start": "backend.js",
+	"imports": ["httpd", "filesystem"],
+	"href": "/upload",
+	"description": "File upload test."
+}
