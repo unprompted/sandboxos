@@ -69,15 +69,32 @@ function parseForm(request) {
 function sayHello(request, response) {
 	if (request.method == "POST") {
 		parseForm(request);
-		response.writeHead(200, {"Content-Type": request.multipart[0]["content-type"], "Connection": "close"});
-		response.end(request.multipart[0].data);
-		//response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-		//response.end("test: " + JSON.stringify(request.multipart));
-	} else {
+		return imports.filesystem.getPackageData().then(function(fs) {
+			return fs.ensureDirectoryTreeExists(".").then(function() {
+				return Promise.all([
+					fs.writeFile("data", request.multipart[0].data),
+					fs.writeFile("contentType", request.multipart[0]["content-type"]),
+				]).then(function() {
+					response.writeHead(303, {"Location": request.uri, "Connection": "close"});
+					response.end();
+				});
+			});
+		});
+	} else if (request.uri == "/upload") {
 		response.writeHead(200, {"Content-Type": "text/html", "Connection": "close"});
 		return imports.filesystem.getPackage().then(function(fs) {
 			return fs.readFile("index.html").then(function(data) {
 				return response.end(data);
+			});
+		});
+	} else if (request.uri == "/upload/image") {
+		return imports.filesystem.getPackageData().then(function(fs) {
+			return Promise.all([
+				fs.readFile("data"),
+				fs.readFile("contentType"),
+			]).then(function(results) {
+				response.writeHead(200, {"Content-Type": results[1], "Connection": "close"});
+				return response.end(results[0]);
 			});
 		});
 	}
