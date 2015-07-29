@@ -33,14 +33,19 @@ int Task::_count;
 
 struct ExportRecord {
 	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _persistent;
+	int _useCount;
 
 	ExportRecord(v8::Isolate* isolate, v8::Handle<v8::Function> function)
-	:	_persistent(isolate, function) {
+	:	_persistent(isolate, function),
+		_useCount(0) {
 	}
 
-	static void onRelease(const v8::WeakCallbackData<v8::Function, ExportRecord>& data) {
-		data.GetParameter()->_persistent.Reset();
-		delete data.GetParameter();
+	void ref() {
+		++_useCount;
+	}
+
+	bool release() {
+		return --_useCount == 0;
 	}
 };
 
@@ -433,6 +438,10 @@ exportid_t Task::exportFunction(v8::Handle<v8::Function> function) {
 		_exports[exportId] = record;
 	}
 
+	if (_exports[exportId]) {
+		_exports[exportId]->ref();
+	}
+
 	return exportId;
 }
 
@@ -529,9 +538,9 @@ void Task::onReceivePacket(int packetType, const char* begin, size_t length, voi
 		exportid_t exportId;
 		memcpy(&exportId, begin, sizeof(exportId));
 		if (to->_exports[exportId]) {
-			to->_exports[exportId]->_persistent.Reset();
-			delete to->_exports[exportId];
-			to->_exports.erase(exportId);
+			if (to->_exports[exportId]->release()) {
+				to->_exports.erase(exportId);
+			}
 		}
 		break;
 	case kReleaseImport:
