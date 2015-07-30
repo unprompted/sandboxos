@@ -90,11 +90,11 @@ function Response(client) {
 				reason = kStatusText[status];
 				headers = arguments[1];
 			}
-			var headerString = "HTTP/1.0 " + status + " " + reason + "\n";
+			var headerString = "HTTP/1.0 " + status + " " + reason + "\r\n";
 			for (var i in headers) {
-				headerString += i + ": " + headers[i] + "\n";
+				headerString += i + ": " + headers[i] + "\r\n";
 			}
-			headerString += "\n";
+			headerString += "\r\n";
 			_started = true;
 			client.write(headerString);
 		},
@@ -110,10 +110,10 @@ function Response(client) {
 		},
 		reportError: function(error) {
 			if (!_started) {
-				client.write("HTTP/1.0 500 Internal Server Error\nContent-Type: text/plain\n\n");
+				client.write("HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\n");
 			}
 			if (!_finished) {
-				client.write("500 Internal Server Error\n\n" + error.stackTrace);
+				client.write("500 Internal Server Error\r\n\r\n" + error.stackTrace);
 				client.shutdown();
 			}
 			logError(client.peerName + " - - [" + new Date() + "] " + error);
