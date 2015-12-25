@@ -309,9 +309,9 @@ class TlsContext_osx : public  TlsContext {
 public:
 	~TlsContext_osx() override;
 	TlsSession* createSession() override;
-	bool setCertificate(const char* certificate);
-	bool setPrivateKey(const char* privateKey);
-	bool addTrustedCertificate(const char* certificate);
+	bool setCertificate(const char* certificate) override;
+	bool setPrivateKey(const char* privateKey) override;
+	bool addTrustedCertificate(const char* certificate) override;
 
 	SecKeyRef& getPrivateKey() { return _privateKey; }
 	SecCertificateRef& getCertificate() { return _certificate; }

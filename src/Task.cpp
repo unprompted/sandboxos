@@ -181,7 +181,7 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
 		v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
-		std::cout << *value ? *value : "(null)";
+		std::cout << (*value ? *value : "(null)");
 	}
 	std::cout << '\n';
 }
