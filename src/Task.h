@@ -3,6 +3,7 @@
 
 #include "PacketStream.h"
 
+#include <cstring>
 #include <iostream>
 #include <list>
 #include <map>
@@ -36,6 +37,23 @@ enum MessageType {
 	kStatistics,
 	kSetImports,
 	kGetExports,
+};
+
+class NewArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
+public:
+	void* Allocate(size_t length) {
+		char* bytes = new char[length];
+		std::memset(bytes, 0, length);
+		return bytes;
+	}
+
+	void* AllocateUninitialized(size_t length) {
+		return new char[length];
+	}
+
+	void Free(void* data, size_t length) {
+		delete[] reinterpret_cast<char*>(data);
+	}
 };
 
 class Task {
@@ -83,6 +101,7 @@ private:
 	bool _trusted = false;
 	bool _killed = false;
 	std::string _scriptName;
+	NewArrayBufferAllocator _allocator;
 	v8::Isolate* _isolate = 0;
 
 	std::map<promiseid_t, v8::Persistent<v8::Promise::Resolver, v8::CopyablePersistentTraits<v8::Promise::Resolver> > > _promises;

@@ -96,7 +96,9 @@ struct ImportRecord {
 Task::Task() {
 	_loop = uv_loop_new();
 	++_count;
-	_isolate = v8::Isolate::New();
+	v8::Isolate::CreateParams options;
+	options.array_buffer_allocator = &_allocator;
+	_isolate = v8::Isolate::New(options);
 	_isolate->SetData(0, this);
 }
 
