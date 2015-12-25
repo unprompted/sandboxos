@@ -11,12 +11,15 @@
 # - MDB_USE_POSIX_SEM
 # - MDB_DSYNC
 # - MDB_FDATASYNC
+# - MDB_FDATASYNC_WORKS
 # - MDB_USE_PWRITEV
+# - MDB_USE_ROBUST
 #
 # There may be other macros in mdb.c of interest. You should
 # read mdb.c before changing any of them.
 #
 CC	= gcc
+AR	= ar
 W	= -W -Wall -Wno-unused-parameter -Wbad-function-cast -Wuninitialized
 THREADS = -pthread
 OPT = -O2 -g
@@ -24,6 +27,7 @@ CFLAGS	= $(THREADS) $(OPT) $(W) $(XCFLAGS)
 LDLIBS	=
 SOLIBS	=
 prefix	= /usr/local
+mandir = $(prefix)/man
 
 ########################################################################
 
@@ -35,10 +39,14 @@ PROGS	= $(IPROGS) mtest mtest2 mtest3 mtest4 mtest5
 all:	$(ILIBS) $(PROGS)
 
 install: $(ILIBS) $(IPROGS) $(IHDRS)
+	mkdir -p $(DESTDIR)$(prefix)/bin
+	mkdir -p $(DESTDIR)$(prefix)/lib
+	mkdir -p $(DESTDIR)$(prefix)/include
+	mkdir -p $(DESTDIR)$(prefix)/man/man1
 	for f in $(IPROGS); do cp $$f $(DESTDIR)$(prefix)/bin; done
 	for f in $(ILIBS); do cp $$f $(DESTDIR)$(prefix)/lib; done
 	for f in $(IHDRS); do cp $$f $(DESTDIR)$(prefix)/include; done
-	for f in $(IDOCS); do cp $$f $(DESTDIR)$(prefix)/man/man1; done
+	for f in $(IDOCS); do cp $$f $(DESTDIR)$(mandir)/man1; done
 
 clean:
 	rm -rf $(PROGS) *.[ao] *.[ls]o *~ testdb
@@ -48,7 +56,7 @@ test:	all
 	./mtest && ./mdb_stat testdb
 
 liblmdb.a:	mdb.o midl.o
-	ar rs $@ mdb.o midl.o
+	$(AR) rs $@ mdb.o midl.o
 
 liblmdb.so:	mdb.lo midl.lo
 #	$(CC) $(LDFLAGS) -pthread -shared -Wl,-Bsymbolic -o $@ mdb.o midl.o $(SOLIBS)
