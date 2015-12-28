@@ -27,7 +27,7 @@ env.Append(CPPPATH=[
 	os.path.join('deps', 'liblmdb'),
 ])
 if sys.platform == 'win32':
-	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'libuv', 'advapi32', 'winmm', 'wsock32', 'ws2_32', 'psapi', 'iphlpapi'])
+	env.Append(LIBS=['v8_base_0', 'v8_base_1', 'v8_base_2', 'v8_base_3', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'libuv', 'advapi32', 'winmm', 'wsock32', 'ws2_32', 'psapi', 'iphlpapi'])
 	env.Append(CXXFLAGS=['/EHsc', '/MT', '/Zi', '/Gy'])
 	env.Append(CFLAGS=['/EHsc', '/MT', '/Zi', '/Gy'])
 	env.Append(LIBPATH=[
