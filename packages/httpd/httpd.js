@@ -2,7 +2,6 @@ var gHandlers = [];
 
 function logError(error) {
 	print("ERROR " + error);
-	imports.log.append("ERROR " + error);
 }
 
 function addHandler(handler) {
@@ -125,10 +124,6 @@ function Response(client) {
 function handleRequest(request, response) {
 	var  handler = findHandler(request);
 
-	if (request.uri != "/log/get") {
-		imports.log.append(request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version + " \"" + request.headers["user-agent"] + "\"");
-	}
-
 	if (handler) {
 		handler.invoke(request, response).catch(function(error) {
 			response.reportError(error);
@@ -188,7 +183,7 @@ function handleConnection(client) {
 	}
 
 	client.onError(function(error) {
-		imports.log.append("ERROR " + client.peerName + " - - [" + new Date() + "] " + error);
+		logError(client.peerName + " - - [" + new Date() + "] " + error);
 	});
 
 	client.read(function(data) {

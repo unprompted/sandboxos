@@ -1,7 +1,0 @@
-{
-	"name": "hitcounter",
-	"start": "hitcounter.js",
-	"imports": ["httpd", "filesystem"],
-	"href": "/hitcounter",
-	"description": "A page hit counter test."
-}
