@@ -1,7 +1,0 @@
-{
-	"name": "terminal",
-	"start": "backend.js",
-	"imports": ["auth", "httpd", "filesystem", "shell"],
-	"href": "/terminal",
-	"description": "A very basic terminal which can be used to run commands exposed by the shell task."
-}

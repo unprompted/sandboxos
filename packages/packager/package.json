@@ -1,7 +1,0 @@
-{
-	"name": "packager",
-	"start": "packager.js",
-	"trusted": true,
-	"imports": ["auth", "filesystem", "system"],
-	"description": "Manages installation and copying of installed packages."
-}

@@ -1,7 +1,0 @@
-{
-	"name": "auth",
-	"start": "auth.js",
-	"imports": ["httpd", "filesystem"],
-	"href": "/login",
-	"description": "Handles authentication and authorization.  Validates HTTP sessions for other tasks and presents a login form when visited."
-}

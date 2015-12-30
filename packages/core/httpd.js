@@ -125,9 +125,11 @@ function handleRequest(request, response) {
 	var  handler = findHandler(request);
 
 	if (handler) {
-		handler.invoke(request, response).catch(function(error) {
+		try {
+			handler.invoke(request, response);
+		} catch (error) {
 			response.reportError(error);
-		});
+		}
 	} else {
 		response.writeHead(200, {"Content-Type": "text/plain; encoding=utf-8", "Connection": "close"});
 		response.end("No handler found for request: " + request.uri);
@@ -228,39 +230,28 @@ socket.bind(kHost, kHttpPort).then(function() {
 	logError("[" + new Date() + "] " + error);
 });
 
-imports.filesystem.getPackageData().then(function(fs) {
-	return Promise.all([
-		fs.readFile("privatekey.pem"),
-		fs.readFile("certificate.pem"),
-	]);
-}).then(function(files) {
-	var privateKey = files[0];
-	var certificate = files[1];
+var privateKey = File.readFile("data/httpd/privatekey.pem");
+var certificate = File.readFile("data/httpd/certificate.pem");
 
-	if (privateKey && certificate) {
-		var tls = new TlsContext();
-		tls.setPrivateKey(privateKey);
-		tls.setCertificate(certificate);
+if (privateKey && certificate) {
+	var tls = new TlsContext();
+	tls.setPrivateKey(privateKey);
+	tls.setCertificate(certificate);
 
-		var secureSocket = new Socket();
-		return secureSocket.bind(kHost, kHttpsPort).then(function() {
-			secureSocket.listen(kBacklog, function() {
-				secureSocket.accept().then(function(client) {
-					handleConnection(client);
-					client.startTls(tls).catch(function(error) {
-						logError("[" + new Date() + "] [" + client.peerName + "] " + error);
-					});
-				}).catch(function(error) {
-					logError("[" + new Date() + "] " + error);
+	var secureSocket = new Socket();
+	secureSocket.bind(kHost, kHttpsPort).then(function() {
+		secureSocket.listen(kBacklog, function() {
+			secureSocket.accept().then(function(client) {
+				handleConnection(client);
+				client.startTls(tls).catch(function(error) {
+					logError("[" + new Date() + "] [" + client.peerName + "] " + error);
 				});
+			}).catch(function(error) {
+				logError("[" + new Date() + "] " + error);
 			});
 		});
-	}
-}).catch(function(error) {
-	logError("[" + new Date() + "] " + error);
-});
+	});
+}
 
-exports = {
-	all: all,
-	get: get,
-};
+exports.all = all;
+exports.get = get;

@@ -26,13 +26,13 @@ int main(int argc, char* argv[]) {
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
 	bool isChild = false;
-	const char* systemTask = "packages/system/system.js";
+	const char* coreTask = "packages/core/core.js";
 
 	for (int i = 1; i < argc; ++i) {
 		if (!std::strcmp(argv[i], "--child")) {
 			isChild = true;
 		} else {
-			systemTask = argv[i];
+			coreTask = argv[i];
 		}
 	}
 
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 		Task task;
 		task.setTrusted(true);
 		task.activate();
-		task.execute(systemTask);
+		task.execute(coreTask);
 		task.run();
 	}
 

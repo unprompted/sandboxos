@@ -27,7 +27,7 @@ function storeTarget(target) {
 
 function receive() {
 	$.ajax({
-		url: "/terminal/receive",
+		url: window.location.href + "/receive",
 			method: "POST",
 			data: haveIndex.toString(),
 			dataType: "json",
@@ -92,7 +92,7 @@ function send(command) {
 		$("#input").val("");
 	}
 	$.ajax({
-		url: "/terminal/send",
+		url: window.location.href + "/send",
 			method: "POST",
 			data: value,
 			dataType: "text",
@@ -105,7 +105,6 @@ $(document).ready(function() {
 	$("#input").keydown(enter);
 	$("#input").focus();
 	setTimeout(function() {
-		send("hello");
 		receive();
 	}, 1000);
 });
