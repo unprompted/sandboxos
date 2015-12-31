@@ -1,7 +1,5 @@
 "use strict";
 
-var gTerminals = {};
-
 var kStaticFiles = [
 	{uri: '', path: 'index.html', type: 'text/html'},
 	{uri: '/edit', path: 'edit.html', type: 'text/html'},
@@ -59,16 +57,6 @@ Terminal.prototype.getOutput = function(haveIndex) {
 	});
 }
 
-function getTerminal(basePath, session) {
-	var key = JSON.stringify(basePath, session);
-	if (!gTerminals[key]) {
-		gTerminals[key] = new Terminal();
-		gTerminals[key].basePath = basePath;
-		gTerminals[key].session = session;
-	}
-	return gTerminals[key];
-}
-
 function invoke(handlers, argv) {
 	var promises = [];
 	for (var i = 0; i < handlers.length; ++i) {
@@ -101,18 +89,20 @@ function handler(request, response, basePath, session, process) {
 		}
 	}
 	if (!found) {
-		var terminal = getTerminal(basePath, session);
+		if (!process.terminal) {
+			process.terminal = new Terminal();
+		}
 		if (request.uri == basePath + "/send") {
 			var command = request.body;
-			terminal.print("> " + command);
+			process.terminal.print("> " + command);
 			invoke(process.eventHandlers['onInput'], [command]).then(function() {
 				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
 				response.end("");
 			}).catch(function(error) {
-				terminal.print(error);
+				process.terminal.print(error);
 			});
 		} else if (request.uri == basePath + "/receive") {
-			terminal.getOutput(parseInt(request.body)).then(function(output) {
+			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
 				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
 				response.end(JSON.stringify(output));
 			});
@@ -148,4 +138,3 @@ function handler(request, response, basePath, session, process) {
 }
 
 exports.handler = handler;
-exports.getTerminal = getTerminal;

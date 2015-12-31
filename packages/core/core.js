@@ -48,31 +48,48 @@ function printError(out, error) {
 	}
 }
 
+function broadcast(message) {
+	var sender = this;
+	for (var i in gProcesses) {
+		var process = gProcesses[i];
+		if (process != sender && process.packageName == sender.packageName) {
+			invoke(process.eventHandlers['onMessage'], [message]);
+		}
+	}
+}
+
 function getProcess(packageName, session) {
 	var process = gProcesses[session];
 	if (!process) {
 		print("Creating task for " + packageName + " session " + session);
 		process = {};
 		process.task = new Task();
-		process.eventHandlers = {'onInput': []};
+		process.eventHandlers = {
+			'onInput': [],
+			'onMessage': [],
+		};
 		process.packageName = packageName;
+		process.terminal = new Terminal();
 		gProcesses[session] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
-			var instance = terminal.getTerminal("/" + packageName, session);
 			if (terminationSignal) {
-				instance.print("Process terminated with signal " + terminationSignal + ".");
+				process.terminal.print("Process terminated with signal " + terminationSignal + ".");
 			} else {
-				instance.print("Process ended with exit code " + exitCode + ".");
+				process.terminal.print("Process ended with exit code " + exitCode + ".");
 			}
 			delete gProcesses[session];
 		};
-		var instance = terminal.getTerminal("/" + packageName, session);
-		process.task.setImports({'terminal': {
-			'print': instance.print.bind(instance),
-			'register': function(eventName, handler) {
-				process.eventHandlers[eventName].push(handler);
+		process.task.setImports({
+			'core': {
+				'broadcast': broadcast.bind(process),
 			},
-		}});
+			'terminal': {
+				'print': process.terminal.print.bind(process.terminal),
+				'register': function(eventName, handler) {
+					process.eventHandlers[eventName].push(handler);
+				},
+			},
+		});
 		print("Activating task");
 		process.task.activate();
 		print("Executing task");
@@ -80,10 +97,10 @@ function getProcess(packageName, session) {
 			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
 				print("Task ready");
 			}).catch(function(error) {
-				printError(instance, error);
+				printError(process.terminal, error);
 			});
 		} catch (error) {
-			printError(instance, error);
+			printError(process.terminal, error);
 		}
 	}
 	return process;
@@ -111,6 +128,5 @@ httpd.all("", function(request, response) {
 		kIgnore.indexOf(request.uri) == -1) {
 		process = getProcess(packageName, session);
 	}
-
 	return terminal.handler(request, response, basePath, session, process);
 });

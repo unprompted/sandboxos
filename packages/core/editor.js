@@ -4,6 +4,14 @@ $(document).ready(function() {
 	gBackup = $("#editor").val();
 });
 
+function back() {
+	var url = window.location.href;
+	if (url.substring(url.length - "/edit".length) == "/edit") {
+		url = url.substring(0, url.length - "/edit".length);
+	}
+	window.location.href = url;
+}
+
 function save() {
 	document.getElementById("save").disabled = true;
 	document.getElementById("saveAndRun").disabled = true;
@@ -26,13 +34,7 @@ function save() {
 }
 
 function saveAndRun() {
-	save().done(function() {
-		var url = window.location.href;
-		if (url.substring(url.length - "/edit".length) == "/edit") {
-			url = url.substring(0, url.length - "/edit".length);
-		}
-		window.location.href = url;
-	});
+	save().done(back);
 }
 
 function revert() {
