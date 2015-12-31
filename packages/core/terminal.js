@@ -57,18 +57,14 @@ Terminal.prototype.getOutput = function(haveIndex) {
 	});
 }
 
-Terminal.prototype.send = function(user, message) {
-	if (gTerminals[user]) {
-		gTerminals[user].print("Message from " + this.owner + ": " + message);
+function getTerminal(basePath, session) {
+	var key = JSON.stringify(basePath, session);
+	if (!gTerminals[key]) {
+		gTerminals[key] = new Terminal();
+		gTerminals[key].basePath = basePath;
+		gTerminals[key].session = session;
 	}
-}
-
-function getTerminal(session) {
-	if (!gTerminals[session.name]) {
-		gTerminals[session.name] = new Terminal();
-		gTerminals[session.name].owner = session.name;
-	}
-	return gTerminals[session.name];
+	return gTerminals[key];
 }
 
 function invoke(handlers, argv) {
@@ -94,7 +90,7 @@ function handler(request, response, basePath, session, process) {
 		}
 	}
 	if (!found) {
-		var terminal = getTerminal(session);
+		var terminal = getTerminal(basePath, session);
 		if (request.uri == basePath + "/send") {
 			var command = request.body;
 			terminal.print("> " + command);

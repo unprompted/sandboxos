@@ -36,6 +36,18 @@ function makeSessionId() {
 	return id;
 }
 
+function printError(out, error) {
+	if (error.stackTrace) {
+		out.print(error.fileName + ":" + error.lineNumber + ": " + error.message);
+		out.print(error.stackTrace);
+	} else {
+		for (var i in error) {
+			out.print(i);
+		}
+		out.print(error.toString());
+	}
+}
+
 function getProcess(packageName, session) {
 	var process = gProcesses[session];
 	if (!process) {
@@ -52,7 +64,7 @@ function getProcess(packageName, session) {
 			}
 			delete gProcesses[session];
 		};
-		var instance = terminal.getTerminal(session);
+		var instance = terminal.getTerminal("/" + packageName, session);
 		process.task.setImports({'terminal': {
 			'print': instance.print.bind(instance),
 			'register': function(eventName, handler) {
@@ -62,9 +74,15 @@ function getProcess(packageName, session) {
 		print("Activating task");
 		process.task.activate();
 		print("Executing task");
-		process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
-			print("Task ready");
-		});
+		try {
+			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
+				print("Task ready");
+			}).catch(function(error) {
+				printError(instance, error);
+			});
+		} catch (error) {
+			printError(instance, error);
+		}
 	}
 	return process;
 }

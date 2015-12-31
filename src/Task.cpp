@@ -217,10 +217,13 @@ void Task::execute(const char* fileName) {
 			script->Run();
 			std::cout << "Script " << fileName << " completed\n";
 		} else {
-			std::cerr << "Failed to compile script.\n";
+			std::cerr << "Failed to compile: " << fileName << ".\n";
 		}
 	} else {
-		std::cerr << "Failed to load file " << fileName << "\n";
+		std::string message;
+		message = "Failed to load file: ";
+		message += fileName;
+		_isolate->ThrowException(v8::Exception::Error(v8::String::NewFromUtf8(_isolate, message.c_str())));
 	}
 }
 
