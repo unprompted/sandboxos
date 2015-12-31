@@ -56,7 +56,7 @@ function escape(line) {
 
 function autoNewLine() {
 	if (document.getElementById("terminal").innerHTML) {
-		document.getElementById("terminal").innerHTML += "<br/>\n";
+		document.getElementById("terminal").innerHTML += "\n";
 	}
 }
 

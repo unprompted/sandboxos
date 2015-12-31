@@ -32,6 +32,7 @@ body {
 	border: 1px solid #040;
 	outline: none;
 	word-wrap: break-word;
+	white-space: pre;
 }
 
 .input {
