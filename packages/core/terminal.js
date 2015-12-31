@@ -84,6 +84,9 @@ function handler(request, response, basePath, session, process) {
 			(basePath + kStaticFiles[i].uri === request.uri)) {
 			found = true;
 			var data = File.readFile("packages/core/" + kStaticFiles[i].path);
+			if (kStaticFiles[i].uri == "") {
+				data = data.replace("$(VIEW_SOURCE)", basePath + "/view");
+			}
 			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Connection": "close", "Set-Cookie": sessionCookie});
 			response.end(data);
 			break;
@@ -94,16 +97,22 @@ function handler(request, response, basePath, session, process) {
 		if (request.uri == basePath + "/send") {
 			var command = request.body;
 			terminal.print("> " + command);
-			return invoke(process.eventHandlers['onInput'], [command]).catch(function(error) {
+			invoke(process.eventHandlers['onInput'], [command]).then(function() {
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+				response.end("");
+			}).catch(function(error) {
 				terminal.print(error);
 			});
-			response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
-			response.end("OK");
 		} else if (request.uri == basePath + "/receive") {
 			terminal.getOutput(parseInt(request.body)).then(function(output) {
 				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
 				response.end(JSON.stringify(output));
 			});
+		} else if (request.uri == basePath + "/view") {
+			var packageName = basePath.substring(1);
+			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
+			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close", "Set-Cookie": sessionCookie});
+			response.end(data);
 		}
 	}
 }
