@@ -1,0 +1,18 @@
+<html>
+	<head>
+		<title>Web Terminal</title>
+		<link type ="text/css" rel="stylesheet" href="/terminal/style.css"></link>
+	</head>
+	<body>
+		<div id="body">
+			<div>
+				<input type="button" id="save" name="save" value="Save" onclick="save()">
+				<input type="button" id="saveAndRun" name="saveAndRun" value="Save and Run" onclick="saveAndRun()">
+				<input type="button" id="revert" name="revert" value="Revert to Saved" onclick="revert()">
+			</div>
+			<textarea id="editor" class="main">$(SOURCE)</textarea>
+			<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+			<script src="/terminal/editor.js"></script>
+		</div>
+	</body>
+</html>

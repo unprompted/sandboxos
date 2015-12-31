@@ -4,8 +4,10 @@ var gTerminals = {};
 
 var kStaticFiles = [
 	{uri: '', path: 'index.html', type: 'text/html'},
+	{uri: '/edit', path: 'edit.html', type: 'text/html'},
 	{uri: '/style.css', path: 'style.css', type: 'text/css'},
 	{uri: '/client.js', path: 'client.js', type: 'text/javascript'},
+	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript'},
 ];
 var kBacklog = 64;
 
@@ -86,6 +88,12 @@ function handler(request, response, basePath, session, process) {
 			var data = File.readFile("packages/core/" + kStaticFiles[i].path);
 			if (kStaticFiles[i].uri == "") {
 				data = data.replace("$(VIEW_SOURCE)", basePath + "/view");
+				data = data.replace("$(EDIT_SOURCE)", basePath + "/edit");
+			} else if (kStaticFiles[i].uri == "/edit") {
+				var packageName = basePath.substring(1);
+				var source = File.readFile("packages/" + packageName + "/" + packageName + ".js") || "";
+				source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
+				data = data.replace("$(SOURCE)", source);
 			}
 			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Connection": "close", "Set-Cookie": sessionCookie});
 			response.end(data);
@@ -113,6 +121,28 @@ function handler(request, response, basePath, session, process) {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
 			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close", "Set-Cookie": sessionCookie});
 			response.end(data);
+		} else if (request.uri == basePath + "/save") {
+			var packageName = basePath.substring(1);
+			if (packageName == "core" ||
+				packageName.indexOf(".") != -1 ||
+				packageName.indexOf("/") != -1)
+			{
+				response.writeHead(403, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+				response.end("Invalid package name: " + packageName);
+			} else {
+				File.makeDirectory("packages/" + packageName)
+				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
+					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+					response.end();
+					updateProcesses(packageName);
+				} else {
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+					response.end("Problem saving: " + packageName);
+				}
+			}
+		} else {
+			response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close", "Set-Content": sessionCookie});
+			response.end("404 File not found");
 		}
 	}
 }

@@ -23,7 +23,7 @@ function wait() {
 	});
 }
 
-imports.terminal.print("Welcome to a test BBS!");
+imports.terminal.print("Welcome to a test BBS!!!");
 
 function main() {
 	return wait().then(function(input) {

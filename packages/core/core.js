@@ -55,12 +55,14 @@ function getProcess(packageName, session) {
 		process = {};
 		process.task = new Task();
 		process.eventHandlers = {'onInput': []};
+		process.packageName = packageName;
 		gProcesses[session] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
+			var instance = terminal.getTerminal("/" + packageName, session);
 			if (terminationSignal) {
-				print("Task " + session + " terminated with signal " + terminationSignal + ".");
+				instance.print("Process terminated with signal " + terminationSignal + ".");
 			} else {
-				print("Task " + session + " returned " + exitCode + ".");
+				instance.print("Process ended with exit code " + exitCode + ".");
 			}
 			delete gProcesses[session];
 		};
@@ -85,6 +87,16 @@ function getProcess(packageName, session) {
 		}
 	}
 	return process;
+}
+
+function updateProcesses(packageName) {
+	for (var i in gProcesses) {
+		var process = gProcesses[i];
+		if (process.packageName == packageName) {
+			process.task.kill();
+			process.task = null;
+		}
+	}
 }
 
 var kIgnore = ["/favicon.ico"];
