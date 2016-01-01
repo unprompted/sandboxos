@@ -57,7 +57,7 @@ function main() {
 
 function chat() {
 	imports.terminal.print("");
-	imports.terminal.print("You are now in a chat.");
+	imports.terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say \"exit\".");
 	return wait().then(chatLoop);
 }
 

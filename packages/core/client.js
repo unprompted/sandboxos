@@ -108,7 +108,6 @@ function getNewSession() {
 			method: "GET",
 			dataType: "json",
 	}).then(function(data) {
-		console.debug(data);
 		gSessionId = data.sessionId;
 		receive();
 	}).fail(function(xhr, message, error) {

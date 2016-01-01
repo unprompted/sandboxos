@@ -4,37 +4,55 @@ $(document).ready(function() {
 	gBackup = $("#editor").val();
 });
 
-function back() {
-	var url = window.location.href;
-	if (url.substring(url.length - "/edit".length) == "/edit") {
-		url = url.substring(0, url.length - "/edit".length);
+function packageName() {
+	var name = window.location.pathname;
+	var start = 0;
+	var end = -1;
+	while (name.charAt(start) == '/') {
+		start++;
 	}
-	window.location.href = url;
+	for (var i = start + 1; i < name.length; i++) {
+		if (name.charAt(i) == '/') {
+			end = i;
+		}
+	}
+	return name.substring(start, end);
 }
 
-function save() {
+function back(name) {
+	window.location.pathname = "/" + (name || packageName());
+}
+
+function save(newName) {
 	document.getElementById("save").disabled = true;
-	document.getElementById("saveAndRun").disabled = true;
+	document.getElementById("saveAs").disabled = true;
 
 	var contents = $("#editor").val();
+	var run = document.getElementById("run").checked;
 
 	return $.ajax({
 		type: "POST",
-		url: "save",
+		url: newName ? "/" + newName + "/save" : "save",
 		data: contents,
 		dataType: "text",
 	}).done(function() {
 		gBackup = contents;
+		if (run) {
+			back(newName);
+		}
 	}).fail(function(xhr, status, error) {
 		alert("Unable to save: " + xhr.responseText);
 	}).always(function() {
 		document.getElementById("save").disabled = false;
-		document.getElementById("saveAndRun").disabled = false;
+		document.getElementById("saveAs").disabled = false;
 	});
 }
 
-function saveAndRun() {
-	save().done(back);
+function saveAs() {
+	var newName = prompt("Save as:", packageName());
+	if (newName) {
+		save(newName);
+	}
 }
 
 function revert() {
