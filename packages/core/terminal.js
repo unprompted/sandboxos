@@ -98,15 +98,16 @@ function handler(request, response, basePath) {
 			var command = request.body;
 			process.terminal.print("> " + command);
 			invoke(process.eventHandlers['onInput'], [command]).then(function() {
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Content-Length": "0"});
 				response.end("");
 			}).catch(function(error) {
 				process.terminal.print(error);
 			});
 		} else if (request.uri == basePath + "/receive") {
 			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
-				response.end(JSON.stringify(output));
+				var data = JSON.stringify(output);
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Content-Length": data.length.toString()});
+				response.end(data);
 			}).catch(function(error) {
 				print("ERROR GETTING OUTPUT!");
 			});

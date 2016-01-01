@@ -165,8 +165,8 @@ function handleConnection(client) {
 				headers[key.toLowerCase()] = value;
 				return true;
 			} else {
-				if (headers["content-length"] > 0) {
-					bodyToRead = headers["content-length"];
+				if (headers["content-length"] != undefined) {
+					bodyToRead = parseInt(headers["content-length"]);
 					lineByLine = false;
 					body = "";
 					return true;
@@ -197,7 +197,7 @@ function handleConnection(client) {
 					more = false;
 					var end = inputBuffer.indexOf('\n');
 					var realEnd = end;
-					while  (end > 0 && inputBuffer[end - 1] == '\r') {
+					if (end > 0 && inputBuffer[end - 1] == '\r') {
 						--end;
 					}
 					if (end != -1) {
