@@ -4,6 +4,10 @@ var gEditor;
 $(document).ready(function() {
 	gEditor = CodeMirror.fromTextArea(document.getElementById("editor"), {
 		'theme': 'base16-dark',
+		'lineNumbers': true,
+		'tabSize': 4,
+		'indentUnit': 4,
+		'indentWithTabs': true,
 	});
 	gBackup = gEditor.getValue();
 });
