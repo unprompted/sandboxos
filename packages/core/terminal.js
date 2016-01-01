@@ -107,6 +107,8 @@ function handler(request, response, basePath) {
 			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
 				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end(JSON.stringify(output));
+			}).catch(function(error) {
+				print("ERROR GETTING OUTPUT!");
 			});
 		} else if (request.uri == basePath + "/view") {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");

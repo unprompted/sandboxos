@@ -74,6 +74,11 @@ private:
 	static void onWrite(uv_write_t* request, int status);
 	static void onRelease(const v8::WeakCallbackData<v8::Object, Socket>& data);
 
+	void processTlsShutdown(promiseid_t promise);
+	static void onTlsShutdown(uv_write_t* request, int status);
+	void shutdownInternal(promiseid_t promise);
+
+	bool processSomeOutgoingTls(promiseid_t promise, uv_write_cb callback);
 	void processOutgoingTls();
 	void reportTlsErrors();
 	void reportError(const char* error);
