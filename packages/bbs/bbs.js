@@ -35,7 +35,7 @@ function welcome() {
 	imports.terminal.print('/ /___/ /_/ / /  / /_/ / (__  )  / /_/ / /_/ /__/ / ');
 	imports.terminal.print('\\____/\\____/_/   \\__, / /____/  /_____/_____/____/  ');
 	imports.terminal.print('                /____/                              ');
-	imports.terminal.print('             the future of text-based communication.');
+	imports.terminal.print('                    yesterday\'s technology...today!');
 }
 
 function main() {

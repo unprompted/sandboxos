@@ -1,4 +1,5 @@
-var haveIndex = -1;
+var gHaveIndex = -1;
+var gSessionId;
 
 function enter(event) {
 	if (event.keyCode == 13) {
@@ -27,9 +28,9 @@ function storeTarget(target) {
 
 function receive() {
 	$.ajax({
-		url: window.location.href + "/receive",
+		url: window.location.href + "/receive?sessionId=" + gSessionId,
 			method: "POST",
-			data: haveIndex.toString(),
+			data: gHaveIndex.toString(),
 			dataType: "json",
 	}).then(function(data) {
 		for (var i in data.lines) {
@@ -43,7 +44,7 @@ function receive() {
 				print(JSON.stringify(data.lines[i]));
 			}
 		}
-		haveIndex = data.index;
+		gHaveIndex = data.index;
 		receive();
 	}).fail(function(xhr, message, error) {
 		print("RECEIVE FAILED.  Reload to resume.");
@@ -92,7 +93,7 @@ function send(command) {
 		$("#input").val("");
 	}
 	$.ajax({
-		url: window.location.href + "/send",
+		url: window.location.href + "/send?sessionId=" + gSessionId,
 			method: "POST",
 			data: value,
 			dataType: "text",
@@ -101,10 +102,27 @@ function send(command) {
 	});
 }
 
+function getNewSession() {
+	$.ajax({
+		url: window.location.href + "/newSession",
+			method: "GET",
+			dataType: "json",
+	}).then(function(data) {
+		console.debug(data);
+		gSessionId = data.sessionId;
+		receive();
+	}).fail(function(xhr, message, error) {
+		print("Error starting session.");
+	});
+}
+
 $(document).ready(function() {
 	$("#input").keydown(enter);
 	$("#input").focus();
+});
+
+$(window).load(function() {
 	setTimeout(function() {
-		receive();
-	}, 1000);
+		getNewSession();
+	}, 0);
 });

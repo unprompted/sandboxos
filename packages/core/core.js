@@ -122,11 +122,5 @@ var httpd = require("httpd");
 httpd.all("", function(request, response) {
 	var packageName = request.uri.split("/")[1];
 	var basePath = "/" + packageName;
-	var session = getCookies(request.headers).terminalSession || makeSessionId();
-	var process = null;
-	if (packageName != "terminal" &&
-		kIgnore.indexOf(request.uri) == -1) {
-		process = getProcess(packageName, session);
-	}
-	return terminal.handler(request, response, basePath, session, process);
+	return terminal.handler(request, response, basePath);
 });

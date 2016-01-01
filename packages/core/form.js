@@ -14,8 +14,8 @@ function decode(encoded) {
 	return result;
 }
 
-function decodeForm(encoded) {
-	var result = {};
+function decodeForm(encoded, initial) {
+	var result = initial || {};
 	if (encoded) {
 		encoded = encoded.trim();
 		var items = encoded.split('&');

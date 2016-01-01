@@ -65,9 +65,15 @@ function invoke(handlers, argv) {
 	return Promise.all(promises);
 }
 
-function handler(request, response, basePath, session, process) {
+function handler(request, response, basePath) {
 	var found = false;
-	var sessionCookie = "terminalSession=" + session + "; path=" + basePath + "; Max-Age=604800";
+	var formData = form.decodeForm(request.query);
+	var packageName = basePath.substring(1);
+	var process;
+
+	if (formData.sessionId) {
+		process = getProcess(packageName, formData.sessionId);
+	}
 
 	for (var i in kStaticFiles) {
 		if (("/terminal" + kStaticFiles[i].uri === request.uri) ||
@@ -78,60 +84,57 @@ function handler(request, response, basePath, session, process) {
 				data = data.replace("$(VIEW_SOURCE)", basePath + "/view");
 				data = data.replace("$(EDIT_SOURCE)", basePath + "/edit");
 			} else if (kStaticFiles[i].uri == "/edit") {
-				var packageName = basePath.substring(1);
 				var source = File.readFile("packages/" + packageName + "/" + packageName + ".js") || "";
 				source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
 				data = data.replace("$(SOURCE)", source);
 			}
-			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Connection": "close", "Set-Cookie": sessionCookie});
+			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Connection": "close"});
 			response.end(data);
 			break;
 		}
 	}
 	if (!found) {
-		if (!process.terminal) {
-			process.terminal = new Terminal();
-		}
 		if (request.uri == basePath + "/send") {
 			var command = request.body;
 			process.terminal.print("> " + command);
 			invoke(process.eventHandlers['onInput'], [command]).then(function() {
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end("");
 			}).catch(function(error) {
 				process.terminal.print(error);
 			});
 		} else if (request.uri == basePath + "/receive") {
 			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end(JSON.stringify(output));
 			});
 		} else if (request.uri == basePath + "/view") {
-			var packageName = basePath.substring(1);
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
-			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close", "Set-Cookie": sessionCookie});
+			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close"});
 			response.end(data);
 		} else if (request.uri == basePath + "/save") {
-			var packageName = basePath.substring(1);
 			if (packageName == "core" ||
 				packageName.indexOf(".") != -1 ||
 				packageName.indexOf("/") != -1)
 			{
-				response.writeHead(403, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+				response.writeHead(403, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end("Invalid package name: " + packageName);
 			} else {
 				File.makeDirectory("packages/" + packageName)
 				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
-					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end();
 					updateProcesses(packageName);
 				} else {
-					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close", "Set-Cookie": sessionCookie});
+					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end("Problem saving: " + packageName);
 				}
 			}
+		} else if (request.uri == basePath + "/newSession") {
+			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close"});
+			response.end(JSON.stringify({'sessionId': makeSessionId()}));
 		} else {
-			response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close", "Set-Content": sessionCookie});
+			response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close"});
 			response.end("404 File not found");
 		}
 	}
