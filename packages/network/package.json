@@ -1,6 +1,0 @@
-{
-	"name": "network",
-	"start": "network.js",
-	"trusted": true,
-	"description": "A task for maintaining persistent network connections."
-}

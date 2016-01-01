@@ -1,5 +1,0 @@
-{
-	"name": "log",
-	"start": "log.js",
-	"description": "Use this to log messages.  They can be viewed in logviewer."
-}

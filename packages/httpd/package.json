@@ -1,7 +1,0 @@
-{
-	"name": "httpd",
-	"start": "httpd.js",
-	"trusted": true,
-	"imports": ["log", "filesystem"],
-	"description": "A very basic web server."
-}

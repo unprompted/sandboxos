@@ -1,7 +1,0 @@
-{
-	"name": "filesystem",
-	"start": "filesystem.js",
-	"imports": [],
-	"trusted": true,
-	"description": "Provides appropriately limited access to the host filesystem."
-}

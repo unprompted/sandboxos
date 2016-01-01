@@ -1,6 +1,0 @@
-{
-	"name": "xmpp",
-	"start": "xmpp.js",
-	"imports": ["auth", "shell", "network", "filesystem"],
-	"description": "An extremely work in progress XMPP client."
-}

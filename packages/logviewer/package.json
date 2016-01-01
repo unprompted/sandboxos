@@ -1,7 +1,0 @@
-{
-	"name": "logviewer",
-	"start": "logviewer.js",
-	"imports": ["httpd", "log", "filesystem"],
-	"href": "/log",
-	"description": "Displays a scrolling window of all messages logged via the log task."
-}

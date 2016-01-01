@@ -9,6 +9,8 @@
 #include <cstring>
 #include <uv.h>
 
+#include <iostream>
+
 int Socket::_count = 0;
 int Socket::_openCount = 0;
 TlsContext* Socket::_defaultTlsContext = 0;
@@ -137,32 +139,34 @@ void Socket::stopTls(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 }
 
-void Socket::processOutgoingTls() {
-	while (true) {
-		char buffer[8192];
-		int result = _tls->readEncrypted(buffer, sizeof(buffer));
-		if (result > 0) {
-			char* rawBuffer = new char[sizeof(uv_write_t) + result];
-			uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
-			std::memset(request, 0, sizeof(*request));
-			request->data = reinterpret_cast<void*>(-1);
-			rawBuffer += sizeof(uv_write_t);
-			std::memcpy(rawBuffer, buffer, result);
+bool Socket::processSomeOutgoingTls(promiseid_t promise, uv_write_cb callback) {
+	char buffer[8192];
+	int result = _tls->readEncrypted(buffer, sizeof(buffer));
+	if (result > 0) {
+		char* rawBuffer = new char[sizeof(uv_write_t) + result];
+		uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
+		std::memset(request, 0, sizeof(*request));
+		request->data = reinterpret_cast<void*>(promise);
+		rawBuffer += sizeof(uv_write_t);
+		std::memcpy(rawBuffer, buffer, result);
 
-			uv_buf_t writeBuffer;
-			writeBuffer.base = rawBuffer;
-			writeBuffer.len = result;
+		uv_buf_t writeBuffer;
+		writeBuffer.base = rawBuffer;
+		writeBuffer.len = result;
 
-			int writeResult = uv_write(request, reinterpret_cast<uv_stream_t*>(&_socket), &writeBuffer, 1, onWrite);
-			if (writeResult != 0) {
-				std::string error = "uv_write: " + std::string(uv_strerror(writeResult));
-				reportError(error.c_str());
-			}
-		} else {
-			reportTlsErrors();
-			break;
+		int writeResult = uv_write(request, reinterpret_cast<uv_stream_t*>(&_socket), &writeBuffer, 1, callback);
+		if (writeResult != 0) {
+			std::string error = "uv_write: " + std::string(uv_strerror(writeResult));
+			reportError(error.c_str());
 		}
+	} else {
+		reportTlsErrors();
 	}
+	return result > 0;
+}
+
+void Socket::processOutgoingTls() {
+	while (processSomeOutgoingTls(-1, onWrite)) {}
 }
 
 void Socket::bind(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -337,24 +341,40 @@ void Socket::close(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void Socket::shutdown(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (Socket* socket = Socket::get(args.Data())) {
 		if (socket->_tls) {
-			socket->_tls->shutdown();
-			socket->processOutgoingTls();
 			promiseid_t promise = socket->_task->allocatePromise();
-			socket->_task->resolvePromise(promise, v8::Undefined(socket->_task->getIsolate()));
+			socket->processTlsShutdown(promise);
 			args.GetReturnValue().Set(socket->_task->getPromise(promise));
 		} else {
-			uv_shutdown_t* request = new uv_shutdown_t();
-			std::memset(request, 0, sizeof(*request));
 			promiseid_t promise = socket->_task->allocatePromise();
-			request->data = reinterpret_cast<void*>(promise);
-			int result = uv_shutdown(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), onShutdown);
-			if (result != 0) {
-				std::string error = "uv_shutdown: " + std::string(uv_strerror(result));
-				socket->_task->rejectPromise(promise, v8::Exception::Error(v8::String::NewFromUtf8(socket->_task->getIsolate(), error.c_str())));
-				delete request;
-			}
+			socket->shutdownInternal(promise);
 			args.GetReturnValue().Set(socket->_task->getPromise(promise));
 		}
+	}
+}
+
+void Socket::shutdownInternal(promiseid_t promise) {
+	uv_shutdown_t* request = new uv_shutdown_t();
+	std::memset(request, 0, sizeof(*request));
+	request->data = reinterpret_cast<void*>(promise);
+	int result = uv_shutdown(request, reinterpret_cast<uv_stream_t*>(&_socket), onShutdown);
+	if (result != 0) {
+		std::string error = "uv_shutdown: " + std::string(uv_strerror(result));
+		_task->rejectPromise(promise, v8::Exception::Error(v8::String::NewFromUtf8(_task->getIsolate(), error.c_str())));
+		delete request;
+	}
+}
+
+void Socket::processTlsShutdown(promiseid_t promise) {
+	_tls->shutdown();
+	if (!processSomeOutgoingTls(promise, onTlsShutdown)) {
+		shutdownInternal(promise);
+	}
+}
+
+void Socket::onTlsShutdown(uv_write_t* request, int status) {
+	if (Socket* socket = reinterpret_cast<Socket*>(request->handle->data)) {
+		promiseid_t promise = reinterpret_cast<intptr_t>(request->data);
+		socket->processTlsShutdown(promise);
 	}
 }
 
