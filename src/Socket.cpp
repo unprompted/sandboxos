@@ -9,8 +9,6 @@
 #include <cstring>
 #include <uv.h>
 
-#include <iostream>
-
 int Socket::_count = 0;
 int Socket::_openCount = 0;
 TlsContext* Socket::_defaultTlsContext = 0;
@@ -438,30 +436,30 @@ void Socket::onRead(uv_stream_t* stream, ssize_t readSize, const uv_buf_t* buffe
 							socket->_task->rejectPromise(promise, v8::Undefined(socket->_task->getIsolate()));
 						}
 					}
-				} else {
-					while (true) {
-						char plain[8192];
-						int result = socket->_tls->readPlain(plain, sizeof(plain));
-						if (result > 0) {
-							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
-							if (!callback.IsEmpty()) {
-								data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
-								callback->Call(callback, 1, &data);
-							}
-						} else if (result == TlsSession::kReadFailed) {
-							socket->reportTlsErrors();
-							socket->close();
-							break;
-						} else if (result == TlsSession::kReadZero) {
-							v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
-							if (!callback.IsEmpty()) {
-								data = v8::Undefined(socket->_task->getIsolate());
-								callback->Call(callback, 1, &data);
-							}
-							break;
-						} else {
-							break;
+				}
+
+				while (true) {
+					char plain[8192];
+					int result = socket->_tls->readPlain(plain, sizeof(plain));
+					if (result > 0) {
+						v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
+						if (!callback.IsEmpty()) {
+							data = v8::String::NewFromOneByte(socket->_task->getIsolate(), reinterpret_cast<const uint8_t*>(plain), v8::String::kNormalString, result);
+							callback->Call(callback, 1, &data);
 						}
+					} else if (result == TlsSession::kReadFailed) {
+						socket->reportTlsErrors();
+						socket->close();
+						break;
+					} else if (result == TlsSession::kReadZero) {
+						v8::Local<v8::Function> callback = v8::Local<v8::Function>::New(socket->_task->getIsolate(), socket->_onRead);
+						if (!callback.IsEmpty()) {
+							data = v8::Undefined(socket->_task->getIsolate());
+							callback->Call(callback, 1, &data);
+						}
+						break;
+					} else {
+						break;
 					}
 				}
 				if (socket->_tls) {
