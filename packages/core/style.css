@@ -56,3 +56,7 @@ body {
 #target {
 	font-family: monospace;
 }
+
+.CodeMirror {
+	height: 100%;
+}

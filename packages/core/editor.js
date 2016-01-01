@@ -1,7 +1,11 @@
 var gBackup;
+var gEditor;
 
 $(document).ready(function() {
-	gBackup = $("#editor").val();
+	gEditor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+		'theme': 'base16-dark',
+	});
+	gBackup = gEditor.getValue();
 });
 
 function packageName() {
@@ -27,7 +31,7 @@ function save(newName) {
 	document.getElementById("save").disabled = true;
 	document.getElementById("saveAs").disabled = true;
 
-	var contents = $("#editor").val();
+	var contents = gEditor.getValue();
 	var run = document.getElementById("run").checked;
 
 	return $.ajax({
@@ -56,5 +60,5 @@ function saveAs() {
 }
 
 function revert() {
-	$("#editor").val(gBackup);
+	gEditor.setValue(gBackup);
 }
