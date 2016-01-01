@@ -1,6 +1,4 @@
 "use strict";
-var gWaiting = [];
-var gMessages = [];
 var gOnInput = null;
 
 imports.terminal.register("onMessage", function(message) {
@@ -45,16 +43,11 @@ function main() {
 function chat() {
 	imports.terminal.print("");
 	imports.terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say \"exit\".");
-	chatLoop();
-}
-
-function chatLoop(input) {
 	gOnInput = function(input) {
 		if (input == "exit") {
 			main();
 		} else {
 			imports.core.broadcast(input);
-			chatLoop();
 		}
 	};
 }
