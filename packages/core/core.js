@@ -58,6 +58,36 @@ function broadcast(message) {
 	}
 }
 
+function getDatabase(process) {
+	if (!process.database) {
+		File.makeDirectory('data');
+		File.makeDirectory('data/' + process.packageName);
+		File.makeDirectory('data/' + process.packageName + "/db");
+		process.database = new Database('data/' + process.packageName + '/db');
+	}
+	return process.database;
+}
+
+function databaseGet(key) {
+	var db = getDatabase(this);
+	return db.get(key);
+}
+
+function databaseSet(key, value) {
+	var db = getDatabase(this);
+	return db.set(key, value);
+}
+
+function databaseRemove(key) {
+	var db = getDatabase(this);
+	return db.remove(key);
+}
+
+function databaseGetAll() {
+	var db = getDatabase(this);
+	return db.getAll();
+}
+
 function getProcess(packageName, session) {
 	var process = gProcesses[session];
 	if (!process) {
@@ -70,6 +100,7 @@ function getProcess(packageName, session) {
 		};
 		process.packageName = packageName;
 		process.terminal = new Terminal();
+		process.database = null;
 		gProcesses[session] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
 			if (terminationSignal) {
@@ -82,6 +113,12 @@ function getProcess(packageName, session) {
 		process.task.setImports({
 			'core': {
 				'broadcast': broadcast.bind(process),
+			},
+			'database': {
+				'get': databaseGet.bind(process),
+				'set': databaseSet.bind(process),
+				'remove': databaseRemove.bind(process),
+				'getAll': databaseGetAll.bind(process),
 			},
 			'terminal': {
 				'print': process.terminal.print.bind(process.terminal),

@@ -20,16 +20,23 @@ function welcome() {
 	imports.terminal.print('\\____/\\____/_/   \\__, / /____/  /_____/_____/____/  ');
 	imports.terminal.print('                /____/                              ');
 	imports.terminal.print('                    yesterday\'s technology...today!');
+	main();
 }
 
 function main() {
 	imports.terminal.print("");
-	imports.terminal.print("Commands:");
+	imports.terminal.print("Main menu commands:");
 	imports.terminal.print("  chat       enter the group chat");
+	imports.terminal.print("  board      message board (not really a message board - just a database test)");
+	imports.terminal.print("  guess      guess the number game");
 	imports.terminal.print("  exit       end the current session (and start a new one)");
 	gOnInput = function(input) {
 		if (input == "chat") {
 			chat();
+		} else if (input == "board") {
+			board();
+		} else if (input == "guess") {
+			guess();
 		} else if (input == "exit") {
 			imports.terminal.print("Goodbye.");
 			exit(0);
@@ -52,5 +59,66 @@ function chat() {
 	};
 }
 
+function board() {
+	imports.terminal.print("Message board commands: get, set, remove, getAll, exit");
+	gOnInput = function(input) {
+		var parts = input.split(' ');
+		if (parts[0] == "get") {
+			imports.database.get(parts[1]).then(function(value) {
+				imports.terminal.print(parts[0] + " => " + value);
+			}).catch(function(error) {
+				imports.terminal.print(error);
+			});
+		} else if (parts[0] == "set") {
+			imports.database.set(parts[1], parts[2]).then(function() {
+				imports.terminal.print("set");
+			}).catch(function(error) {
+				imports.terminal.print(error);
+			});
+		} else if (parts[0] == "remove") {
+			imports.database.remove(parts[1]).then(function(value) {
+				imports.terminal.print(parts[0] + " removed");
+			}).catch(function(error) {
+				imports.terminal.print(error);
+			});
+		} else if (parts[0] == "getAll") {
+			imports.database.getAll().then(function(data) {
+				imports.terminal.print(data.join(", "));
+			}).catch(function(error) {
+				imports.terminal.print(error);
+			});
+		} else if (parts[0] == "exit") {
+			main();
+		} else {
+			imports.terminal.print("I didn't get that.");
+		}
+	}
+}
+
+function guess() {
+	var number = Math.round(Math.random() * 100);
+	var guesses = 0;
+	imports.terminal.print("OK, I have a number in mind.  What do you think it is?  Use \"exit\" to stop.");
+	gOnInput = function(input) {
+		if (input == "exit") {
+			main();
+		} else {
+			var guess = parseInt(input);
+			guesses++;
+			if (input != guess.toString()) {
+				imports.terminal.print("I'm not sure that's an integer.  Please guess only integers.");
+			} else {
+				if (guess < number) {
+					imports.terminal.print("Too low.");
+				} else if (guess > number) {
+					imports.terminal.print("Too high.");
+				} else if (guess == number) {
+					imports.terminal.print("Wow, you got it in " + guesses + " guesses!  It was " + number + ".");
+					main();
+				}
+			}
+		}
+	}
+}
+
 welcome();
-main();
