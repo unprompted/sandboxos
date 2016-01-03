@@ -7,7 +7,6 @@ var kStaticFiles = [
 	{uri: '/client.js', path: 'client.js', type: 'text/javascript'},
 	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript'},
 ];
-var kBacklog = 64;
 
 var form = require('form');
 
@@ -21,6 +20,8 @@ function Terminal() {
 	return this;
 }
 
+Terminal.kBacklog = 64;
+
 Terminal.prototype.dispatch = function(data) {
 	for (var i in this._waiting) {
 		this._waiting[i](data);
@@ -31,9 +32,9 @@ Terminal.prototype.dispatch = function(data) {
 Terminal.prototype.print = function(line) {
 	this._lines.push(line);
 	this._index++;
-	if (this._lines.length >= kBacklog * 2) {
-		this._firstLine = this._index - kBacklog;
-		this._lines = this._lines.slice(this._lines.length - kBacklog);
+	if (this._lines.length >= Terminal.kBacklog * 2) {
+		this._firstLine = this._index - Terminal.kBacklog;
+		this._lines = this._lines.slice(this._lines.length - Terminal.kBacklog);
 	}
 	this.dispatch({index: this._index - 1, lines: [line]});
 	this._lastWrite = new Date();

@@ -31,6 +31,7 @@ function main() {
 	imports.terminal.print("  guess      guess the number game");
 	imports.terminal.print("  exit       end the current session (and start a new one)");
 	gOnInput = function(input) {
+		input = input.toLowerCase();
 		if (input == "chat") {
 			chat();
 		} else if (input == "board") {
@@ -114,11 +115,46 @@ function guess() {
 					imports.terminal.print("Too high.");
 				} else if (guess == number) {
 					imports.terminal.print("Wow, you got it in " + guesses + " guesses!  It was " + number + ".");
-					main();
+					guessEnd(guesses);
 				}
 			}
 		}
+	};
+}
+
+function guessEnd(guesses) {
+	imports.terminal.print("What's your name, for the high score table?");
+	gOnInput = function(name) {
+		var entry = {'guesses': guesses, 'name': name, 'when': new Date().toString()};
+		imports.database.get("guessHighScores").then(function(data) {
+			data = JSON.parse(data);
+			var index = data.length;
+			for (var i in data) {
+				if (guesses < data[i].guesses) {
+					index = i;
+					break;
+				}
+			}
+			data.splice(index, 0, entry);
+			printHighScores(data);
+			imports.database.set("guessHighScores", JSON.stringify(data));
+			main();
+		}).catch(function() {
+			var data = [entry];
+			printHighScores(data);
+			imports.database.set("guessHighScores", JSON.stringify(data));
+			main();
+		});
+	};
+}
+
+function printHighScores(data) {
+	imports.terminal.print("NAME    GUESSES    DATE");
+	for (var i = 0; i < 10 && i < data.length; i++) {
+		var entry = data[i];
+		imports.terminal.print(entry.name + " " + entry.guesses + " " + entry.when);
 	}
+	imports.terminal.print("");
 }
 
 welcome();
