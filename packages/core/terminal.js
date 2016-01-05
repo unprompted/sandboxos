@@ -124,7 +124,7 @@ function handler(request, response, basePath) {
 				response.writeHead(403, {"Content-Type": "text/plain", "Connection": "close"});
 				response.end("Invalid package name: " + packageName);
 			} else {
-				File.makeDirectory("packages/" + packageName)
+				File.makeDirectory("packages/" + packageName);
 				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
 					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
 					response.end();
