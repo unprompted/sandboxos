@@ -50,12 +50,27 @@ function printError(out, error) {
 
 function broadcast(message) {
 	var sender = this;
+	var promises = [];
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
 		if (process != sender && process.packageName == sender.packageName) {
-			invoke(process.eventHandlers['onMessage'], [message]);
+			promises.push(invoke(process.eventHandlers['onMessage'], [message]));
 		}
 	}
+	return Promise.all(promises);
+}
+
+function sendToLeader(message) {
+	var sender = this;
+	var promises = [];
+	for (var i in gProcesses) {
+		var process = gProcesses[i];
+		if (process.packageName == sender.packageName) {
+			promises.push(invoke(process.eventHandlers['onMessage'], [message]));
+			break;
+		}
+	}
+	return Promise.all(promises);
 }
 
 function getDatabase(process) {
@@ -113,6 +128,7 @@ function getProcess(packageName, session) {
 		process.task.setImports({
 			'core': {
 				'broadcast': broadcast.bind(process),
+				'sendToLeader': sendToLeader.bind(process),
 			},
 			'database': {
 				'get': databaseGet.bind(process),

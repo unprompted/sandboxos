@@ -2,7 +2,21 @@
 var gOnInput = null;
 
 imports.terminal.register("onMessage", function(message) {
-	imports.terminal.print("Incoming message: " + message);
+	if (message.chat) {
+		imports.terminal.print("Incoming message: " + message.chat);
+	} else if (message.message && message.when) {
+		imports.database.get("board").catch(function() {
+			return null;
+		}).then(function(data) {
+			try {
+				data = JSON.parse(data);
+			} catch(e) {
+				data = [];
+			}
+			data.push(message);
+			return imports.database.set("board", JSON.stringify(data));
+		});
+	}
 });
 
 imports.terminal.register("onInput", function(input) {
@@ -59,13 +73,34 @@ function chat() {
 		if (input == "exit") {
 			main();
 		} else {
-			imports.core.broadcast(input);
+			imports.core.broadcast({chat: input});
 		}
 	};
 }
 
 function board() {
-	imports.terminal.print("Message board commands: get, set, remove, getAll, exit");
+	imports.terminal.print("");
+	imports.terminal.print("Message board (\"exit\" to exit):");
+	
+	imports.database.get("board").catch(function() {
+		return JSON.stringify([]);
+	}).then(function(board) {
+		board = JSON.parse(board);
+		printTable([["When", "Message"]].concat(board.slice(Math.max(0, board.length - 10), board.length).map(function(entry) {
+			return [entry.when, entry.message];
+		})));
+	});	
+	gOnInput = function(input) {
+		if (input == "exit") {
+			main();
+		} else {
+			imports.core.sendToLeader({when: new Date().toString(), message: input}).then(board);
+		}
+	};
+}
+
+function databaseTest() {
+	imports.terminal.print("Database test commands: get, set, remove, getAll, exit");
 	gOnInput = function(input) {
 		var parts = input.split(' ');
 		if (parts[0] == "get") {
@@ -152,13 +187,30 @@ function guessEnd(guesses) {
 	};
 }
 
-function printHighScores(data) {
-	imports.terminal.print("NAME    GUESSES    DATE");
-	for (var i = 0; i < 10 && i < data.length; i++) {
-		var entry = data[i];
-		imports.terminal.print(entry.name + " " + entry.guesses + " " + entry.when);
+function printTable(data) {
+	var widths = [];
+	for (var i in data) {
+		var row = data[i];
+		for (var c in row) {
+			widths[c] = Math.max(widths[c] || 0, row[c].length);
+		}
 	}
-	imports.terminal.print("");
+
+	for (var i in data) {
+		var row = data[i];
+		var line = "";
+		for (var c in row) {
+			line += row[c];
+			line += " ".repeat(widths[c] - row[c].length + 2);
+		}
+		imports.terminal.print(line);
+	}
+}
+
+function printHighScores(data) {
+	printTable([["Name", "Guesses", "Date"]].concat(data.map(function(entry) {
+		return [entry.name, entry.guesses.toString(), entry.when];
+	})));
 }
 
 welcome();
