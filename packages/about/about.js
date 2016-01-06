@@ -10,8 +10,8 @@ var kMessages = [
 		"",
 		"The goal: enable de-centralized webapps that anyone can download, modify, run, and share.",
 		"",
-		"Source: https://www.unprompted.com/projects/browser/sandboxos/trunk/",
-		"Cory's BBS: https://www.sandboxos.net/bbs",
+		["Source: ", {href: "https://www.unprompted.com/projects/browser/sandboxos/trunk/"}],
+		["Cory's BBS: ", {href: "https://www.sandboxos.net/bbs"}],
 	],
 	[
 		"-------------------",
@@ -57,8 +57,8 @@ var kMessages = [
 		"Blah blah blah modify?",
 		"----------------------",
 		"",
-		"1. https://www.wikipedia.org/",
-		"2. http://www.gnu.org/philosophy/free-sw.html",
+		["1. ", {href: "https://www.wikipedia.org/"}],
+		["2. ", {href: "http://www.gnu.org/philosophy/free-sw.html"}],
 		"",
 		"See also the edit link at the top left.",
 		"",
@@ -113,13 +113,15 @@ var kMessages = [
 var gIndex = 0;
 
 function printNextMessage() {
-	var block = kMessages[gIndex];
-	for (var i = 0; i < block.length; i++) {
-		imports.terminal.print(block[i]);
+	if (gIndex < kMessages.length) {
+		var block = kMessages[gIndex];
+		for (var i = 0; i < block.length; i++) {
+			imports.terminal.print(block[i]);
+		}
+		imports.terminal.print("");
 	}
-	imports.terminal.print("");
 	imports.terminal.print("(press enter to continue, \"exit\" to exit)");
-	if (gIndex < kMessages.length - 1) {
+	if (gIndex < kMessages.length) {
 		gIndex++;
 	}
 }

@@ -36,8 +36,8 @@ function receive() {
 		for (var i in data.lines) {
 			if (typeof data.lines[i] == "string") {
 				print(data.lines[i]);
-			} else if (data.lines[i] && data.lines[i].styled) {
-				printStyled(data.lines[i].styled);
+			} else if (data.lines[i] instanceof Array) {
+				printStructured(data.lines[i]);
 			} else if (data.lines[i] && data.lines[i].action == "clear") {
 				document.getElementById("terminal").innerText = "";
 			} else {
@@ -62,19 +62,36 @@ function autoNewLine() {
 }
 
 function print(line) {
-	autoNewLine();
-	document.getElementById("terminal").innerHTML += escape(line);
+	if (!line) {
+		document.getElementById("terminal").innerHTML += "\n";
+	} else {
+		autoNewLine();
+		document.getElementById("terminal").innerHTML += escape(line);
+	}
 	autoScroll();
 }
 
-function printStyled(styled) {
+function printStructured(list) {
 	autoNewLine();
 	var terminal = document.getElementById("terminal");
-	for (var i = 0; i < styled.length; i++) {
-		var node = document.createElement("span");
-		node.setAttribute("style", styled[i].style);
-		node.innerText = styled[i].value;
-		terminal.appendChild(node);
+	for (var i = 0; i < list.length; i++) {
+		var item = list[i];
+		if (typeof item == "string" || item instanceof String) {
+			terminal.innerHTML += escape(item);
+		} else {
+			var node;
+			if (item.href) {
+				node = document.createElement("a");
+				node.setAttribute("href", item.href);
+			} else {
+				node = document.createElement("span");
+			}
+			if (item.style) {
+				node.setAttribute("style", item.style);
+			}
+			node.innerText = item.value || item.href;
+			terminal.appendChild(node);
+		}
 	}
 	autoScroll();
 }

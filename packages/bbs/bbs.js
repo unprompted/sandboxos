@@ -12,6 +12,8 @@ imports.terminal.register("onInput", function(input) {
 });
 
 function welcome() {
+	imports.terminal.print("");
+	imports.terminal.print("");
 	imports.terminal.print('Welcome to');
 	imports.terminal.print('   ______                _          ____  ____ _____');
 	imports.terminal.print('  / ____/___  _______  _( )_____   / __ )/ __ ) ___/');
@@ -20,6 +22,8 @@ function welcome() {
 	imports.terminal.print('\\____/\\____/_/   \\__, / /____/  /_____/_____/____/  ');
 	imports.terminal.print('                /____/                              ');
 	imports.terminal.print('                    yesterday\'s technology...today!');
+	imports.terminal.print("");
+	imports.terminal.print("");
 	main();
 }
 

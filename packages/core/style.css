@@ -1,6 +1,7 @@
 body {
-	background-color: #000;
-	color: #0f0;
+	font-family: monospace;
+	background-color: #002b36;
+	color: #eee8d5;
 }
 
 #body {
@@ -26,13 +27,25 @@ body {
 }
 
 #terminal {
-	font-family: monospace;
-	background-color: #000;
-	color: #0f0;
-	border: 1px solid #040;
 	outline: none;
 	word-wrap: break-word;
 	white-space: pre;
+}
+
+#terminal :link {
+	color: #268bd2;
+}
+
+#terminal :visited {
+	color: #6c71c4;
+}
+
+#terminal :hover {
+	color: #2aa198;
+}
+
+#terminal :active {
+	color: #dc322f;
 }
 
 .input {
@@ -42,19 +55,16 @@ body {
 
 .prompt {
 	padding-right: 0.5em;
+	color: #eee8d5;
 }
 
 #input {
 	flex: 1;
-	font-family: monospace;
-	background-color: #000;
-	color: #0f0;
-	border: 1px solid #040;
+	border: 0;
 	outline: none;
-}
-
-#target {
 	font-family: monospace;
+	background-color: #002b36;
+	color: #eee8d5;
 }
 
 .CodeMirror {
