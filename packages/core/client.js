@@ -51,24 +51,22 @@ function receive() {
 	});
 }
 
-function escape(line) {
-	return line.replace(/[&<>]/g, function(c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]; });
-}
-
 function autoNewLine() {
-	if (document.getElementById("terminal").innerHTML) {
-		document.getElementById("terminal").innerHTML += "\n";
-	}
+	document.getElementById("terminal").appendChild(document.createElement("br"));
 }
 
 function print(line) {
 	if (!line) {
-		document.getElementById("terminal").innerHTML += "\n";
+		document.getElementById("terminal").appendChild(document.createElement("br"));
 	} else {
 		autoNewLine();
-		document.getElementById("terminal").innerHTML += escape(line);
+		document.getElementById("terminal").appendChild(document.createTextNode(line));
 	}
 	autoScroll();
+}
+
+function commandClick() {
+	send(this.dataset.command);
 }
 
 function printStructured(list) {
@@ -77,7 +75,7 @@ function printStructured(list) {
 	for (var i = 0; i < list.length; i++) {
 		var item = list[i];
 		if (typeof item == "string" || item instanceof String) {
-			terminal.innerHTML += escape(item);
+			terminal.appendChild(document.createTextNode(item));
 		} else {
 			var node;
 			if (item.href) {
@@ -89,7 +87,12 @@ function printStructured(list) {
 			if (item.style) {
 				node.setAttribute("style", item.style);
 			}
-			node.innerText = item.value || item.href;
+			node.innerText = item.value || item.href || item.command;
+			if (item.command) {
+				node.dataset.command = item.command;
+				node.onclick = commandClick;
+				node.setAttribute("class", "command");
+			}
 			terminal.appendChild(node);
 		}
 	}

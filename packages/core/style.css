@@ -32,20 +32,24 @@ body {
 	white-space: pre;
 }
 
-#terminal :link {
+#terminal>a:link, .command {
 	color: #268bd2;
+	cursor: pointer;
 }
 
-#terminal :visited {
+#terminal>a:visited, .command:visited {
 	color: #6c71c4;
+	cursor: pointer;
 }
 
-#terminal :hover {
+#terminal>a:hover, .command:hover {
 	color: #2aa198;
+	cursor: pointer;
 }
 
-#terminal :active {
+#terminal>a:active, .command:active {
 	color: #dc322f;
+	cursor: pointer;
 }
 
 .input {
