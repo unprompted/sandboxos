@@ -38,7 +38,7 @@ function welcome() {
 	imports.terminal.print('                /____/                              ');
 	imports.terminal.print('                    yesterday\'s technology...today!');
 	imports.terminal.print("");
-	imports.terminal.print(["Press ", {command: "enter"}, " to continue."]);
+	imports.terminal.print("Press ", {command: "enter"}, " to continue.");
 	gOnInput = function(input) {
 		main();
 	};
@@ -48,10 +48,10 @@ function main() {
 	imports.terminal.clear();
 	imports.terminal.print("");
 	imports.terminal.print("Main menu commands:");
-	imports.terminal.print(["  ", {command: "chat"}, "       enter the group chat"]);
-	imports.terminal.print(["  ", {command: "board"}, "      message board test thing"]);
-	imports.terminal.print(["  ", {command: "guess"}, "      guess the number game"]);
-	imports.terminal.print(["  ", {command: "exit"}, "       back to that sweet logo"]);
+	imports.terminal.print("  ", {command: "chat"}, "       enter the group chat");
+	imports.terminal.print("  ", {command: "board"}, "      message board test thing");
+	imports.terminal.print("  ", {command: "guess"}, "      guess the number game");
+	imports.terminal.print("  ", {command: "exit"}, "       back to that sweet logo");
 	gOnInput = function(input) {
 		input = input.toLowerCase();
 		if (input == "chat") {
@@ -73,7 +73,7 @@ function main() {
 function chat() {
 	imports.terminal.clear();
 	imports.terminal.print("");
-	imports.terminal.print(["You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, "."]);
+	imports.terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, ".");
 	gOnInput = function(input) {
 		if (input == "exit") {
 			main();
@@ -86,7 +86,7 @@ function chat() {
 function board() {
 	imports.terminal.clear();
 	imports.terminal.print("");
-	imports.terminal.print(["Message board (", {command: "exit"}, " to exit):"]);
+	imports.terminal.print("Message board (", {command: "exit"}, " to exit):");
 	
 	imports.database.get("board").catch(function() {
 		return JSON.stringify([]);
@@ -107,7 +107,7 @@ function board() {
 
 function databaseTest() {
 	imports.terminal.clear();
-	imports.terminal.print(["Database test commands: ", {command: "get"}, {command: "set"}, {command: "remove"}, {command: "getAll"}, {command: "exit"}]);
+	imports.terminal.print("Database test commands: ", {command: "get"}, {command: "set"}, {command: "remove"}, {command: "getAll"}, {command: "exit"});
 	gOnInput = function(input) {
 		var parts = input.split(' ');
 		if (parts[0] == "get") {
@@ -146,7 +146,7 @@ function guess() {
 	imports.terminal.clear();
 	var number = Math.round(Math.random() * 100);
 	var guesses = 0;
-	imports.terminal.print(["OK, I have a number in mind.  What do you think it is?  Use ", {command: "exit"}, " to stop."]);
+	imports.terminal.print("OK, I have a number in mind.  What do you think it is?  Use ", {command: "exit"}, " to stop.");
 	gOnInput = function(input) {
 		if (input == "exit") {
 			main();

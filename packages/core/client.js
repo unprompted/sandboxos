@@ -34,15 +34,7 @@ function receive() {
 			dataType: "json",
 	}).then(function(data) {
 		for (var i in data.lines) {
-			if (typeof data.lines[i] == "string") {
-				print(data.lines[i]);
-			} else if (data.lines[i] instanceof Array) {
-				printStructured(data.lines[i]);
-			} else if (data.lines[i] && data.lines[i].action == "clear") {
-				document.getElementById("terminal").innerText = "";
-			} else {
-				print(JSON.stringify(data.lines[i]));
-			}
+			print(data.lines[i]);
 		}
 		gHaveIndex = data.index;
 		receive();
@@ -55,48 +47,46 @@ function autoNewLine() {
 	document.getElementById("terminal").appendChild(document.createElement("br"));
 }
 
-function print(line) {
-	if (!line) {
-		document.getElementById("terminal").appendChild(document.createElement("br"));
-	} else {
-		autoNewLine();
-		document.getElementById("terminal").appendChild(document.createTextNode(line));
-	}
+function print(data) {
+	autoNewLine();
+	printStructured(data);
 	autoScroll();
+}
+
+function printStructured(data) {
+	if (typeof data == "string") {
+		document.getElementById("terminal").appendChild(document.createTextNode(data));
+	} else if (data && data[0] != undefined) {
+		for (var i in data) {
+			printStructured(data[i]);
+		}
+	} else if (data && data.action == "clear") {
+		document.getElementById("terminal").innerText = "";
+	} else if (data) {
+		var node;
+		if (data.href) {
+			node = document.createElement("a");
+			node.setAttribute("href", data.href);
+		} else {
+			node = document.createElement("span");
+		}
+		if (data.style) {
+			node.setAttribute("style", data.style);
+		}
+		node.innerText = data.value || data.href || data.command;
+		if (data.command) {
+			node.dataset.command = data.command;
+			node.onclick = commandClick;
+			node.setAttribute("class", "command");
+		}
+		terminal.appendChild(node);
+	} else {
+		printStructured(JSON.stringify(data));
+	}
 }
 
 function commandClick() {
 	send(this.dataset.command);
-}
-
-function printStructured(list) {
-	autoNewLine();
-	var terminal = document.getElementById("terminal");
-	for (var i = 0; i < list.length; i++) {
-		var item = list[i];
-		if (typeof item == "string" || item instanceof String) {
-			terminal.appendChild(document.createTextNode(item));
-		} else {
-			var node;
-			if (item.href) {
-				node = document.createElement("a");
-				node.setAttribute("href", item.href);
-			} else {
-				node = document.createElement("span");
-			}
-			if (item.style) {
-				node.setAttribute("style", item.style);
-			}
-			node.innerText = item.value || item.href || item.command;
-			if (item.command) {
-				node.dataset.command = item.command;
-				node.onclick = commandClick;
-				node.setAttribute("class", "command");
-			}
-			terminal.appendChild(node);
-		}
-	}
-	autoScroll();
 }
 
 function autoScroll() {

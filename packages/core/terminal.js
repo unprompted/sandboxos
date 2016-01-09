@@ -29,14 +29,15 @@ Terminal.prototype.dispatch = function(data) {
 	this._waiting.length = 0;
 }
 
-Terminal.prototype.print = function(line) {
-	this._lines.push(line);
+Terminal.prototype.print = function() {
+	print(arguments);
+	this._lines.push(arguments);
 	this._index++;
 	if (this._lines.length >= Terminal.kBacklog * 2) {
 		this._firstLine = this._index - Terminal.kBacklog;
 		this._lines = this._lines.slice(this._lines.length - Terminal.kBacklog);
 	}
-	this.dispatch({index: this._index - 1, lines: [line]});
+	this.dispatch({index: this._index - 1, lines: [arguments]});
 	this._lastWrite = new Date();
 }
 
