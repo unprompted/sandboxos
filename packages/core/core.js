@@ -138,6 +138,7 @@ function getProcess(packageName, session) {
 			},
 			'terminal': {
 				'print': process.terminal.print.bind(process.terminal),
+				'clear': process.terminal.clear.bind(process.terminal),
 				'register': function(eventName, handler) {
 					process.eventHandlers[eventName].push(handler);
 				},
