@@ -67,6 +67,12 @@ function printStructured(data) {
 		if (data.href) {
 			node = document.createElement("a");
 			node.setAttribute("href", data.href);
+		} else if (data.iframe) {
+			node = document.createElement("iframe");
+			node.setAttribute("srcdoc", data.iframe);
+			node.setAttribute("sandbox", "allow-forms allow-scripts");
+			node.setAttribute("width", data.width || 320);
+			node.setAttribute("height", data.height || 240);
 		} else {
 			node = document.createElement("span");
 		}
