@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 	v8::V8::SetFlagsFromCommandLine(&argc, argv, true);
 
 	bool isChild = false;
-	const char* coreTask = "packages/core/core.js";
+	const char* coreTask = "core/core.js";
 
 	for (int i = 1; i < argc; ++i) {
 		if (!std::strcmp(argv[i], "--child")) {

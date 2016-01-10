@@ -70,7 +70,7 @@ function invoke(handlers, argv) {
 function handler(request, response, basePath) {
 	var found = false;
 	var formData = form.decodeForm(request.query);
-	var packageName = basePath.substring(1);
+	var packageName = basePath.substring(1) || "index";
 	var process;
 
 	if (formData.sessionId) {
@@ -79,12 +79,13 @@ function handler(request, response, basePath) {
 
 	for (var i in kStaticFiles) {
 		if (("/terminal" + kStaticFiles[i].uri === request.uri) ||
-			(basePath + kStaticFiles[i].uri === request.uri)) {
+			(basePath + kStaticFiles[i].uri === request.uri) ||
+			request.uri == "/") {
 			found = true;
-			var data = File.readFile("packages/core/" + kStaticFiles[i].path);
+			var data = File.readFile("core/" + kStaticFiles[i].path);
 			if (kStaticFiles[i].uri == "") {
-				data = data.replace("$(VIEW_SOURCE)", basePath + "/view");
-				data = data.replace("$(EDIT_SOURCE)", basePath + "/edit");
+				data = data.replace("$(VIEW_SOURCE)", "/" + packageName + "/view");
+				data = data.replace("$(EDIT_SOURCE)", "/" + packageName + "/edit");
 			} else if (kStaticFiles[i].uri == "/edit") {
 				var source = File.readFile("packages/" + packageName + "/" + packageName + ".js") || "";
 				source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');

@@ -103,6 +103,10 @@ function databaseGetAll() {
 	return db.getAll();
 }
 
+function getPackages() {
+	return File.readDirectory('packages/').filter(function(name) { return name.charAt(0) != '.'; });
+}
+
 function getProcess(packageName, session) {
 	var process = gProcesses[session];
 	if (!process) {
@@ -129,6 +133,7 @@ function getProcess(packageName, session) {
 			'core': {
 				'broadcast': broadcast.bind(process),
 				'sendToLeader': sendToLeader.bind(process),
+				'getPackages': getPackages.bind(process),
 			},
 			'database': {
 				'get': databaseGet.bind(process),
