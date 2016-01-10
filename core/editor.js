@@ -8,6 +8,7 @@ $(document).ready(function() {
 		'tabSize': 4,
 		'indentUnit': 4,
 		'indentWithTabs': true,
+		'showTrailingSpace': true,
 	});
 	gBackup = gEditor.getValue();
 });
