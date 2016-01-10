@@ -156,7 +156,6 @@ void TaskStub::onProcessExit(uv_process_t* process, int64_t status, int terminat
 		args[0] = v8::Integer::New(stub->_owner->_isolate, status);
 		args[1] = v8::Integer::New(stub->_owner->_isolate, terminationSignal);
 		callback->Call(callback, 2, &args[0]);
-	} else {
 	}
 	stub->_stream.close();
 	stub->_owner->_children.erase(stub->_id);
@@ -167,7 +166,7 @@ void TaskStub::onRelease(const v8::WeakCallbackData<v8::Object, TaskStub>& data)
 }
 
 void TaskStub::getTrusted(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
-	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), false /*TaskStub::get(args.Data())->_task->_trusted)*/));
+	args.GetReturnValue().Set(v8::Boolean::New(args.GetIsolate(), false));
 }
 
 void TaskStub::setTrusted(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args) {
