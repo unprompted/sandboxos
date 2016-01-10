@@ -62,6 +62,8 @@ function printStructured(data) {
 		}
 	} else if (data && data.action == "clear") {
 		document.getElementById("terminal").innerText = "";
+	} else if (data && data.action == "ping") {
+		// pong
 	} else if (data) {
 		var node;
 		if (data.href) {

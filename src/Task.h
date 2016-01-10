@@ -127,6 +127,9 @@ private:
 	static void print(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void require(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+	static void setTimeout(const v8::FunctionCallbackInfo<v8::Value>& args);
+	static void timeoutCallback(uv_timer_t* handle);
+
 	static void invokeThen(const v8::FunctionCallbackInfo<v8::Value>& args);
 	static void invokeCatch(const v8::FunctionCallbackInfo<v8::Value>& args);
 

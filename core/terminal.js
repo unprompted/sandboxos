@@ -30,7 +30,6 @@ Terminal.prototype.dispatch = function(data) {
 }
 
 Terminal.prototype.print = function() {
-	print(arguments);
 	this._lines.push(arguments);
 	this._index++;
 	if (this._lines.length >= Terminal.kBacklog * 2) {
@@ -47,6 +46,10 @@ Terminal.prototype.clear = function() {
 	this.print({action: "clear"});
 }
 
+Terminal.prototype.ping = function() {
+	this.dispatch({index: this._index - 1, lines: [{action: "ping"}]});
+}
+
 Terminal.prototype.getOutput = function(haveIndex) {
 	var terminal = this;
 	terminal._lastRead = new Date();
@@ -61,8 +64,11 @@ Terminal.prototype.getOutput = function(haveIndex) {
 
 function invoke(handlers, argv) {
 	var promises = [];
-	for (var i = 0; i < handlers.length; ++i) {
-		promises.push(handlers[i].apply(null, argv));
+	print([handlers, argv]);
+	if (handlers) {
+		for (var i = 0; i < handlers.length; ++i) {
+			promises.push(handlers[i].apply(null, argv));
+		}
 	}
 	return Promise.all(promises);
 }
@@ -75,6 +81,7 @@ function handler(request, response, basePath) {
 
 	if (formData.sessionId) {
 		process = getProcess(packageName, formData.sessionId);
+		process.lastActive = Date.now();
 	}
 
 	for (var i in kStaticFiles) {

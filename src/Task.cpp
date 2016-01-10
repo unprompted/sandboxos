@@ -149,6 +149,7 @@ void Task::activate() {
 
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
 	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
+	global->Set(v8::String::NewFromUtf8(_isolate, "setTimeout"), v8::FunctionTemplate::New(_isolate, setTimeout));
 	global->Set(v8::String::NewFromUtf8(_isolate, "require"), v8::FunctionTemplate::New(_isolate, require));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
@@ -186,6 +187,36 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		std::cout << (*value ? *value : "(null)");
 	}
 	std::cout << '\n';
+}
+
+struct TimeoutData {
+	Task* _task;
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > _callback;
+};
+
+void Task::setTimeout(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	v8::HandleScope scope(args.GetIsolate());
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+
+	TimeoutData* timeout = new TimeoutData();
+	timeout->_task = task;
+
+	v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function> > function(args.GetIsolate(), v8::Handle<v8::Function>::Cast(args[0]));
+	timeout->_callback = function;
+
+	uv_timer_t* timer = new uv_timer_t();
+	uv_timer_init(task->_loop, timer);
+	timer->data = timeout;
+	uv_timer_start(timer, timeoutCallback, static_cast<uint64_t>(args[1].As<v8::Number>()->Value()), 0);
+}
+
+void Task::timeoutCallback(uv_timer_t* handle) {
+	TimeoutData* timeout = reinterpret_cast<TimeoutData*>(handle->data);
+	TaskTryCatch tryCatch(timeout->_task);
+	v8::HandleScope scope(timeout->_task->_isolate);
+	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(timeout->_task->_isolate, timeout->_callback);
+	function->Call(v8::Undefined(timeout->_task->_isolate), 0, 0);
+	delete timeout;
 }
 
 void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {

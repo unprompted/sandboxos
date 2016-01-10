@@ -2,7 +2,10 @@
 
 var terminal = require("terminal");
 
+var gProcessIndex = 0;
 var gProcesses = {};
+
+var kPingInterval = 480 * 1000;
 
 function getCookies(headers) {
 	var cookies = {};
@@ -46,6 +49,15 @@ function printError(out, error) {
 		}
 		out.print(error.toString());
 	}
+}
+
+function broadcastEvent(eventName, argv) {
+	var promises = [];
+	for (var i in gProcesses) {
+		var process = gProcesses[i];
+		promises.push(invoke(process.eventHandlers[eventName], argv));
+	}
+	return Promise.all(promises);
 }
 
 function broadcast(message) {
@@ -107,21 +119,57 @@ function getPackages() {
 	return File.readDirectory('packages/').filter(function(name) { return name.charAt(0) != '.'; });
 }
 
+function getUsers(packageName) {
+	var result = [];
+	for (var session in gProcesses) {
+		var process = gProcesses[session];
+		if (!packageName || process.packageName == packageName) {
+			result.push({
+				index: process.index,
+				packageName: process.packageName,
+			});
+		}
+	}
+	return result;
+}
+
+function ping() {
+	var process = this;
+	var now = Date.now();
+	var again = true;
+	if (now - process.lastActive < kPingInterval) {
+		// Active.
+	} else if (process.lastPing > process.lastActive) {
+		// We lost them.
+		process.task.kill();
+		again = false;
+	} else {
+		// Idle.  Ping them.
+		process.terminal.ping();
+		process.lastPing = now;
+	}
+
+	if (again) {
+		setTimeout(ping.bind(process), kPingInterval);
+	}
+}
+
 function getProcess(packageName, session) {
 	var process = gProcesses[session];
 	if (!process) {
 		print("Creating task for " + packageName + " session " + session);
 		process = {};
+		process.index = gProcessIndex++;
 		process.task = new Task();
-		process.eventHandlers = {
-			'onInput': [],
-			'onMessage': [],
-		};
+		process.eventHandlers = {};
 		process.packageName = packageName;
 		process.terminal = new Terminal();
 		process.database = null;
+		process.lastActive = Date.now();
+		process.lastPing = null;
 		gProcesses[session] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
+			broadcastEvent('onSessionEnd', [{packageName: process.packageName, index: process.index}]);
 			if (terminationSignal) {
 				process.terminal.print("Process terminated with signal " + terminationSignal + ".");
 			} else {
@@ -129,11 +177,13 @@ function getProcess(packageName, session) {
 			}
 			delete gProcesses[session];
 		};
+		setTimeout(ping.bind(process), kPingInterval);
 		process.task.setImports({
 			'core': {
 				'broadcast': broadcast.bind(process),
 				'sendToLeader': sendToLeader.bind(process),
 				'getPackages': getPackages.bind(process),
+				'getUsers': getUsers.bind(process),
 			},
 			'database': {
 				'get': databaseGet.bind(process),
@@ -145,6 +195,9 @@ function getProcess(packageName, session) {
 				'print': process.terminal.print.bind(process.terminal),
 				'clear': process.terminal.clear.bind(process.terminal),
 				'register': function(eventName, handler) {
+					if (!process.eventHandlers[eventName]) {
+						process.eventHandlers[eventName] = [];
+					}
 					process.eventHandlers[eventName].push(handler);
 				},
 			},
@@ -155,6 +208,7 @@ function getProcess(packageName, session) {
 		try {
 			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
 				print("Task ready");
+				broadcastEvent('onSessionBegin', [{packageName: process.packageName, index: process.index}]);
 			}).catch(function(error) {
 				printError(process.terminal, error);
 			});
@@ -170,7 +224,6 @@ function updateProcesses(packageName) {
 		var process = gProcesses[i];
 		if (process.packageName == packageName) {
 			process.task.kill();
-			process.task = null;
 		}
 	}
 }
