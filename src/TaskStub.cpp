@@ -239,7 +239,7 @@ void TaskStub::execute(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void TaskStub::kill(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (TaskStub* stub = TaskStub::get(args.Data())) {
-		stub->_stream.send(kKill, 0, 0);
+		uv_process_kill(&stub->_process, SIGTERM);
 	}
 }
 
