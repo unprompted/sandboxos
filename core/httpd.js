@@ -122,7 +122,9 @@ function Response(client) {
 }
 
 function handleRequest(request, response) {
-	var  handler = findHandler(request);
+	var handler = findHandler(request);
+
+	print(request.client.peerName + " - - [" + new Date() + "] " + request.method + " " + request.uri + " " + request.version + " \"" + request.headers["user-agent"] + "\"");
 
 	if (handler) {
 		try {

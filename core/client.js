@@ -95,6 +95,7 @@ function printStructured(data) {
 
 function commandClick() {
 	send(this.dataset.command);
+	$("#input").focus();
 }
 
 function autoScroll() {

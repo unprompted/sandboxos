@@ -185,7 +185,9 @@ function guessEnd(guesses) {
 			data.splice(index, 0, entry);
 			printHighScores(data);
 			imports.database.set("guessHighScores", JSON.stringify(data));
-			main();
+			gOnInput = function() {
+				main();
+			};
 		}).catch(function() {
 			var data = [entry];
 			printHighScores(data);

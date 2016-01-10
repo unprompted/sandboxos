@@ -5,7 +5,7 @@ var terminal = require("terminal");
 var gProcessIndex = 0;
 var gProcesses = {};
 
-var kPingInterval = 480 * 1000;
+var kPingInterval = 60 * 1000;
 
 function getCookies(headers) {
 	var cookies = {};
