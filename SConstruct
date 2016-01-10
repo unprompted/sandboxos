@@ -92,6 +92,7 @@ if env['package'] and sys.platform == 'win32':
 	]
 	files += listAllFiles('src')
 	files += listAllFiles('packages')
+	files += listAllFiles('core')
 	env.Package(
 		NAME='SandboxOS',
 		target='dist/SandboxOS-win32.zip',
