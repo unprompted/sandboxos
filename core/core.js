@@ -72,19 +72,6 @@ function broadcast(message) {
 	return Promise.all(promises);
 }
 
-function sendToLeader(message) {
-	var sender = this;
-	var promises = [];
-	for (var i in gProcesses) {
-		var process = gProcesses[i];
-		if (process.packageName == sender.packageName) {
-			promises.push(invoke(process.eventHandlers['onMessage'], [message]));
-			break;
-		}
-	}
-	return Promise.all(promises);
-}
-
 function getDatabase(process) {
 	if (!process.database) {
 		File.makeDirectory('data');
@@ -121,8 +108,8 @@ function getPackages() {
 
 function getUsers(packageName) {
 	var result = [];
-	for (var session in gProcesses) {
-		var process = gProcesses[session];
+	for (var key in gProcesses) {
+		var process = gProcesses[key];
 		if (!packageName || process.packageName == packageName) {
 			result.push({
 				index: process.index,
@@ -137,7 +124,7 @@ function ping() {
 	var process = this;
 	var now = Date.now();
 	var again = true;
-	if (now - process.lastActive < kPingInterval) {
+	if (now - process.lastActive < process.timeout) {
 		// Active.
 	} else if (process.lastPing > process.lastActive) {
 		// We lost them.
@@ -150,14 +137,37 @@ function ping() {
 	}
 
 	if (again) {
-		setTimeout(ping.bind(process), kPingInterval);
+		setTimeout(ping.bind(process), process.timeout);
 	}
 }
 
-function getProcess(packageName, session) {
-	var process = gProcesses[session];
+function postMessage(message) {
+	var process = this;
+	return invoke(process.eventHandlers['onMessage'], [message]);
+}
+
+function getService(service) {
+	var process = this;
+	var serviceProcess = getServiceProcess(process.packageName, service);
+	return serviceProcess.ready.then(function() {
+		return {
+			postMessage: postMessage.bind(serviceProcess),
+		}
+	});
+}
+
+function getSessionProcess(packageName, session) {
+	return getProcess(packageName, 'session_' + session, {terminal: true, timeout: kPingInterval});
+}
+
+function getServiceProcess(packageName, service, options) {
+	return getProcess(packageName, 'service_' + service, options || {});
+}
+
+function getProcess(packageName, key, options) {
+	var process = gProcesses[key];
 	if (!process) {
-		print("Creating task for " + packageName + " session " + session);
+		print("Creating task for " + packageName + " " + key);
 		process = {};
 		process.index = gProcessIndex++;
 		process.task = new Task();
@@ -167,33 +177,32 @@ function getProcess(packageName, session) {
 		process.database = null;
 		process.lastActive = Date.now();
 		process.lastPing = null;
-		gProcesses[session] = process;
+		process.timeout = options.timeout;
+		var resolveReady;
+		var rejectReady;
+		process.ready = new Promise(function(resolve, reject) {
+			resolveReady = resolve;
+			rejectReady = reject;
+		});
+		gProcesses[key] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
-			broadcastEvent('onSessionEnd', [{packageName: process.packageName, index: process.index}]);
+			broadcastEvent('onSessionEnd', [{packageName: process.packageName, index: process.index, signal: terminationSignal, exitCode: exitCode}]);
 			if (terminationSignal) {
 				process.terminal.print("Process terminated with signal " + terminationSignal + ".");
 			} else {
 				process.terminal.print("Process ended with exit code " + exitCode + ".");
 			}
-			delete gProcesses[session];
+			delete gProcesses[key];
 		};
-		setTimeout(ping.bind(process), kPingInterval);
-		process.task.setImports({
+		if (process.timeout > 0) {
+			setTimeout(ping.bind(process), process.timeout);
+		}
+		var imports = {
 			'core': {
 				'broadcast': broadcast.bind(process),
-				'sendToLeader': sendToLeader.bind(process),
+				'getService': getService.bind(process),
 				'getPackages': getPackages.bind(process),
 				'getUsers': getUsers.bind(process),
-			},
-			'database': {
-				'get': databaseGet.bind(process),
-				'set': databaseSet.bind(process),
-				'remove': databaseRemove.bind(process),
-				'getAll': databaseGetAll.bind(process),
-			},
-			'terminal': {
-				'print': process.terminal.print.bind(process.terminal),
-				'clear': process.terminal.clear.bind(process.terminal),
 				'register': function(eventName, handler) {
 					if (!process.eventHandlers[eventName]) {
 						process.eventHandlers[eventName] = [];
@@ -201,7 +210,20 @@ function getProcess(packageName, session) {
 					process.eventHandlers[eventName].push(handler);
 				},
 			},
-		});
+			'database': {
+				'get': databaseGet.bind(process),
+				'set': databaseSet.bind(process),
+				'remove': databaseRemove.bind(process),
+				'getAll': databaseGetAll.bind(process),
+			},
+		};
+		if (options.terminal) {
+			imports.terminal = {
+				'print': process.terminal.print.bind(process.terminal),
+				'clear': process.terminal.clear.bind(process.terminal),
+			};
+		}
+		process.task.setImports(imports);
 		print("Activating task");
 		process.task.activate();
 		print("Executing task");
@@ -209,11 +231,14 @@ function getProcess(packageName, session) {
 			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
 				print("Task ready");
 				broadcastEvent('onSessionBegin', [{packageName: process.packageName, index: process.index}]);
+				resolveReady(process);
 			}).catch(function(error) {
 				printError(process.terminal, error);
+				rejectReady();
 			});
 		} catch (error) {
 			printError(process.terminal, error);
+			rejectReady();
 		}
 	}
 	return process;

@@ -126,7 +126,7 @@ function printNextMessage() {
 	}
 }
 
-imports.terminal.register("onInput", function(input) {
+imports.core.register("onInput", function(input) {
 	if (input == "exit") {
 		exit();
 	} else {

@@ -1,25 +1,35 @@
 "use strict";
 var gOnInput = null;
 
-imports.terminal.register("onMessage", function(message) {
-	if (message.chat) {
-		imports.terminal.print("Incoming message: " + message.chat);
-	} else if (message.message && message.when) {
-		imports.database.get("board").catch(function() {
-			return null;
-		}).then(function(data) {
-			try {
-				data = JSON.parse(data);
-			} catch(e) {
-				data = [];
-			}
-			data.push(message);
-			return imports.database.set("board", JSON.stringify(data));
-		});
-	}
-});
+if (imports.terminal) {
+	imports.core.register("onMessage", function(message) {
+		if (message.message && message.when) {
+			imports.terminal.print("Incoming message: " + message.when + ": " + message.message);
+		}
+	});
+} else {
+	// Chat service process.
+	imports.core.register("onMessage", function(message) {
+		print("ONMESSAGE: " + JSON.stringify(message));
+		if (message.message && message.when) {
+			return imports.database.get("board").catch(function() {
+				return null;
+			}).then(function(data) {
+				try {
+					data = JSON.parse(data);
+				} catch(error) {
+					data = [];
+				}
+				data.push(message);
+				return imports.database.set("board", JSON.stringify(data));
+			}).then(function() {
+				return imports.core.broadcast(message);
+			});
+		}
+	});
+}
 
-imports.terminal.register("onInput", function(input) {
+imports.core.register("onInput", function(input) {
 	if (gOnInput) {
 		gOnInput(input);
 	}
@@ -48,16 +58,13 @@ function main() {
 	imports.terminal.clear();
 	imports.terminal.print("");
 	imports.terminal.print("Main menu commands:");
-	imports.terminal.print("  ", {command: "chat"}, "       enter the group chat");
-	imports.terminal.print("  ", {command: "board"}, "      message board test thing");
+	imports.terminal.print("  ", {command: "chat"}, "       chat message board");
 	imports.terminal.print("  ", {command: "guess"}, "      guess the number game");
 	imports.terminal.print("  ", {command: "exit"}, "       back to that sweet logo");
 	gOnInput = function(input) {
 		input = input.toLowerCase();
 		if (input == "chat") {
 			chat();
-		} else if (input == "board") {
-			board();
 		} else if (input == "guess") {
 			guess();
 		} else if (input == "exit") {
@@ -74,72 +81,30 @@ function chat() {
 	imports.terminal.clear();
 	imports.terminal.print("");
 	imports.terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, ".");
-	gOnInput = function(input) {
-		if (input == "exit") {
-			main();
-		} else {
-			imports.core.broadcast({chat: input});
-		}
-	};
-}
-
-function board() {
-	imports.terminal.clear();
-	imports.terminal.print("");
-	imports.terminal.print("Message board (", {command: "exit"}, " to exit):");
-	
 	imports.database.get("board").catch(function() {
-		return JSON.stringify([]);
+		return null;
 	}).then(function(board) {
-		board = JSON.parse(board);
+		try {
+			board = JSON.parse(board);
+		} catch (error) {
+			board = [];
+		}
 		printTable([["When", "Message"]].concat(board.slice(Math.max(0, board.length - 10), board.length).map(function(entry) {
 			return [entry.when, entry.message];
 		})));
-	});	
+	});
 	gOnInput = function(input) {
 		if (input == "exit") {
 			main();
 		} else {
-			imports.core.sendToLeader({when: new Date().toString(), message: input}).then(board);
+			imports.core.getService("chat").then(function(chatService) {
+				print("POST MESSAGE");
+				return chatService.postMessage({when: new Date().toString(), message: input});
+			}).catch(function(error) {
+				imports.terminal.print("ERROR: " + error);
+			});
 		}
 	};
-}
-
-function databaseTest() {
-	imports.terminal.clear();
-	imports.terminal.print("Database test commands: ", {command: "get"}, {command: "set"}, {command: "remove"}, {command: "getAll"}, {command: "exit"});
-	gOnInput = function(input) {
-		var parts = input.split(' ');
-		if (parts[0] == "get") {
-			imports.database.get(parts[1]).then(function(value) {
-				imports.terminal.print(parts[0] + " => " + value);
-			}).catch(function(error) {
-				imports.terminal.print(error);
-			});
-		} else if (parts[0] == "set") {
-			imports.database.set(parts[1], parts[2]).then(function() {
-				imports.terminal.print("set");
-			}).catch(function(error) {
-				imports.terminal.print(error);
-			});
-		} else if (parts[0] == "remove") {
-			imports.database.remove(parts[1]).then(function(value) {
-				imports.terminal.print(parts[0] + " removed");
-			}).catch(function(error) {
-				imports.terminal.print(error);
-			});
-		} else if (parts[0] == "getAll") {
-			imports.database.getAll().then(function(data) {
-				imports.terminal.print(data.join(", "));
-			}).catch(function(error) {
-				imports.terminal.print(error);
-			});
-		} else if (parts[0] == "exit") {
-			main();
-		} else {
-			imports.terminal.print("I didn't get that.");
-		}
-	}
 }
 
 function guess() {
@@ -223,4 +188,8 @@ function printHighScores(data) {
 	})));
 }
 
-welcome();
+if (imports.terminal) {
+	welcome();
+} else {
+}
+	

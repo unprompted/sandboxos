@@ -64,7 +64,6 @@ Terminal.prototype.getOutput = function(haveIndex) {
 
 function invoke(handlers, argv) {
 	var promises = [];
-	print([handlers, argv]);
 	if (handlers) {
 		for (var i = 0; i < handlers.length; ++i) {
 			promises.push(handlers[i].apply(null, argv));
@@ -80,7 +79,7 @@ function handler(request, response, basePath) {
 	var process;
 
 	if (formData.sessionId) {
-		process = getProcess(packageName, formData.sessionId);
+		process = getSessionProcess(packageName, formData.sessionId);
 		process.lastActive = Date.now();
 	}
 
