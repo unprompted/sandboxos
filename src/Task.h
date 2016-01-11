@@ -134,6 +134,7 @@ private:
 	static void invokeCatch(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
+	static void version(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
 	static void getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void getExports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);

@@ -155,6 +155,7 @@ void Task::activate() {
 	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "imports"), getImports);
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "version"), version);
 	if (_trusted) {
 		global->Set(v8::String::NewFromUtf8(_isolate, "Database"), v8::FunctionTemplate::New(_isolate, Database::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
@@ -392,6 +393,11 @@ void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo
 	} else {
 		args.GetReturnValue().Set(v8::Undefined(task->_isolate));
 	}
+}
+
+void Task::version(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	args.GetReturnValue().Set(v8::String::NewFromUtf8(task->_isolate, v8::V8::GetVersion()));
 }
 
 void Task::getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
