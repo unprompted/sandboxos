@@ -1,11 +1,11 @@
 "use strict";
 
 var kStaticFiles = [
-	{uri: '', path: 'index.html', type: 'text/html'},
-	{uri: '/edit', path: 'edit.html', type: 'text/html'},
-	{uri: '/style.css', path: 'style.css', type: 'text/css'},
-	{uri: '/client.js', path: 'client.js', type: 'text/javascript'},
-	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript'},
+	{uri: '', path: 'index.html', type: 'text/html; charset=utf-8'},
+	{uri: '/edit', path: 'edit.html', type: 'text/html; charset=utf-8'},
+	{uri: '/style.css', path: 'style.css', type: 'text/css; charset=utf-8'},
+	{uri: '/client.js', path: 'client.js', type: 'text/javascript; charset=utf-8'},
+	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript; charset=utf-8'},
 ];
 
 var form = require('form');
@@ -107,7 +107,7 @@ function handler(request, response, basePath) {
 			var command = request.body;
 			process.terminal.print("> " + command);
 			invoke(process.eventHandlers['onInput'], [command]).then(function() {
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Content-Length": "0"});
+				response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close", "Content-Length": "0"});
 				response.end("");
 			}).catch(function(error) {
 				process.terminal.print(error);
@@ -115,38 +115,38 @@ function handler(request, response, basePath) {
 		} else if (request.uri == basePath + "/receive") {
 			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
 				var data = JSON.stringify(output);
-				response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close", "Content-Length": data.length.toString()});
+				response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close", "Content-Length": data.length.toString()});
 				response.end(data);
 			}).catch(function(error) {
 				print("ERROR GETTING OUTPUT!");
 			});
 		} else if (request.uri == basePath + "/view") {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
-			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close"});
+			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Connection": "close"});
 			response.end(data);
 		} else if (request.uri == basePath + "/save") {
 			if (packageName == "core" ||
 				packageName.indexOf(".") != -1 ||
 				packageName.indexOf("/") != -1)
 			{
-				response.writeHead(403, {"Content-Type": "text/plain", "Connection": "close"});
+				response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 				response.end("Invalid package name: " + packageName);
 			} else {
 				File.makeDirectory("packages/" + packageName);
 				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
-					response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+					response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 					response.end();
 					updateProcesses(packageName);
 				} else {
-					response.writeHead(500, {"Content-Type": "text/plain", "Connection": "close"});
+					response.writeHead(500, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 					response.end("Problem saving: " + packageName);
 				}
 			}
 		} else if (request.uri == basePath + "/newSession") {
-			response.writeHead(200, {"Content-Type": "text/javascript", "Connection": "close"});
+			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Connection": "close"});
 			response.end(JSON.stringify({'sessionId': makeSessionId()}));
 		} else {
-			response.writeHead(404, {"Content-Type": "text/plain", "Connection": "close"});
+			response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 			response.end("404 File not found");
 		}
 	}

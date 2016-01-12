@@ -109,7 +109,7 @@ function Response(client) {
 		},
 		reportError: function(error) {
 			if (!_started) {
-				client.write("HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\n");
+				client.write("HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n");
 			}
 			if (!_finished) {
 				client.write("500 Internal Server Error\r\n\r\n" + error.stackTrace);
@@ -133,7 +133,7 @@ function handleRequest(request, response) {
 			response.reportError(error);
 		}
 	} else {
-		response.writeHead(200, {"Content-Type": "text/plain; encoding=utf-8", "Connection": "close"});
+		response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 		response.end("No handler found for request: " + request.uri);
 	}
 }
