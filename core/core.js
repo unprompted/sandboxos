@@ -63,10 +63,11 @@ function broadcastEvent(eventName, argv) {
 function broadcast(message) {
 	var sender = this;
 	var promises = [];
+	var from = getUser(sender);
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
 		if (process != sender && process.packageName == sender.packageName) {
-			promises.push(invoke(process.eventHandlers['onMessage'], [message]));
+			promises.push(invoke(process.eventHandlers['onMessage'], [from, message]));
 		}
 	}
 	return Promise.all(promises);
@@ -106,15 +107,20 @@ function getPackages() {
 	return File.readDirectory('packages/').filter(function(name) { return name.charAt(0) != '.'; });
 }
 
+function getUser(process) {
+	return {
+		name: process.userName || ('user' + process.index),
+		index: process.index,
+		packageName: process.packageName,
+	};
+}
+
 function getUsers(packageName) {
 	var result = [];
 	for (var key in gProcesses) {
 		var process = gProcesses[key];
 		if (!packageName || process.packageName == packageName) {
-			result.push({
-				index: process.index,
-				packageName: process.packageName,
-			});
+			result.push(getUser(process));
 		}
 	}
 	return result;
@@ -141,9 +147,9 @@ function ping() {
 	}
 }
 
-function postMessage(message) {
+function postMessage(from, message) {
 	var process = this;
-	return invoke(process.eventHandlers['onMessage'], [message]);
+	return invoke(process.eventHandlers['onMessage'], [getUser(from), message]);
 }
 
 function getService(service) {
@@ -151,7 +157,7 @@ function getService(service) {
 	var serviceProcess = getServiceProcess(process.packageName, service);
 	return serviceProcess.ready.then(function() {
 		return {
-			postMessage: postMessage.bind(serviceProcess),
+			postMessage: postMessage.bind(serviceProcess, process),
 		}
 	});
 }
@@ -161,7 +167,7 @@ function getSessionProcess(packageName, session) {
 }
 
 function getServiceProcess(packageName, service, options) {
-	return getProcess(packageName, 'service_' + service, options || {});
+	return getProcess(packageName, 'service_' + packageName + '_' + service, options || {});
 }
 
 function getProcess(packageName, key, options) {

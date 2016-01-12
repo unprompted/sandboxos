@@ -2,16 +2,16 @@
 var gOnInput = null;
 
 if (imports.terminal) {
-	imports.core.register("onMessage", function(message) {
+	imports.core.register("onMessage", function(sender, message) {
 		if (message.message && message.when) {
-			imports.terminal.print("Incoming message: " + message.when + ": " + message.message);
+			printMessage(message);
 		}
 	});
 } else {
 	// Chat service process.
-	imports.core.register("onMessage", function(message) {
-		print("ONMESSAGE: " + JSON.stringify(message));
+	imports.core.register("onMessage", function(sender, message) {
 		if (message.message && message.when) {
+			message.sender = sender;
 			return imports.database.get("board").catch(function() {
 				return null;
 			}).then(function(data) {
@@ -77,6 +77,10 @@ function main() {
 	};
 }
 
+function printMessage(message) {
+	imports.terminal.print(message.when + " <" + (message.sender ? message.sender.name : "unknown") + "> " + message.message);
+}
+
 function chat() {
 	imports.terminal.clear();
 	imports.terminal.print("");
@@ -89,19 +93,19 @@ function chat() {
 		} catch (error) {
 			board = [];
 		}
-		printTable([["When", "Message"]].concat(board.slice(Math.max(0, board.length - 10), board.length).map(function(entry) {
-			return [entry.when, entry.message];
-		})));
+
+		for (let i = Math.max(0, board.length - 10); i < board.length; i++) {
+			printMessage(board[i]);
+		}
 	});
 	gOnInput = function(input) {
 		if (input == "exit") {
 			main();
 		} else {
 			imports.core.getService("chat").then(function(chatService) {
-				print("POST MESSAGE");
 				return chatService.postMessage({when: new Date().toString(), message: input});
 			}).catch(function(error) {
-				imports.terminal.print("ERROR: " + error);
+				imports.terminal.print("ERROR: " + JSON.stringify(error));
 			});
 		}
 	};

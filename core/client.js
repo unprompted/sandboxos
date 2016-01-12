@@ -33,10 +33,14 @@ function receive() {
 			data: gHaveIndex.toString(),
 			dataType: "json",
 	}).then(function(data) {
-		for (var i in data.lines) {
-			print(data.lines[i]);
+		if (data.lines[0] && data.lines[0].action == "ping") {
+			// PONG
+		} else {
+			for (var i in data.lines) {
+				print(data.lines[i]);
+			}
+			gHaveIndex = data.index;
 		}
-		gHaveIndex = data.index;
 		receive();
 	}).fail(function(xhr, message, error) {
 		print("RECEIVE FAILED.  Reload to resume.");
@@ -62,8 +66,6 @@ function printStructured(data) {
 		}
 	} else if (data && data.action == "clear") {
 		document.getElementById("terminal").innerText = "";
-	} else if (data && data.action == "ping") {
-		// pong
 	} else if (data) {
 		var node;
 		if (data.href) {

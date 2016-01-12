@@ -66,7 +66,7 @@ function invoke(handlers, argv) {
 	var promises = [];
 	if (handlers) {
 		for (var i = 0; i < handlers.length; ++i) {
-			promises.push(handlers[i].apply(null, argv));
+			promises.push(handlers[i].apply({}, argv));
 		}
 	}
 	return Promise.all(promises);
