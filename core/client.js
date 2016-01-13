@@ -1,5 +1,6 @@
 var gHaveIndex = -1;
 var gSessionId;
+var gCredentials;
 
 function enter(event) {
 	if (event.keyCode == 13) {
@@ -123,6 +124,23 @@ function send(command) {
 	});
 }
 
+function updateLogin() {
+	var login = document.getElementById("login");
+	while (login.firstChild) {
+		login.removeChild(login.firstChild);
+	}
+
+	var a = document.createElement("a");
+	if (gCredentials && gCredentials.session) {
+		a.appendChild(document.createTextNode("logout " + gCredentials.session.name));
+		a.setAttribute("href", "/login/logout?return=" + encodeURIComponent(window.location.href));
+	} else {
+		a.appendChild(document.createTextNode("login"));
+		a.setAttribute("href", "/login?return=" + encodeURIComponent(window.location.href));
+	}
+	login.appendChild(a);
+}
+
 function getNewSession() {
 	$.ajax({
 		url: window.location.href + "/newSession",
@@ -130,6 +148,8 @@ function getNewSession() {
 			dataType: "json",
 	}).then(function(data) {
 		gSessionId = data.sessionId;
+		gCredentials = data.credentials;
+		updateLogin();
 		receive();
 	}).fail(function(xhr, message, error) {
 		print("Error starting session.");

@@ -1,6 +1,7 @@
 "use strict";
 
 var terminal = require("terminal");
+var auth = require("auth");
 
 var gProcessIndex = 0;
 var gProcesses = {};
@@ -109,7 +110,7 @@ function getPackages() {
 
 function getUser(process) {
 	return {
-		name: process.userName || ('user' + process.index),
+		name: process.userName,
 		index: process.index,
 		packageName: process.packageName,
 	};
@@ -162,8 +163,14 @@ function getService(service) {
 	});
 }
 
-function getSessionProcess(packageName, session) {
-	return getProcess(packageName, 'session_' + session, {terminal: true, timeout: kPingInterval});
+function getSessionProcess(packageName, session, options) {
+	var actualOptions = {terminal: true, timeout: kPingInterval};
+	if (options) {
+		for (var i in options) {
+			actualOptions[i] = options[i];
+		}
+	}
+	return getProcess(packageName, 'session_' + session, actualOptions);
 }
 
 function getServiceProcess(packageName, service, options) {
@@ -176,6 +183,7 @@ function getProcess(packageName, key, options) {
 		print("Creating task for " + packageName + " " + key);
 		process = {};
 		process.index = gProcessIndex++;
+		process.userName = options.userName || ('user' + process.index);
 		process.task = new Task();
 		process.eventHandlers = {};
 		process.packageName = packageName;
@@ -261,7 +269,9 @@ function updateProcesses(packageName) {
 
 var kIgnore = ["/favicon.ico"];
 
+var auth = require("auth");
 var httpd = require("httpd");
+httpd.all("/login", auth.handler);
 httpd.all("", function(request, response) {
 	var packageName = request.uri.split("/")[1];
 	var basePath = "/" + packageName;

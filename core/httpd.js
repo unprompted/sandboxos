@@ -17,6 +17,8 @@ function addHandler(handler) {
 		gHandlers.push(handler);
 		added = true;
 	}
+
+	print(gHandlers);
 }
 
 function get(prefix, handler) {
@@ -55,6 +57,8 @@ function Request(method, uri, version, headers, body, client) {
 
 function findHandler(request) {
 	var matchedHandler = null;
+	print(gHandlers);
+	print(request);
 	for (var name in gHandlers) {
 		var handler = gHandlers[name];
 		if ((!handler.method || handler.method == request.method)

@@ -13,6 +13,7 @@ body {
 
 .navigation {
 	height: auto;
+	width: 100%;
 }
 
 .navigation > a {
@@ -32,22 +33,22 @@ body {
 	white-space: pre;
 }
 
-#terminal>a:link, .command {
+a:link, .command {
 	color: #268bd2;
 	cursor: pointer;
 }
 
-#terminal>a:visited, .command:visited {
+a:visited, .command:visited {
 	color: #6c71c4;
 	cursor: pointer;
 }
 
-#terminal>a:hover, .command:hover {
+a:hover, .command:hover {
 	color: #2aa198;
 	cursor: pointer;
 }
 
-#terminal>a:active, .command:active {
+a:active, .command:active {
 	color: #dc322f;
 	cursor: pointer;
 }
@@ -87,4 +88,8 @@ body {
 	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3QUXCToH00Y1UgAAACFJREFUCNdjPMDBUc/AwNDAAAFMTAwMDA0OP34wQgX/AQBYgwYEx4f9lQAAAABJRU5ErkJggg==);
 	background-position: bottom left;
 	background-repeat: repeat-x;
+}
+
+#login {
+	float: right;
 }

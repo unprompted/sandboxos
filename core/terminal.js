@@ -8,6 +8,7 @@ var kStaticFiles = [
 	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript; charset=utf-8'},
 ];
 
+var auth = require('auth');
 var form = require('form');
 
 function Terminal() {
@@ -79,7 +80,12 @@ function handler(request, response, basePath) {
 	var process;
 
 	if (formData.sessionId) {
-		process = getSessionProcess(packageName, formData.sessionId);
+		var options = {};
+		var credentials = auth.query(request.headers);
+		if (credentials && credentials.session) {
+			options.userName = credentials.session.name;
+		}
+		process = getSessionProcess(packageName, formData.sessionId, options);
 		process.lastActive = Date.now();
 	}
 
@@ -144,7 +150,8 @@ function handler(request, response, basePath) {
 			}
 		} else if (request.uri == basePath + "/newSession") {
 			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Connection": "close"});
-			response.end(JSON.stringify({'sessionId': makeSessionId()}));
+			var credentials = auth.query(request.headers);
+			response.end(JSON.stringify({'sessionId': makeSessionId(), 'credentials': credentials}));
 		} else {
 			response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 			response.end("404 File not found");
