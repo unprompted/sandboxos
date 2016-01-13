@@ -153,6 +153,7 @@ void Task::activate() {
 	global->Set(v8::String::NewFromUtf8(_isolate, "require"), v8::FunctionTemplate::New(_isolate, require));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "parent"), parent);
 	global->Set(v8::String::NewFromUtf8(_isolate, "exit"), v8::FunctionTemplate::New(_isolate, exit));
+	global->Set(v8::String::NewFromUtf8(_isolate, "utf8Length"), v8::FunctionTemplate::New(_isolate, utf8Length));
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "imports"), getImports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "version"), version);
@@ -218,6 +219,13 @@ void Task::timeoutCallback(uv_timer_t* handle) {
 	v8::Handle<v8::Function> function = v8::Local<v8::Function>::New(timeout->_task->_isolate, timeout->_callback);
 	function->Call(v8::Undefined(timeout->_task->_isolate), 0, 0);
 	delete timeout;
+}
+
+void Task::utf8Length(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	TaskTryCatch tryCatch(task);
+	v8::HandleScope scope(task->_isolate);
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), args[0].As<v8::String>()->Utf8Length()));
 }
 
 void Task::exit(const v8::FunctionCallbackInfo<v8::Value>& args) {

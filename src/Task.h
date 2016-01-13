@@ -136,6 +136,8 @@ private:
 	static void parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void version(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 
+	static void utf8Length(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 	static void getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void getExports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args);
 	static void setExports(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& args);

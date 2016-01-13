@@ -507,15 +507,24 @@ void Socket::write(const v8::FunctionCallbackInfo<v8::Value>& args) {
 				}
 				socket->processOutgoingTls();
 			} else {
-				int valueLength = value->Utf8Length();
-				char* rawBuffer = new char[sizeof(uv_write_t) + valueLength];
+				v8::String::Utf8Value utf8(value);
+				int length;
+				char* rawBuffer = 0;
+				if (value->ContainsOnlyOneByte()) {
+					length = value->Length();
+					rawBuffer = new char[sizeof(uv_write_t) + length];
+					value->WriteOneByte(reinterpret_cast<uint8_t*>(rawBuffer) + sizeof(uv_write_t), 0, length, v8::String::NO_NULL_TERMINATION);
+				} else {
+					v8::String::Utf8Value utf8(value);
+					length = utf8.length();
+					rawBuffer = new char[sizeof(uv_write_t) + length];
+					std::memcpy(rawBuffer + sizeof(uv_write_t), *utf8, length);
+				}
 				uv_write_t* request = reinterpret_cast<uv_write_t*>(rawBuffer);
-				rawBuffer += sizeof(uv_write_t);
-				value->WriteUtf8(rawBuffer, valueLength, 0, 0);
 
 				uv_buf_t buffer;
-				buffer.base = rawBuffer;
-				buffer.len = valueLength;
+				buffer.base = rawBuffer + sizeof(uv_write_t);
+				buffer.len = length;
 
 				request->data = reinterpret_cast<void*>(promise);
 				int result = uv_write(request, reinterpret_cast<uv_stream_t*>(&socket->_socket), &buffer, 1, onWrite);
