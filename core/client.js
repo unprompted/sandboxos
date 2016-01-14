@@ -69,7 +69,7 @@ function printStructured(data) {
 			printStructured(data[i]);
 		}
 	} else if (data && data.action == "clear") {
-		document.getElementById("terminal").innerText = "";
+		document.getElementById("terminal").innerHTML = "";
 	} else if (data) {
 		var node;
 		if (data.href) {
@@ -90,7 +90,7 @@ function printStructured(data) {
 		if (data.class) {
 			node.setAttribute("class", data.class);
 		}
-		node.innerText = data.value || data.href || data.command;
+		node.appendChild(document.createTextNode(data.value || data.href || data.command));
 		if (data.command) {
 			node.dataset.command = data.command;
 			node.onclick = commandClick;

@@ -107,7 +107,7 @@ function authHandler(request, response) {
 			response.writeHead(303, {"Location": queryForm.return, "Connection": "close", "Set-Cookie": cookie});
 			response.end();
 		} else {
-			response.writeHead(200, {"Content-Type": "text/html", "Connection": "close", "Set-Cookie": cookie});
+			response.writeHead(200, {"Content-Type": "text/html; charset=utf-6", "Connection": "close", "Set-Cookie": cookie});
 			var html = File.readFile("core/auth.html");
 			var contents = "";
 
@@ -138,7 +138,7 @@ function authHandler(request, response) {
 		response.writeHead(303, {"Connection": "close", "Set-Cookie": "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", "Location": "/login" + (request.query ? "?" + request.query : "")});
 		response.end();
 	} else {
-		response.writeHead(200, {"Content-Type": "text/plain", "Connection": "close"});
+		response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
 		response.end("Hello, " + request.client.peerName + ".");
 	}
 }
