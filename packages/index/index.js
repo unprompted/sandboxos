@@ -11,13 +11,13 @@ function index() {
 			if (!usersByApp[user.packageName]) {
 				usersByApp[user.packageName] = [];
 			}
-			usersByApp[user.packageName].push(user.index.toString());
+			usersByApp[user.packageName].push(user.name);
 		}
 
 		imports.terminal.clear();
 		imports.terminal.print("Available applications [active users]:");
 		packages.sort().forEach(function(name) {
-			imports.terminal.print("* ", {href: "/" + name, value: name}, usersByApp[name] ? " [" + usersByApp[name].map(x => "user" + x).join(", ") + "]" : "");
+			imports.terminal.print("* ", {href: "/" + name, value: name}, usersByApp[name] ? " [" + usersByApp[name].sort().join(", ") + "]" : "");
 		});
 	});
 }

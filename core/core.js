@@ -235,6 +235,8 @@ function getProcess(packageName, key, options) {
 			imports.terminal = {
 				'print': process.terminal.print.bind(process.terminal),
 				'clear': process.terminal.clear.bind(process.terminal),
+				'readLine': process.terminal.readLine.bind(process.terminal),
+				'setEcho': process.terminal.setEcho.bind(process.terminal),
 			};
 		}
 		process.task.setImports(imports);

@@ -18,6 +18,8 @@ function Terminal() {
 	this._lines = [];
 	this._lastRead = null;
 	this._lastWrite = null;
+	this._echo = true;
+	this._readLine = null;
 	return this;
 }
 
@@ -60,6 +62,20 @@ Terminal.prototype.getOutput = function(haveIndex) {
 		} else {
 			terminal._waiting.push(resolve);
 		}
+	});
+}
+
+Terminal.prototype.setEcho = function(echo) {
+	this._echo = echo;
+}
+
+Terminal.prototype.readLine = function() {
+	var self = this;
+	if (self._readLine) {
+		self._readLine[1]();
+	}
+	return new Promise(function(resolve, reject) {
+		self._readLine = [resolve, reject];
 	});
 }
 
@@ -111,8 +127,15 @@ function handler(request, response, basePath) {
 	if (!found) {
 		if (request.uri == basePath + "/send") {
 			var command = request.body;
-			process.terminal.print("> " + command);
-			invoke(process.eventHandlers['onInput'], [command]).then(function() {
+			if (process.terminal._echo) {
+				process.terminal.print("> " + command);
+			}
+			if (process.terminal._readLine) {
+				let promise = process.terminal._readLine;
+				process.terminal._readLine = null;
+				promise[0](command);
+			}
+			return invoke(process.eventHandlers['onInput'], [command]).then(function() {
 				response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close", "Content-Length": "0"});
 				response.end("");
 			}).catch(function(error) {

@@ -78,11 +78,19 @@ function main() {
 }
 
 function printMessage(message) {
-	imports.terminal.print(message.when + " <" + (message.sender ? message.sender.name : "unknown") + "> " + message.message);
+	imports.terminal.print(
+		{class: "base0", value: message.when},
+		" ",
+		{class: "base00", value: "<"},
+		{class: "base3", value: (message.sender ? message.sender.name : "unknown")},
+		{class: "base00", value: ">"},
+		" ",
+		{class: "base1", value: message.message});
 }
 
 function chat() {
 	imports.terminal.clear();
+	imports.terminal.setEcho(false);
 	imports.terminal.print("");
 	imports.terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, ".");
 	imports.database.get("board").catch(function() {
@@ -100,6 +108,7 @@ function chat() {
 	});
 	gOnInput = function(input) {
 		if (input == "exit") {
+			imports.terminal.setEcho(true);
 			main();
 		} else {
 			imports.core.getService("chat").then(function(chatService) {

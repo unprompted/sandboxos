@@ -84,6 +84,9 @@ function printStructured(data) {
 		if (data.style) {
 			node.setAttribute("style", data.style);
 		}
+		if (data.class) {
+			node.setAttribute("class", data.class);
+		}
 		node.innerText = data.value || data.href || data.command;
 		if (data.command) {
 			node.dataset.command = data.command;
