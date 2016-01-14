@@ -1,10 +1,13 @@
 "use strict";
 var gOnInput = null;
 
+var kMaxHistory = 100;
+var kShowHistory = 20;
+
 if (imports.terminal) {
 	imports.core.register("onMessage", function(sender, message) {
 		if (message.message && message.when) {
-			printMessage(message);
+			printMessage(message, true);
 		}
 	});
 } else {
@@ -21,6 +24,9 @@ if (imports.terminal) {
 					data = [];
 				}
 				data.push(message);
+				while (data.length > kMaxHistory) {
+					data.shift();
+				}
 				return imports.database.set("board", JSON.stringify(data));
 			}).then(function() {
 				return imports.core.broadcast(message);
@@ -77,7 +83,7 @@ function main() {
 	};
 }
 
-function printMessage(message) {
+function printMessage(message, notify) {
 	imports.terminal.print(
 		{class: "base0", value: message.when},
 		" ",
@@ -86,13 +92,15 @@ function printMessage(message) {
 		{class: "base00", value: ">"},
 		" ",
 		{class: "base1", value: message.message});
-	return imports.core.getUser().then(function(user) {
-		if (message.message.indexOf("!") != -1) {
-			return imports.terminal.notify("SOMEONE IS SHOUTING!", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
-		} else if (message.message.indexOf(user.name + ":") != -1) {
-			return imports.terminal.notify("Someone is talking at you.", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
-		}
-	});
+	if (notify) {
+		return imports.core.getUser().then(function(user) {
+			if (message.message.indexOf("!") != -1) {
+				return imports.terminal.notify("SOMEONE IS SHOUTING!", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
+			} else if (message.message.indexOf(user.name + ":") != -1) {
+				return imports.terminal.notify("Someone is talking at you.", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
+			}
+		});
+	}
 }
 
 function chat() {
@@ -109,8 +117,8 @@ function chat() {
 			board = [];
 		}
 
-		for (let i = Math.max(0, board.length - 10); i < board.length; i++) {
-			printMessage(board[i]);
+		for (let i = Math.max(0, board.length - kShowHistory); i < board.length; i++) {
+			printMessage(board[i], false);
 		}
 	});
 	gOnInput = function(input) {
