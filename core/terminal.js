@@ -140,7 +140,14 @@ function handler(request, response, basePath) {
 				promise[0](command);
 			}
 			return invoke(process.eventHandlers['onInput'], [command]).then(function() {
-				response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close", "Content-Length": "0"});
+				response.writeHead(200, {
+					"Content-Type": "text/plain; charset=utf-8",
+					"Connection": "close",
+					"Content-Length": "0",
+					"Cache-Control": "no-cache, no-store, must-revalidate",
+					"Pragma": "no-cache",
+					"Expires": "0",
+				});
 				response.end("");
 			}).catch(function(error) {
 				process.terminal.print(error);
@@ -148,7 +155,14 @@ function handler(request, response, basePath) {
 		} else if (request.uri == basePath + "/receive") {
 			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
 				var data = JSON.stringify(output);
-				response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close", "Content-Length": data.length.toString()});
+				response.writeHead(200, {
+					"Content-Type": "text/plain; charset=utf-8",
+					"Connection": "close",
+					"Content-Length": data.length.toString(),
+					"Cache-Control": "no-cache, no-store, must-revalidate",
+					"Pragma": "no-cache",
+					"Expires": "0",
+				});
 				response.end(data);
 			}).catch(function(error) {
 				print("ERROR GETTING OUTPUT!");
@@ -176,7 +190,13 @@ function handler(request, response, basePath) {
 				}
 			}
 		} else if (request.uri == basePath + "/newSession") {
-			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Connection": "close"});
+			response.writeHead(200, {
+				"Content-Type": "text/javascript; charset=utf-8",
+				"Connection": "close",
+				"Cache-Control": "no-cache, no-store, must-revalidate",
+				"Pragma": "no-cache",
+				"Expires": "0",
+			});
 			var credentials = auth.query(request.headers);
 			response.end(JSON.stringify({'sessionId': makeSessionId(), 'credentials': credentials}));
 		} else {
