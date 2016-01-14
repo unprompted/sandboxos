@@ -34,14 +34,17 @@ function receive() {
 			data: gHaveIndex.toString(),
 			dataType: "json",
 	}).then(function(data) {
-		if (data.lines[0] && data.lines[0].action == "ping") {
-			// PONG
-		} else {
-			for (var i in data.lines) {
-				print(data.lines[i]);
+		for (var i in data.lines) {
+			var line = data.lines[i];
+			if (line[0] && line[0].action == "ping") {
+				// PONG
+			} else if (line[0] && line[0].action == "notify") {
+				new Notification(line[0].title, line[0].options);
+			} else {
+				print(line);
 			}
-			gHaveIndex = data.index;
 		}
+		gHaveIndex = data.index;
 		receive();
 	}).fail(function(xhr, message, error) {
 		print("RECEIVE FAILED.  Reload to resume.");
@@ -160,6 +163,9 @@ function getNewSession() {
 }
 
 $(document).ready(function() {
+	if (Notification) {
+		Notification.requestPermission();
+	}
 	$("#input").keydown(enter);
 	$("#input").focus();
 });

@@ -237,6 +237,7 @@ function getProcess(packageName, key, options) {
 				'clear': process.terminal.clear.bind(process.terminal),
 				'readLine': process.terminal.readLine.bind(process.terminal),
 				'setEcho': process.terminal.setEcho.bind(process.terminal),
+				'notify': process.terminal.notify.bind(process.terminal),
 			};
 		}
 		process.task.setImports(imports);

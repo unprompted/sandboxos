@@ -43,6 +43,10 @@ Terminal.prototype.print = function() {
 	this._lastWrite = new Date();
 }
 
+Terminal.prototype.notify = function(title, options) {
+	this.print({action: "notify", title: title, options: options});
+}
+
 Terminal.prototype.clear = function() {
 	this._lines.length = 0;
 	this._firstLine = this._index;

@@ -168,7 +168,6 @@ function getCredentials(headers, task) {
 function transferCredentials(credentials, task) {
 	if (verifyCredentials.bind(this)(credentials)) {
 		var key = JSON.stringify([credentials.user, this.taskName, task]);
-		print(key);
 		if (!gTokens[key]) {
 			gTokens[key] = makeToken(gTokens[credentials.token].session, task);
 		}
@@ -183,10 +182,6 @@ function verifyCredentials(credentials) {
 		&& gSessions[gTokens[credentials.token].session].name == credentials.user) {
 		return {permissions: getPermissions(gTokens[credentials.token].session)};
 	} else {
-		print(this.taskName);
-		print(credentials);
-		print(gTokens[credentials.token]);
-		print(gSessions[gTokens[credentials.token].session]);
 		throw new Error("Access denied.");
 	}
 }
