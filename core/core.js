@@ -223,6 +223,7 @@ function getProcess(packageName, key, options) {
 					}
 					process.eventHandlers[eventName].push(handler);
 				},
+				'getUser': getUser.bind(process, process),
 			},
 			'database': {
 				'get': databaseGet.bind(process),

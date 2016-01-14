@@ -36,9 +36,9 @@ function receive() {
 	}).then(function(data) {
 		for (var i in data.lines) {
 			var line = data.lines[i];
-			if (line[0] && line[0].action == "ping") {
+			if (line && line.action == "ping") {
 				// PONG
-			} else if (line[0] && line[0].action == "notify") {
+			} else if (line && line[0] && line[0].action == "notify") {
 				new Notification(line[0].title, line[0].options);
 			} else {
 				print(line);

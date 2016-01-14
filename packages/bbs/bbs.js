@@ -86,9 +86,13 @@ function printMessage(message) {
 		{class: "base00", value: ">"},
 		" ",
 		{class: "base1", value: message.message});
-	if (message.message.indexOf("!") != -1) {
-		return imports.terminal.notify("SOMEONE IS SHOUTING!", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
-	}
+	return imports.core.getUser().then(function(user) {
+		if (message.message.indexOf("!") != -1) {
+			return imports.terminal.notify("SOMEONE IS SHOUTING!", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
+		} else if (message.message.indexOf(user.name + ":") != -1) {
+			return imports.terminal.notify("Someone is talking at you.", {body: "<" + (message.sender ? message.sender.name : "unknown") + "> " + message.message});
+		}
+	});
 }
 
 function chat() {
