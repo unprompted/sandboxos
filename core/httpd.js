@@ -92,16 +92,18 @@ function Response(request, client) {
 				headers = arguments[1];
 			}
 			var lowerHeaders = {};
-			var headerString = "HTTP/1.0 " + status + " " + reason + "\r\n";
+			var requestVersion = request.version.split("/")[1].split(".");
+			var responseVersion = (requestVersion[0] >= 1 && requestVersion[0] >= 1) ? "1.1" : "1.0";
+			var headerString = "HTTP/" + responseVersion + " " + status + " " + reason + "\r\n";
 			for (var i in headers) {
 				headerString += i + ": " + headers[i] + "\r\n";
 				lowerHeaders[i.toLowerCase()] = headers[i];
 			}
 			if ("connection" in lowerHeaders) {
-				_keepAlive = headers["connection"] == "keep-alive";
+				_keepAlive = lowerHeaders["connection"].toLowerCase() == "keep-alive";
 			} else {
-				_keepAlive = ((request.version == "HTTP/1.0" && headers["connection"] == "keep-alive") ||
-					(request.version == "HTTP/1.1" && headers["connection"] != "close"));
+				_keepAlive = ((request.version == "HTTP/1.0" && ("connection" in lowerHeaders && lowerHeaders["connection"].toLowerCase() == "keep-alive")) ||
+					(request.version == "HTTP/1.1" && (!("connection" in lowerHeaders) || lowerHeaders["connection"].toLowerCase() != "close")));
 				headerString += "Connection: " + (_keepAlive ? "keep-alive" : "close") + "\r\n";
 			}
 			_chunked = _keepAlive && !("content-length" in lowerHeaders);
@@ -118,7 +120,7 @@ function Response(request, client) {
 			}
 			if (data) {
 				if (_chunked) {
-					client.write(data.length.toString(16) + "\r\n" + data + "0\r\n\r\n");
+					client.write(data.length.toString(16) + "\r\n" + data + "\r\n" + "0\r\n\r\n");
 				} else {
 					client.write(data);
 				}
@@ -130,7 +132,7 @@ function Response(request, client) {
 		},
 		reportError: function(error) {
 			if (!_started) {
-				client.write("HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n");
+				client.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n");
 			}
 			if (!_finished) {
 				client.write("500 Internal Server Error\r\n\r\n" + error.stackTrace);

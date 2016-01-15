@@ -107,7 +107,6 @@ function authHandler(request, response) {
 			response.writeHead(303, {"Location": queryForm.return, "Set-Cookie": cookie});
 			response.end();
 		} else {
-			response.writeHead(200, {"Content-Type": "text/html; charset=utf-6", "Set-Cookie": cookie});
 			var html = File.readFile("core/auth.html");
 			var contents = "";
 
@@ -131,7 +130,9 @@ function authHandler(request, response) {
 				contents += '<div><input type="submit" value="Login"></input></div>\n';
 				contents += '</form>';
 			}
-			response.end(html.replace("$(SESSION)", contents));
+			var text = html.replace("$(SESSION)", contents);
+			response.writeHead(200, {"Content-Type": "text/html; charset=utf-6", "Set-Cookie": cookie, "Content-Length": text.length});
+			response.end(text);
 		}
 	} else if (request.uri == "/login/logout") {
 		delete gSessions[session];
