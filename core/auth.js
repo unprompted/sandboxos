@@ -104,10 +104,10 @@ function authHandler(request, response) {
 		if (session
 			&& gSessions[session]
 			&& queryForm.return) {
-			response.writeHead(303, {"Location": queryForm.return, "Connection": "close", "Set-Cookie": cookie});
+			response.writeHead(303, {"Location": queryForm.return, "Set-Cookie": cookie});
 			response.end();
 		} else {
-			response.writeHead(200, {"Content-Type": "text/html; charset=utf-6", "Connection": "close", "Set-Cookie": cookie});
+			response.writeHead(200, {"Content-Type": "text/html; charset=utf-6", "Set-Cookie": cookie});
 			var html = File.readFile("core/auth.html");
 			var contents = "";
 
@@ -135,7 +135,7 @@ function authHandler(request, response) {
 		}
 	} else if (request.uri == "/login/logout") {
 		delete gSessions[session];
-		response.writeHead(303, {"Connection": "close", "Set-Cookie": "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", "Location": "/login" + (request.query ? "?" + request.query : "")});
+		response.writeHead(303, {"Set-Cookie": "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", "Location": "/login" + (request.query ? "?" + request.query : "")});
 		response.end();
 	} else {
 		response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});

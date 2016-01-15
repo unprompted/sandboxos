@@ -66,7 +66,7 @@ function findHandler(request) {
 	return matchedHandler;
 }
 
-function Response(client) {
+function Response(request, client) {
 	var kStatusText = {
 		200: 'OK',
 		303: 'See other',
@@ -75,6 +75,8 @@ function Response(client) {
 	};
 	var _started = false;
 	var _finished = false;
+	var _keepAlive = false;
+	var _chunked = false;
 	return {
 		writeHead: function(status) {
 			if (_started) {
@@ -89,9 +91,22 @@ function Response(client) {
 				reason = kStatusText[status];
 				headers = arguments[1];
 			}
+			var lowerHeaders = {};
 			var headerString = "HTTP/1.0 " + status + " " + reason + "\r\n";
 			for (var i in headers) {
 				headerString += i + ": " + headers[i] + "\r\n";
+				lowerHeaders[i.toLowerCase()] = headers[i];
+			}
+			if ("connection" in lowerHeaders) {
+				_keepAlive = headers["connection"] == "keep-alive";
+			} else {
+				_keepAlive = ((request.version == "HTTP/1.0" && headers["connection"] == "keep-alive") ||
+					(request.version == "HTTP/1.1" && headers["connection"] != "close"));
+				headerString += "Connection: " + (_keepAlive ? "keep-alive" : "close") + "\r\n";
+			}
+			_chunked = _keepAlive && !("content-length" in lowerHeaders);
+			if (_chunked) {
+				headerString += "Transfer-Encoding: chunked\r\n";
 			}
 			headerString += "\r\n";
 			_started = true;
@@ -102,10 +117,16 @@ function Response(client) {
 				throw new Error("Response.end called multiple times.");
 			}
 			if (data) {
-				client.write(data);
+				if (_chunked) {
+					client.write(data.length.toString(16) + "\r\n" + data + "0\r\n\r\n");
+				} else {
+					client.write(data);
+				}
 			}
 			_finished = true;
-			client.shutdown();
+			if (!_keepAlive) {
+				client.shutdown();
+			}
 		},
 		reportError: function(error) {
 			if (!_started) {
@@ -133,7 +154,7 @@ function handleRequest(request, response) {
 			response.reportError(error);
 		}
 	} else {
-		response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
+		response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
 		response.end("No handler found for request: " + request.uri);
 	}
 }
@@ -146,10 +167,23 @@ function handleConnection(client) {
 	var bodyToRead = -1;
 	var body;
 
+	function reset() {
+		inputBuffer = "";
+		request = undefined;
+		headers = {};
+		lineByLine = true;
+		bodyToRead = -1;
+		body = undefined;
+	}
+
 	function finish() {
-		var response = new Response(client);
 		try {
-			handleRequest(new Request(request[0], request[1], request[2], headers, body, client), response)
+			var requestObject = new Request(request[0], request[1], request[2], headers, body, client);
+			var response = new Response(requestObject, client);
+			handleRequest(requestObject, response)
+			if (client.isConnected) {
+				reset();
+			}
 		} catch (error) {
 			response.reportError(error);
 		}

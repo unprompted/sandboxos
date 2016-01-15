@@ -123,7 +123,7 @@ function handler(request, response, basePath) {
 				source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
 				data = data.replace("$(SOURCE)", source);
 			}
-			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Connection": "close"});
+			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Content-Length": data.length});
 			response.end(data);
 			break;
 		}
@@ -142,7 +142,6 @@ function handler(request, response, basePath) {
 			return invoke(process.eventHandlers['onInput'], [command]).then(function() {
 				response.writeHead(200, {
 					"Content-Type": "text/plain; charset=utf-8",
-					"Connection": "close",
 					"Content-Length": "0",
 					"Cache-Control": "no-cache, no-store, must-revalidate",
 					"Pragma": "no-cache",
@@ -157,7 +156,6 @@ function handler(request, response, basePath) {
 				var data = JSON.stringify(output);
 				response.writeHead(200, {
 					"Content-Type": "text/plain; charset=utf-8",
-					"Connection": "close",
 					"Content-Length": data.length.toString(),
 					"Cache-Control": "no-cache, no-store, must-revalidate",
 					"Pragma": "no-cache",
@@ -169,38 +167,39 @@ function handler(request, response, basePath) {
 			});
 		} else if (request.uri == basePath + "/view") {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
-			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Connection": "close"});
+			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Content-Length": data.length});
 			response.end(data);
 		} else if (request.uri == basePath + "/save") {
 			if (packageName == "core" ||
 				packageName.indexOf(".") != -1 ||
 				packageName.indexOf("/") != -1)
 			{
-				response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
+				response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
 				response.end("Invalid package name: " + packageName);
 			} else {
 				File.makeDirectory("packages/" + packageName);
 				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
-					response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
+					response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
 					response.end();
 					updateProcesses(packageName);
 				} else {
-					response.writeHead(500, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
+					response.writeHead(500, {"Content-Type": "text/plain; charset=utf-8"});
 					response.end("Problem saving: " + packageName);
 				}
 			}
 		} else if (request.uri == basePath + "/newSession") {
+			var credentials = auth.query(request.headers);
+			var result = JSON.stringify({'sessionId': makeSessionId(), 'credentials': credentials});
 			response.writeHead(200, {
 				"Content-Type": "text/javascript; charset=utf-8",
-				"Connection": "close",
+				"Content-Length": result.length,
 				"Cache-Control": "no-cache, no-store, must-revalidate",
 				"Pragma": "no-cache",
 				"Expires": "0",
 			});
-			var credentials = auth.query(request.headers);
-			response.end(JSON.stringify({'sessionId': makeSessionId(), 'credentials': credentials}));
+			response.end(result);
 		} else {
-			response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8", "Connection": "close"});
+			response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8"});
 			response.end("404 File not found");
 		}
 	}
