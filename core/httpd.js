@@ -124,6 +124,8 @@ function Response(request, client) {
 				} else {
 					client.write(data);
 				}
+			} else if (_chunked) {
+				client.write("0\r\n\r\n");
 			}
 			_finished = true;
 			if (!_keepAlive) {
@@ -254,8 +256,8 @@ function handleConnection(client) {
 
 var kBacklog = 8;
 var kHost = "0.0.0.0"
-var kHttpPort = 12345;
-var kHttpsPort = 12346;
+var kHttpPort = 12347;
+var kHttpsPort = 12348;
 
 var socket = new Socket();
 socket.bind(kHost, kHttpPort).then(function() {
