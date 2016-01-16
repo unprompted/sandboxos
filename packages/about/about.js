@@ -119,6 +119,7 @@ var kMessages = [
 		"[ ] XMPP",
 		"[ ] task list",
 		"[x] better chat - nicknames?",
+		"[x] linkify text",
 	],
 ];
 var gIndex = 0;

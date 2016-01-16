@@ -83,6 +83,20 @@ function main() {
 	};
 }
 
+function formatMessage(message) {
+	var regex = /(\w+:\/*\S+?)(?=(?:[\.!?])?(?:$|\s))/gi;
+	var match;
+	var result = [];
+	var lastIndex = 0;
+	while ((match = regex.exec(message)) !== null) {
+		result.push({class: "base1", value: message.substring(lastIndex, match.index)});
+		result.push({href: match[0]});
+		lastIndex = regex.lastIndex;
+	}
+	result.push({class: "base1", value: message.substring(lastIndex)});
+	return result;
+}
+
 function printMessage(message, notify) {
 	imports.terminal.print(
 		{class: "base0", value: message.when},
@@ -91,7 +105,7 @@ function printMessage(message, notify) {
 		{class: "base3", value: (message.sender ? message.sender.name : "unknown")},
 		{class: "base00", value: ">"},
 		" ",
-		{class: "base1", value: message.message});
+		formatMessage(message.message));
 	if (notify) {
 		return imports.core.getUser().then(function(user) {
 			if (message.message.indexOf("!") != -1) {
