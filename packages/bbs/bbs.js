@@ -10,6 +10,18 @@ if (imports.terminal) {
 			printMessage(message, true);
 		}
 	});
+	imports.core.register("onSessionBegin", function(user) {
+		if (user.packageName === imports.core.user.packageName &&
+		   user.index !== imports.core.user.index) {
+			imports.terminal.print(user.name + " has joined the BBS.");
+		}
+	});
+	imports.core.register("onSessionEnd", function(user) {
+		if (user.packageName === imports.core.user.packageName &&
+		   user.index !== imports.core.user.index) {
+			imports.terminal.print(user.name + " has left the BBS.");
+		}
+	});
 } else {
 	// Chat service process.
 	imports.core.register("onMessage", function(sender, message) {

@@ -200,7 +200,7 @@ function getProcess(packageName, key, options) {
 		});
 		gProcesses[key] = process;
 		process.task.onExit = function(exitCode, terminationSignal) {
-			broadcastEvent('onSessionEnd', [{packageName: process.packageName, index: process.index, signal: terminationSignal, exitCode: exitCode}]);
+			broadcastEvent('onSessionEnd', [getUser(process)]);
 			if (terminationSignal) {
 				process.terminal.print("Process terminated with signal " + terminationSignal + ".");
 			} else {
@@ -224,6 +224,7 @@ function getProcess(packageName, key, options) {
 					process.eventHandlers[eventName].push(handler);
 				},
 				'getUser': getUser.bind(process, process),
+				'user': getUser(process),
 			},
 			'database': {
 				'get': databaseGet.bind(process),
@@ -248,7 +249,7 @@ function getProcess(packageName, key, options) {
 		try {
 			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
 				print("Task ready");
-				broadcastEvent('onSessionBegin', [{packageName: process.packageName, index: process.index}]);
+				broadcastEvent('onSessionBegin', [getUser(process)]);
 				resolveReady(process);
 			}).catch(function(error) {
 				printError(process.terminal, error);

@@ -256,8 +256,8 @@ function handleConnection(client) {
 
 var kBacklog = 8;
 var kHost = "0.0.0.0"
-var kHttpPort = 12347;
-var kHttpsPort = 12348;
+var kHttpPort = 12345;
+var kHttpsPort = 12346;
 
 var socket = new Socket();
 socket.bind(kHost, kHttpPort).then(function() {
