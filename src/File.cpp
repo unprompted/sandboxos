@@ -14,12 +14,6 @@
 #include <unistd.h>
 #endif
 
-struct FileRequest {
-	uv_fs_t request;
-	Task* task;
-	promiseid_t promise;
-};
-
 void File::configure(v8::Isolate* isolate, v8::Handle<v8::ObjectTemplate> global) {
 	v8::Local<v8::ObjectTemplate> fileTemplate = v8::ObjectTemplate::New(isolate);
 	fileTemplate->Set(v8::String::NewFromUtf8(isolate, "readFile"), v8::FunctionTemplate::New(isolate, readFile));
@@ -129,21 +123,7 @@ void File::makeDirectory(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::HandleScope scope(args.GetIsolate());
 	v8::Handle<v8::String> directory = args[0]->ToString();
 
-	FileRequest* request = new FileRequest;
-	std::memset(request, 0, sizeof(*request));
-	request->request.data = request;
-	request->task = task;
-	request->promise = task->allocatePromise();
-	uv_fs_mkdir(task->getLoop(), &request->request, *v8::String::Utf8Value(directory), 0777, onMakeDirectory);
-	args.GetReturnValue().Set(task->getPromise(request->promise));
-}
-
-void File::onMakeDirectory(uv_fs_t* request) {
-	FileRequest* fileRequest = reinterpret_cast<FileRequest*>(request->data);
-	if (request->result != 0) {
-		fileRequest->task->rejectPromise(fileRequest->promise, v8::Integer::New(fileRequest->task->getIsolate(), request->result));
-	} else {
-		fileRequest->task->resolvePromise(fileRequest->promise, v8::Integer::New(fileRequest->task->getIsolate(), request->result));
-	}
-	delete fileRequest;
+	uv_fs_t req;
+	int result = uv_fs_mkdir(task->getLoop(), &req, *v8::String::Utf8Value(directory), 0755, 0);
+	args.GetReturnValue().Set(result);
 }
