@@ -179,7 +179,7 @@ function getServiceProcess(packageName, service, options) {
 
 function getProcess(packageName, key, options) {
 	var process = gProcesses[key];
-	if (!process) {
+	if (!process && !(options && "create" in options && !options.create)) {
 		print("Creating task for " + packageName + " " + key);
 		process = {};
 		process.index = gProcessIndex++;

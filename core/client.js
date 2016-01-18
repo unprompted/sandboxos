@@ -39,14 +39,21 @@ function receive() {
 			var line = data.lines[i];
 			if (line && line.action == "ping") {
 				// PONG
+			} else if (line && line.action == "session") {
+				gSessionId = line.session.sessionId;
+				gCredentials = line.session.credentials;
+				updateLogin();
 			} else if (line && line[0] && line[0].action == "notify") {
 				new Notification(line[0].title, line[0].options);
 			} else {
 				print(line);
 			}
 		}
-		gHaveIndex = data.index;
+		gHaveIndex = data.index || -1;
 		receive();
+		if (gErrorCount) {
+			document.getElementById("status").setAttribute("style", "display: none");
+		}
 		gErrorCount = 0;
 	}).fail(function(xhr, message, error) {
 		var node = document.getElementById("status");
@@ -54,6 +61,7 @@ function receive() {
 			node.removeChild(node.firstChild);
 		}
 		node.appendChild(document.createTextNode("ERROR: " + JSON.stringify([message, error])));
+		node.setAttribute("style", "display: inline; color: #dc322f");
 		if (gErrorCount < 60) {
 			setTimeout(receive, 1000);
 		} else {
@@ -159,21 +167,6 @@ function updateLogin() {
 	login.appendChild(a);
 }
 
-function getNewSession() {
-	$.ajax({
-		url: window.location.href + "/newSession",
-			method: "GET",
-			dataType: "json",
-	}).then(function(data) {
-		gSessionId = data.sessionId;
-		gCredentials = data.credentials;
-		updateLogin();
-		receive();
-	}).fail(function(xhr, message, error) {
-		print("Error starting session.");
-	});
-}
-
 $(document).ready(function() {
 	if (Notification) {
 		Notification.requestPermission();
@@ -184,6 +177,6 @@ $(document).ready(function() {
 
 $(window).load(function() {
 	setTimeout(function() {
-		getNewSession();
+		receive();
 	}, 0);
 });

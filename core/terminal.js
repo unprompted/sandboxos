@@ -95,19 +95,6 @@ function invoke(handlers, argv) {
 
 function handler(request, response, basePath) {
 	var found = false;
-	var formData = form.decodeForm(request.query);
-	var packageName = basePath.substring(1) || "index";
-	var process;
-
-	if (formData.sessionId) {
-		var options = {};
-		var credentials = auth.query(request.headers);
-		if (credentials && credentials.session) {
-			options.userName = credentials.session.name;
-		}
-		process = getSessionProcess(packageName, formData.sessionId, options);
-		process.lastActive = Date.now();
-	}
 
 	for (var i in kStaticFiles) {
 		if (("/terminal" + kStaticFiles[i].uri === request.uri) ||
@@ -128,44 +115,11 @@ function handler(request, response, basePath) {
 			break;
 		}
 	}
+
 	if (!found) {
-		if (request.uri == basePath + "/send") {
-			var command = request.body;
-			if (process.terminal._echo) {
-				process.terminal.print("> " + command);
-			}
-			if (process.terminal._readLine) {
-				let promise = process.terminal._readLine;
-				process.terminal._readLine = null;
-				promise[0](command);
-			}
-			return invoke(process.eventHandlers['onInput'], [command]).then(function() {
-				response.writeHead(200, {
-					"Content-Type": "text/plain; charset=utf-8",
-					"Content-Length": "0",
-					"Cache-Control": "no-cache, no-store, must-revalidate",
-					"Pragma": "no-cache",
-					"Expires": "0",
-				});
-				response.end("");
-			}).catch(function(error) {
-				process.terminal.print(error);
-			});
-		} else if (request.uri == basePath + "/receive") {
-			process.terminal.getOutput(parseInt(request.body)).then(function(output) {
-				var data = JSON.stringify(output);
-				response.writeHead(200, {
-					"Content-Type": "text/plain; charset=utf-8",
-					"Content-Length": data.length.toString(),
-					"Cache-Control": "no-cache, no-store, must-revalidate",
-					"Pragma": "no-cache",
-					"Expires": "0",
-				});
-				response.end(data);
-			}).catch(function(error) {
-				print("ERROR GETTING OUTPUT!");
-			});
-		} else if (request.uri == basePath + "/view") {
+		var packageName = basePath.substring(1) || "index";
+		var process;
+		if (request.uri == basePath + "/view") {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
 			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Content-Length": data.length});
 			response.end(data);
@@ -187,20 +141,83 @@ function handler(request, response, basePath) {
 					response.end("Problem saving: " + packageName);
 				}
 			}
-		} else if (request.uri == basePath + "/newSession") {
-			var credentials = auth.query(request.headers);
-			var result = JSON.stringify({'sessionId': makeSessionId(), 'credentials': credentials});
-			response.writeHead(200, {
-				"Content-Type": "text/javascript; charset=utf-8",
-				"Content-Length": result.length,
-				"Cache-Control": "no-cache, no-store, must-revalidate",
-				"Pragma": "no-cache",
-				"Expires": "0",
-			});
-			response.end(result);
 		} else {
-			response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8"});
-			response.end("404 File not found");
+			var options = {};
+			var credentials = auth.query(request.headers);
+			if (credentials && credentials.session) {
+				options.userName = credentials.session.name;
+			}
+			var sessionId = form.decodeForm(request.query).sessionId;
+			var isNewSession = false;
+			if (!getSessionProcess(packageName, sessionId, {create: false})) {
+				sessionId = makeSessionId();
+				isNewSession = true;
+			}
+			process = getSessionProcess(packageName, sessionId, options);
+			process.lastActive = Date.now();
+
+			if (request.uri == basePath + "/send") {
+				if (isNewSession) {
+					var command = request.body;
+					if (process.terminal._echo) {
+						process.terminal.print("> " + command);
+					}
+					if (process.terminal._readLine) {
+						let promise = process.terminal._readLine;
+						process.terminal._readLine = null;
+						promise[0](command);
+					}
+					return invoke(process.eventHandlers['onInput'], [command]).then(function() {
+						response.writeHead(200, {
+							"Content-Type": "text/plain; charset=utf-8",
+							"Content-Length": "0",
+							"Cache-Control": "no-cache, no-store, must-revalidate",
+							"Pragma": "no-cache",
+							"Expires": "0",
+						});
+						response.end("");
+					}).catch(function(error) {
+						process.terminal.print(error);
+					});
+				} else {
+					response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
+					response.end("Too soon.");
+				}
+			} else if (request.uri == basePath + "/receive") {
+				if (isNewSession) {
+					var data = JSON.stringify({
+						lines: [
+							{
+								action: "session",
+								session: {
+									sessionId: sessionId,
+									credentials: credentials,
+								}
+							},
+						]
+					});
+					response.writeHead(200, {
+						"Content-Type": "text/plain; charset=utf-8",
+						"Content-Length": data.length.toString(),
+						"Cache-Control": "no-cache, no-store, must-revalidate",
+						"Pragma": "no-cache",
+						"Expires": "0",
+					});
+					response.end(data);
+				} else {
+					return process.terminal.getOutput(parseInt(request.body)).then(function(output) {
+						var data = JSON.stringify(output);
+						response.writeHead(200, {
+							"Content-Type": "text/plain; charset=utf-8",
+							"Content-Length": data.length.toString(),
+							"Cache-Control": "no-cache, no-store, must-revalidate",
+							"Pragma": "no-cache",
+							"Expires": "0",
+						});
+						response.end(data);
+					});
+				}
+			}
 		}
 	}
 }

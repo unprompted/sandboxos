@@ -91,7 +91,6 @@ a:active, .command:active {
 }
 
 #status {
-	float: right;
 	display: none;
 }
 
