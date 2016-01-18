@@ -49,7 +49,9 @@ function receive() {
 				print(line);
 			}
 		}
-		gHaveIndex = data.index || -1;
+		if ("index" in data) {
+			gHaveIndex = data.index;
+		}
 		receive();
 		if (gErrorCount) {
 			document.getElementById("status").setAttribute("style", "display: none");

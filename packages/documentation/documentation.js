@@ -4,6 +4,7 @@ let kDocumentation = {
 	"imports.core.broadcast": ["message", "Broadcast a message to every other instance of the same app.  Messages will be received through the \"onMessage\" event."],
 	"imports.core.getService": ["name", "Get a reference to a long-running service process identified by name.  A process will be started if it is not already running.  Useful for coordinating between client processes."],
 	"imports.core.getPackages": ["", "Get a list of all available applications."],
+	"imports.core.getUser": ["", "Gets information about the current user."],
 	"imports.core.getUsers": ["", "Get a list of all online users."],
 	"imports.core.register": ["eventName, handlerFunction", "Register a callback function for the given event."],
 	"imports.database.get": ["key", "Retrieve the database value associated with the given key."],
@@ -16,6 +17,9 @@ let kDocumentation = {
 	{style: "color: #f00", value: "Hello, world!"} => Create styled text.
 	{command: "exit", value: "get out of here"} => Create a link that when clicked will act as if the user typed the given command.`],
 	"imports.terminal.clear": ["", "Remove all terminal output."],
+	"imports.terminal.readLine": ["", "Produces the next line of text from user input."],
+	"imports.terminal.setEcho": ["echo", "Controls whether the terminal will automatically echo user input (default=true)."],
+	"imports.terminal.notify": ["body, {title, icon}", ["Produces an ", {href: "https://developer.mozilla.org/en-US/docs/Web/API/notification", value: "HTML5 Notification"}, ".  Arguments are the same as the Notification constructor."]],
 };
 
 imports.terminal.print("V8 Version ", version);
@@ -38,15 +42,15 @@ like this:
 		doSomethingWithTheResult(value);
 	});`);
 
-function dumpDocumentation(prefix, object) {
+function dumpDocumentation(prefix, object, depth) {
 	if (typeof object == "function") {
 		let documentation = kDocumentation[prefix] || ["", ""];
 		imports.terminal.print(prefix + "(" + documentation[0] + ")");
 		imports.terminal.print("\t", documentation[1]);
 		imports.terminal.print("");
-	} else if (object) {
+	} else if (object && typeof object != "string") {
 		for (let i in object) {
-			dumpDocumentation(prefix + "." + i, object[i]);
+			dumpDocumentation(prefix + "." + i, object[i], (depth || 0) + 1);
 		}
 	}
 }
