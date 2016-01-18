@@ -158,6 +158,9 @@ function handler(request, response, basePath) {
 
 			if (request.uri == basePath + "/send") {
 				if (isNewSession) {
+					response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
+					response.end("Too soon.");
+				} else {
 					var command = request.body;
 					if (process.terminal._echo) {
 						process.terminal.print("> " + command);
@@ -179,9 +182,6 @@ function handler(request, response, basePath) {
 					}).catch(function(error) {
 						process.terminal.print(error);
 					});
-				} else {
-					response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
-					response.end("Too soon.");
 				}
 			} else if (request.uri == basePath + "/receive") {
 				if (isNewSession) {
