@@ -95,6 +95,7 @@ function invoke(handlers, argv) {
 
 function handler(request, response, basePath) {
 	var found = false;
+	var packageName = basePath.substring(1) || "index";
 
 	for (var i in kStaticFiles) {
 		if (("/terminal" + kStaticFiles[i].uri === request.uri) ||
@@ -117,7 +118,6 @@ function handler(request, response, basePath) {
 	}
 
 	if (!found) {
-		var packageName = basePath.substring(1) || "index";
 		var process;
 		if (request.uri == basePath + "/view") {
 			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
