@@ -103,6 +103,9 @@ function printStructured(data) {
 			node.setAttribute("sandbox", "allow-forms allow-scripts");
 			node.setAttribute("width", data.width || 320);
 			node.setAttribute("height", data.height || 240);
+		} else if (data.image) {
+			node = document.createElement("img");
+			node.setAttribute("src", data.image);
 		} else {
 			node = document.createElement("span");
 		}
@@ -145,7 +148,7 @@ function send(command) {
 	$.ajax({
 		url: window.location.href + "/send?sessionId=" + gSessionId,
 			method: "POST",
-			data: value,
+			data: JSON.stringify(value),
 			dataType: "text",
 	}).fail(function(xhr, status, error) {
 		print("SEND FAILED: " + status + ": " + error)
@@ -169,12 +172,53 @@ function updateLogin() {
 	login.appendChild(a);
 }
 
+var gOriginalInput;
+function dragHover(event) {
+	event.stopPropagation();
+	event.preventDefault();
+	if (event.type == "dragover") {
+		if (!$("#input").hasClass("drop")) {
+			$("#input").addClass("drop");
+			gOriginalInput = $("#input").val();
+			$("#input").val("drop file to upload");
+		}
+	} else {
+		$("#input").removeClass("drop");
+		$("#input").val(gOriginalInput);
+	}
+}
+
+function fileDropRead(event) {
+	send({image: event.target.result});
+}
+
+function fileDrop(event) {
+	dragHover(event);
+
+	var files = event.target.files || event.dataTransfer.files;
+	for (var i = 0; i < files.length; i++) {
+		var file = files[i];
+		var reader = new FileReader();
+		reader.onloadend = fileDropRead;
+		reader.readAsDataURL(file);
+	}
+}
+
+function enableDragDrop() {
+	var body = document.body;
+	body.addEventListener("dragover", dragHover);
+	body.addEventListener("dragleave", dragHover);
+
+	body.addEventListener("drop", fileDrop);
+}
+
 $(document).ready(function() {
 	if (Notification) {
 		Notification.requestPermission();
 	}
 	$("#input").keydown(enter);
 	$("#input").focus();
+	enableDragDrop();
 });
 
 $(window).load(function() {

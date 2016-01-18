@@ -72,6 +72,11 @@ a:active, .command:active {
 	color: #eee8d5;
 }
 
+#input.drop {
+	border: 2px solid;
+	color: #cb4b16;
+}
+
 .CodeMirror {
 	height: 100%;
 }

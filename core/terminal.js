@@ -161,8 +161,8 @@ function handler(request, response, basePath) {
 					response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
 					response.end("Too soon.");
 				} else {
-					var command = request.body;
-					if (process.terminal._echo) {
+					var command = JSON.parse(request.body);
+					if (process.terminal._echo && typeof command == "string") {
 						process.terminal.print("> " + command);
 					}
 					if (process.terminal._readLine) {

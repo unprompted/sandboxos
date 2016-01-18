@@ -96,16 +96,21 @@ function main() {
 }
 
 function formatMessage(message) {
-	var regex = /(\w+:\/*\S+?)(?=(?:[\.!?])?(?:$|\s))/gi;
-	var match;
-	var result = [];
-	var lastIndex = 0;
-	while ((match = regex.exec(message)) !== null) {
-		result.push({class: "base1", value: message.substring(lastIndex, match.index)});
-		result.push({href: match[0]});
-		lastIndex = regex.lastIndex;
+	var result;
+	if (typeof message == "string") {
+		result = [];
+		var regex = /(\w+:\/*\S+?)(?=(?:[\.!?])?(?:$|\s))/gi;
+		var match;
+		var lastIndex = 0;
+		while ((match = regex.exec(message)) !== null) {
+			result.push({class: "base1", value: message.substring(lastIndex, match.index)});
+			result.push({href: match[0]});
+			lastIndex = regex.lastIndex;
+		}
+		result.push({class: "base1", value: message.substring(lastIndex)});
+	} else {
+		result = message;
 	}
-	result.push({class: "base1", value: message.substring(lastIndex)});
 	return result;
 }
 
