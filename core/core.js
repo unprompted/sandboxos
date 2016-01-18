@@ -75,7 +75,7 @@ function broadcast(message) {
 }
 
 function getDatabase(process) {
-	if (!process.database) {
+	if (!process.database && process.packageName != "auth") {
 		File.makeDirectory('data');
 		File.makeDirectory('data/' + process.packageName);
 		File.makeDirectory('data/' + process.packageName + "/db");

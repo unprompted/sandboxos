@@ -90,6 +90,11 @@ a:active, .command:active {
 	background-repeat: repeat-x;
 }
 
+#status {
+	float: right;
+	display: none;
+}
+
 #login {
 	float: right;
 }

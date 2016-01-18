@@ -1,15 +1,20 @@
+"use strict";
 var kAccountsFile = "data/auth/accounts.json";
 var kPermissionsFile = "data/auth/permissions.json";
 
 var gAccounts = {};
 var gPermissions = {};
-var gSessions = {};
 var gTokens = {};
 
 var bCryptLib = require('bCrypt');
 bCrypt = new bCryptLib.bCrypt();
 
 var form = require('form');
+
+File.makeDirectory("data");
+File.makeDirectory("data/auth");
+File.makeDirectory("data/auth/db");
+var gDatabase = new Database("data/auth/db");
 
 try {
 	gAccounts = JSON.parse(File.readFile(kAccountsFile));
@@ -21,20 +26,29 @@ try {
 } catch (error) {
 }
 
-function getCookies(headers) {
-	var cookies = {};
+function readSession(session) {
+	var result = session ? gDatabase.get("session_" + session) : null;
 
-	if (headers.cookie) {
-		var parts = headers.cookie.split(/,|;/);
-		for (var i in parts) {
-			var equals = parts[i].indexOf("=");
-			var name = parts[i].substring(0, equals).trim();
-			var value = parts[i].substring(equals + 1).trim();
-			cookies[name] = value;
+	if (result) {
+		result = JSON.parse(result);
+
+		let kRefreshInterval = 1 * 60 * 60 * 1000;
+		let now = Date.now();
+		if (!result.lastAccess || result.lastAccess < now - kRefreshInterval) {
+			result.lastAccess = now;
+			writeSession(session, result);
 		}
 	}
 
-	return cookies;
+	return result;
+}
+
+function writeSession(session, value) {
+	gDatabase.set("session_" + session, JSON.stringify(value));
+}
+
+function removeSession(session, value) {
+	gDatabase.remove("session_" + session);
 }
 
 function newSession() {
@@ -44,19 +58,6 @@ function newSession() {
 		result += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
 	}
 	return result;
-}
-
-function getPermissions(session) {
-	var permissions = {};
-	if (session && gSessions[session]) {
-		permissions.authenticated = true;
-		if (gPermissions[gSessions[session].name]) {
-			for (var i in gPermissions[gSessions[session].name]) {
-				permissions[gPermissions[gSessions[session].name][i]] = true;
-			}
-		}
-	}
-	return permissions;
 }
 
 function verifyPassword(password, hash) {
@@ -83,7 +84,7 @@ function authHandler(request, response) {
 				if (!gAccounts[formData.name] &&
 					formData.password == formData.confirm) {
 					gAccounts[formData.name] = {password: hashPassword(formData.password)};
-					gSessions[session] = {name: formData.name};
+					writeSession(session, {name: formData.name});
 					File.writeFile(kAccountsFile, JSON.stringify(gAccounts));
 				} else {
 					loginError = "Error registering account.";
@@ -91,7 +92,7 @@ function authHandler(request, response) {
 			} else {
 				if (gAccounts[formData.name] &&
 					verifyPassword(formData.password, gAccounts[formData.name].password)) {
-					gSessions[session] = {name: formData.name};
+					writeSession(session, {name: formData.name});
 				} else {
 					loginError = "Invalid username or password.";
 				}
@@ -101,20 +102,19 @@ function authHandler(request, response) {
 		var queryForm = form.decodeForm(request.query);
 
 		var cookie = "session=" + session + "; path=/; Max-Age=604800";
-		if (session
-			&& gSessions[session]
-			&& queryForm.return) {
+		var entry = readSession(session);
+		if (entry && queryForm.return) {
 			response.writeHead(303, {"Location": queryForm.return, "Set-Cookie": cookie});
 			response.end();
 		} else {
 			var html = File.readFile("core/auth.html");
 			var contents = "";
 
-			if (session && gSessions[session]) {
+			if (entry) {
 				if (sessionIsNew) {
-					contents += '<div>Welcome back, ' + gSessions[session].name + '.</div>\n';
+					contents += '<div>Welcome back, ' + entry.name + '.</div>\n';
 				} else {
-					contents += '<div>You are already logged in, ' + gSessions[session].name + '.</div>\n';
+					contents += '<div>You are already logged in, ' + entry.name + '.</div>\n';
 				}
 				contents += '<div><a href="/login/logout">Logout</a></div>\n';
 			} else {
@@ -135,7 +135,7 @@ function authHandler(request, response) {
 			response.end(text);
 		}
 	} else if (request.uri == "/login/logout") {
-		delete gSessions[session];
+		removeSession(session);
 		response.writeHead(303, {"Set-Cookie": "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", "Location": "/login" + (request.query ? "?" + request.query : "")});
 		response.end();
 	} else {
@@ -144,46 +144,25 @@ function authHandler(request, response) {
 	}
 }
 
+function getPermissions(session) {
+	var permissions = {};
+	var entry;
+	if (entry = readSession(session)) {
+		permissions.authenticated = true;
+		if (gPermissions[entry.name]) {
+			for (var i in gPermissions[entry.name]) {
+				permissions[gPermissions[entry.name][i]] = true;
+			}
+		}
+	}
+	return permissions;
+}
+
 function query(headers) {
 	var session = getCookies(headers).session;
-	if (session && gSessions[session]) {
-		return {session: gSessions[session], permissions: getPermissions(session)};
-	}
-}
-
-function makeToken(session, task) {
-	var now = new Date();
-	var random = Math.random();
-	var token = hashPassword(task + ":" + session + ":" + random + ":" + now.toString());
-	gTokens[token] = {session: session, granted: now, random: random, task: task};
-	return {user: gSessions[session].name, token: token};
-}
-
-function getCredentials(headers, task) {
-	var session = getCookies(headers).session;
-	if (session && gSessions[session]) {
-		return makeToken(session, task);
-	}
-}
-
-function transferCredentials(credentials, task) {
-	if (verifyCredentials.bind(this)(credentials)) {
-		var key = JSON.stringify([credentials.user, this.taskName, task]);
-		if (!gTokens[key]) {
-			gTokens[key] = makeToken(gTokens[credentials.token].session, task);
-		}
-		return gTokens[key];
-	}
-}
-
-function verifyCredentials(credentials) {
-	if (gTokens[credentials.token]
-		&& gTokens[credentials.token].task == this.taskName
-		&& gSessions[gTokens[credentials.token].session]
-		&& gSessions[gTokens[credentials.token].session].name == credentials.user) {
-		return {permissions: getPermissions(gTokens[credentials.token].session)};
-	} else {
-		throw new Error("Access denied.");
+	var entry;
+	if (entry = readSession(session)) {
+		return {session: entry, permissions: getPermissions(session)};
 	}
 }
 

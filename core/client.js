@@ -1,6 +1,7 @@
 var gHaveIndex = -1;
 var gSessionId;
 var gCredentials;
+var gErrorCount = 0;
 
 function enter(event) {
 	if (event.keyCode == 13) {
@@ -46,8 +47,19 @@ function receive() {
 		}
 		gHaveIndex = data.index;
 		receive();
+		gErrorCount = 0;
 	}).fail(function(xhr, message, error) {
-		print("RECEIVE FAILED.  Reload to resume.");
+		var node = document.getElementById("status");
+		while (node.firstChild) {
+			node.removeChild(node.firstChild);
+		}
+		node.appendChild(document.createTextNode("ERROR: " + JSON.stringify([message, error])));
+		if (gErrorCount < 60) {
+			setTimeout(receive, 1000);
+		} else {
+			setTimeout(receive, 60 * 1000);
+		}
+		gErrorCount++;
 	});
 }
 
