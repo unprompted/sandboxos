@@ -188,27 +188,35 @@ function dragHover(event) {
 	}
 }
 
-function limitImageSize(sourceData, maxWidth, maxHeight) {
+function limitImageSize(sourceData, maxWidth, maxHeight, callback) {
 	var result = sourceData;
 	var image = new Image();
+	image.onload = function() {
+		if (image.width > maxWidth || image.height > maxHeight) {
+			var downScale = Math.min(maxWidth / image.width, maxHeight / image.height);
+			var canvas = document.createElement("canvas");
+			canvas.width = image.width * downScale;
+			canvas.height = image.height * downScale;
+			var context = canvas.getContext("2d");
+			context.clearRect(0, 0, canvas.width, canvas.height);
+			image.width = canvas.width;
+			image.height = canvas.height;
+			context.drawImage(image, 0, 0, image.width, image.height);
+			result = canvas.toDataURL();
+		}
+		callback(result);
+	};
 	image.src = sourceData;
-	if (image.width > maxWidth || image.height > maxHeight) {
-		var downScale = Math.min(maxWidth / image.width, maxHeight / image.height);
-		var canvas = document.createElement("canvas");
-		canvas.width = image.width * downScale;
-		canvas.height = image.height * downScale;
-		var context = canvas.getContext("2d");
-		context.clearRect(0, 0, canvas.width, canvas.height);
-		image.width = canvas.width;
-		image.height = canvas.height;
-		context.drawImage(image, 0, 0, image.width, image.height);
-		result = canvas.toDataURL();
-	}
-	return result;
+}
+
+function sendImage(image) {
+	limitImageSize(image, 320, 240, function(result) {
+		send({image: result});
+	});
 }
 
 function fileDropRead(event) {
-	send({image: limitImageSize(event.target.result, 320, 240)});
+	sendImage(event.target.result);
 }
 
 function fileDrop(event) {
@@ -221,6 +229,19 @@ function fileDrop(event) {
 			var reader = new FileReader();
 			reader.onloadend = fileDropRead;
 			reader.readAsDataURL(file);
+		}
+	}
+
+	var items = event.dataTransfer.items;
+	for (var i = 0; i < items.length; i++) {
+		if (items[i].type == "text/plain") {
+			items[i].getAsString(function(result) {
+				if (result.substring(0, "data:image/".length) == "data:image/") {
+					sendImage(result);
+				} else {
+					send(result);
+				}
+			});
 		}
 	}
 }
