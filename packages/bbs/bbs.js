@@ -13,13 +13,13 @@ if (imports.terminal) {
 	imports.core.register("onSessionBegin", function(user) {
 		if (user.packageName === imports.core.user.packageName &&
 		   user.index !== imports.core.user.index) {
-			imports.terminal.print(user.name + " has joined the BBS.");
+			listUsers(user.name + " has joined the BBS.  ");
 		}
 	});
 	imports.core.register("onSessionEnd", function(user) {
 		if (user.packageName === imports.core.user.packageName &&
 		   user.index !== imports.core.user.index) {
-			imports.terminal.print(user.name + " has left the BBS.");
+			listUsers(user.name + " has left the BBS.  ");
 		}
 	});
 } else {
@@ -44,6 +44,26 @@ if (imports.terminal) {
 				return imports.core.broadcast(message);
 			});
 		}
+	});
+}
+
+function listUsers(messageStart) {
+	return imports.core.getUsers(imports.core.user.packageName).then(function(users) {
+		var message = [messageStart + "Current users: "];
+		var counts = {};
+		for (var i = 0; i < users.length; i++) {
+			counts[users[i].name] = (counts[users[i].name] || 0) + 1;
+		}
+		for (var i in counts) {
+			if (message.length > 1) {
+				message.push(", ");
+			}
+			message.push({class: "orange", value: i});
+			if (counts[i] > 1) {
+				message.push({class: "base01", value: "(x" + counts[i] + ")"});
+			}
+		}
+		return imports.terminal.print(message);
 	});
 }
 
