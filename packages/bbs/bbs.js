@@ -1,7 +1,7 @@
 "use strict";
 var gOnInput = null;
 
-var kMaxHistory = 100;
+var kMaxHistory = 20;
 var kShowHistory = 20;
 
 if (imports.terminal) {
@@ -39,10 +39,21 @@ if (imports.terminal) {
 				while (data.length > kMaxHistory) {
 					data.shift();
 				}
-				return imports.database.set("board", JSON.stringify(data));
+				return saveBoard(data);
 			}).then(function() {
 				return imports.core.broadcast(message);
 			});
+		}
+	});
+}
+
+function saveBoard(data) {
+	return imports.database.set("board", JSON.stringify(data)).catch(function(error) {
+		if (error.message.indexOf("MDB_MAP_FULL") != -1) {
+			data.shift();
+			return saveBoard(data);
+		} else {
+			throw error;
 		}
 	});
 }
