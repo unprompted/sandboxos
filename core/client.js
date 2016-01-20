@@ -188,8 +188,27 @@ function dragHover(event) {
 	}
 }
 
+function limitImageSize(sourceData, maxWidth, maxHeight) {
+	var result = sourceData;
+	var image = new Image();
+	image.src = sourceData;
+	if (image.width > maxWidth || image.height > maxHeight) {
+		var downScale = Math.min(maxWidth / image.width, maxHeight / image.height);
+		var canvas = document.createElement("canvas");
+		canvas.width = image.width * downScale;
+		canvas.height = image.height * downScale;
+		var context = canvas.getContext("2d");
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		image.width = canvas.width;
+		image.height = canvas.height;
+		context.drawImage(image, 0, 0, image.width, image.height);
+		result = canvas.toDataURL();
+	}
+	return result;
+}
+
 function fileDropRead(event) {
-	send({image: event.target.result});
+	send({image: limitImageSize(event.target.result, 320, 240)});
 }
 
 function fileDrop(event) {
@@ -198,9 +217,11 @@ function fileDrop(event) {
 	var files = event.target.files || event.dataTransfer.files;
 	for (var i = 0; i < files.length; i++) {
 		var file = files[i];
-		var reader = new FileReader();
-		reader.onloadend = fileDropRead;
-		reader.readAsDataURL(file);
+		if (file.type.substring(0, "image/".length) == "image/") {
+			var reader = new FileReader();
+			reader.onloadend = fileDropRead;
+			reader.readAsDataURL(file);
+		}
 	}
 }
 
