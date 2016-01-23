@@ -188,9 +188,11 @@ function dragHover(event) {
 	}
 }
 
-function limitImageSize(sourceData, maxWidth, maxHeight, callback) {
+function fixImage(sourceData, maxWidth, maxHeight, callback) {
 	var result = sourceData;
 	var image = new Image();
+	image.crossOrigin = "anonymous";
+	image.referrerPolicy = "no-referrer";
 	image.onload = function() {
 		if (image.width > maxWidth || image.height > maxHeight) {
 			var downScale = Math.min(maxWidth / image.width, maxHeight / image.height);
@@ -210,7 +212,7 @@ function limitImageSize(sourceData, maxWidth, maxHeight, callback) {
 }
 
 function sendImage(image) {
-	limitImageSize(image, 320, 240, function(result) {
+	fixImage(image, 320, 240, function(result) {
 		send({image: result});
 	});
 }
@@ -222,26 +224,34 @@ function fileDropRead(event) {
 function fileDrop(event) {
 	dragHover(event);
 
-	var files = event.target.files || event.dataTransfer.files;
-	for (var i = 0; i < files.length; i++) {
-		var file = files[i];
-		if (file.type.substring(0, "image/".length) == "image/") {
-			var reader = new FileReader();
-			reader.onloadend = fileDropRead;
-			reader.readAsDataURL(file);
+	var done = false;
+	if (!done) {
+		var files = event.target.files || event.dataTransfer.files;
+		for (var i = 0; i < files.length; i++) {
+			var file = files[i];
+			if (file.type.substring(0, "image/".length) == "image/") {
+				var reader = new FileReader();
+				reader.onloadend = fileDropRead;
+				reader.readAsDataURL(file);
+				done = true;
+			}
 		}
 	}
 
-	var items = event.dataTransfer.items;
-	for (var i = 0; i < items.length; i++) {
-		if (items[i].type == "text/plain") {
-			items[i].getAsString(function(result) {
-				if (result.substring(0, "data:image/".length) == "data:image/") {
-					sendImage(result);
-				} else {
-					send(result);
-				}
-			});
+	if (!done) {
+		var html = event.dataTransfer.getData("text/html");
+		var match = /<img.*src="([^"]+)"/.exec(html);
+		if (match) {
+			sendImage(match[1]);
+			done = true;
+		}
+	}
+
+	if (!done) {
+		var text = event.dataTransfer.getData("text/plain");
+		if (text) {
+			send(text);
+			done = true;
 		}
 	}
 }
