@@ -4,6 +4,7 @@ var kStaticFiles = [
 	{uri: '', path: 'index.html', type: 'text/html; charset=utf-8'},
 	{uri: '/edit', path: 'edit.html', type: 'text/html; charset=utf-8'},
 	{uri: '/style.css', path: 'style.css', type: 'text/css; charset=utf-8'},
+	{uri: '/favicon.png', path: 'favicon.png', type: 'image/png'},
 	{uri: '/client.js', path: 'client.js', type: 'text/javascript; charset=utf-8'},
 	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript; charset=utf-8'},
 ];
