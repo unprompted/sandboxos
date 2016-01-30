@@ -24,14 +24,6 @@ function getCookies(headers) {
 	return cookies;
 }
 
-function packageFilePath(packageName, fileName) {
-	if (packageName.indexOf("..") != -1 && fileName.indexOf("..") != -1) {
-		return null;
-	} else {
-		return 'packages/' + packageName + '/' + fileName;
-	}
-}
-
 function makeSessionId() {
 	var id = "";
 	for (var i = 0; i < 64; i++) {
@@ -75,43 +67,53 @@ function broadcast(message) {
 }
 
 function getDatabase(process) {
-	if (!process.database && process.packageName != "auth") {
-		File.makeDirectory('data');
-		File.makeDirectory('data/' + process.packageName);
-		File.makeDirectory('data/' + process.packageName + "/db");
-		process.database = new Database('data/' + process.packageName + '/db');
+	if (!process.database) {
+		File.makeDirectory("data");
+		File.makeDirectory("data/" + process.packageOwner);
+		File.makeDirectory("data/" + process.packageOwner + "/" + process.packageName);
+		File.makeDirectory("data/" + process.packageOwner + "/" + process.packageName + "/db");
+		process.database = new Database("data/" + process.packageOwner + "/" + process.packageName + "/db");
 	}
 	return process.database;
 }
 
 function databaseGet(key) {
-	var db = getDatabase(this);
-	return db.get(key);
+	return getDatabase(this).get(key);
 }
 
 function databaseSet(key, value) {
-	var db = getDatabase(this);
-	return db.set(key, value);
+	return getDatabase(this).set(key, value);
 }
 
 function databaseRemove(key) {
-	var db = getDatabase(this);
-	return db.remove(key);
+	return getDatabase(this).remove(key);
 }
 
 function databaseGetAll() {
-	var db = getDatabase(this);
-	return db.getAll();
+	return getDatabase(this).getAll();
 }
 
 function getPackages() {
-	return File.readDirectory('packages/').filter(function(name) { return name.charAt(0) != '.'; });
+	var packages = [];
+	var packageOwners = File.readDirectory("packages/");
+	for (var i = 0; i < packageOwners.length; i++) {
+		if (packageOwners[i].charAt(0) != ".") {
+			var packageNames = File.readDirectory("packages/" + packageOwners[i] + "/");
+			for (var j = 0; j < packageNames.length; j++) {
+				if (packageNames[j].charAt(0) != ".") {
+					packages.push({owner: packageOwners[i], name: packageNames[j]});
+				}
+			}
+		}
+	}
+	return packages;
 }
 
 function getUser(process) {
 	return {
 		name: process.userName,
 		index: process.index,
+		packageOwner: process.packageOwner,
 		packageName: process.packageName,
 	};
 }
@@ -155,7 +157,7 @@ function postMessage(from, message) {
 
 function getService(service) {
 	var process = this;
-	var serviceProcess = getServiceProcess(process.packageName, service);
+	var serviceProcess = getServiceProcess(process.packageOwner, process.packageName, service);
 	return serviceProcess.ready.then(function() {
 		return {
 			postMessage: postMessage.bind(serviceProcess, process),
@@ -163,29 +165,46 @@ function getService(service) {
 	});
 }
 
-function getSessionProcess(packageName, session, options) {
+function getSessionProcess(packageOwner, packageName, session, options) {
 	var actualOptions = {terminal: true, timeout: kPingInterval};
 	if (options) {
 		for (var i in options) {
 			actualOptions[i] = options[i];
 		}
 	}
-	return getProcess(packageName, 'session_' + session, actualOptions);
+	return getProcess(packageOwner, packageName, 'session_' + session, actualOptions);
 }
 
 function getServiceProcess(packageName, service, options) {
-	return getProcess(packageName, 'service_' + packageName + '_' + service, options || {});
+	return getProcess(packageOwner, packageName, 'service_' + packageName + '_' + service, options || {});
 }
 
-function getProcess(packageName, key, options) {
+function badName(name) {
+	var bad = false;
+	if (name) {
+		for (var i = 0; i < name.length; i++) {
+			if ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567890-_".indexOf(name.charAt(i)) == -1) {
+				bad = true;
+				break;
+			}
+		}
+	}
+	return bad;
+}
+
+function getProcess(packageOwner, packageName, key, options) {
 	var process = gProcesses[key];
-	if (!process && !(options && "create" in options && !options.create)) {
+	if (!process
+		&& !(options && "create" in options && !options.create)
+		&& !badName(packageOwner) 
+		&& !badName(packageName)) {
 		print("Creating task for " + packageName + " " + key);
 		process = {};
 		process.index = gProcessIndex++;
 		process.userName = options.userName || ('user' + process.index);
 		process.task = new Task();
 		process.eventHandlers = {};
+		process.packageOwner = packageOwner;
 		process.packageName = packageName;
 		process.terminal = new Terminal();
 		process.database = null;
@@ -247,7 +266,9 @@ function getProcess(packageName, key, options) {
 		process.task.activate();
 		print("Executing task");
 		try {
-			process.task.execute(packageFilePath(packageName, packageName + ".js")).then(function() {
+			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
+			print([packageOwner, packageName]);
+			process.task.execute(fileName).then(function() {
 				print("Task ready");
 				broadcastEvent('onSessionBegin', [getUser(process)]);
 				resolveReady(process);
@@ -263,7 +284,7 @@ function getProcess(packageName, key, options) {
 	return process;
 }
 
-function updateProcesses(packageName) {
+function updateProcesses(packageOwner, packageName) {
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
 		if (process.packageName == packageName) {
@@ -278,7 +299,17 @@ var auth = require("auth");
 var httpd = require("httpd");
 httpd.all("/login", auth.handler);
 httpd.all("", function(request, response) {
-	var packageName = request.uri.split("/")[1];
-	var basePath = "/" + packageName;
-	return terminal.handler(request, response, basePath);
+	var match;
+	if (request.uri === "/" || request.uri === "") {
+		response.writeHead(303, {"Location": "/~cory/index", "Content-Length": "0"});
+		return response.end();
+	} else if (match = /^\/terminal(\/.*)/.exec(request.uri)) {
+		return terminal.handler(request, response, null, null, match[1]);
+	} else if (match = /^\/\~([^\/]+)\/([^\/]+)(.*)/.exec(request.uri)) {
+		return terminal.handler(request, response, match[1], match[2], match[3]);
+	} else {
+		var data = "File not found.";
+		response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8", "Content-Length": data.length.toString()});
+		return response.end(data);
+	}
 });

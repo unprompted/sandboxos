@@ -7,7 +7,7 @@ function logError(error) {
 function addHandler(handler) {
 	var added = false;
 	for (var i in gHandlers) {
-		if (gHandlers[i].method == handler.method && gHandlers[i].path == handler.path) {
+		if (gHandlers[i].path == handler.path) {
 			gHandlers[i] = handler;
 			added = true;
 			break;
@@ -17,15 +17,6 @@ function addHandler(handler) {
 		gHandlers.push(handler);
 		added = true;
 	}
-}
-
-function get(prefix, handler) {
-	addHandler({
-		owner: this,
-		method: "GET",
-		path: prefix,
-		invoke: handler,
-	});
 }
 
 function all(prefix, handler) {
@@ -57,8 +48,7 @@ function findHandler(request) {
 	var matchedHandler = null;
 	for (var name in gHandlers) {
 		var handler = gHandlers[name];
-		if ((!handler.method || handler.method == request.method)
-			&& (request.uri == handler.path || request.uri.slice(0, handler.path.length + 1) == handler.path + '/')) {
+		if (request.uri == handler.path || request.uri.slice(0, handler.path.length + 1) == handler.path + '/') {
 			matchedHandler = handler;
 			break;
 		}
@@ -294,4 +284,3 @@ if (privateKey && certificate) {
 }
 
 exports.all = all;
-exports.get = get;

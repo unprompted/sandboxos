@@ -93,49 +93,58 @@ function invoke(handlers, argv) {
 	return Promise.all(promises);
 }
 
-function handler(request, response, basePath) {
+function handler(request, response, packageOwner, packageName, uri) {
 	var found = false;
-	var packageName = basePath.substring(1) || "index";
 
-	for (var i in kStaticFiles) {
-		if (("/terminal" + kStaticFiles[i].uri === request.uri) ||
-			(basePath + kStaticFiles[i].uri === request.uri) ||
-			request.uri == "/") {
-			found = true;
-			var data = File.readFile("core/" + kStaticFiles[i].path);
-			if (kStaticFiles[i].uri == "") {
-				data = data.replace("$(VIEW_SOURCE)", "/" + packageName + "/view");
-				data = data.replace("$(EDIT_SOURCE)", "/" + packageName + "/edit");
-			} else if (kStaticFiles[i].uri == "/edit") {
-				var source = File.readFile("packages/" + packageName + "/" + packageName + ".js") || "";
-				source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
-				data = data.replace("$(SOURCE)", source);
+	if (badName(packageOwner) || badName(packageName)) {
+		var data = "File not found";
+		response.writeHead(404, {"Content-Type": "text/plain; charset=utf-8", "Content-Length": data.length});
+		response.end(data);
+		found = true;
+	}
+
+	if (!found) {
+		for (var i in kStaticFiles) {
+			if (uri === kStaticFiles[i].uri) {
+				found = true;
+				var data = File.readFile("core/" + kStaticFiles[i].path);
+				if (kStaticFiles[i].uri == "") {
+					data = data.replace("$(VIEW_SOURCE)", "/~" + packageOwner + "/" + packageName + "/view");
+					data = data.replace("$(EDIT_SOURCE)", "/~" + packageOwner + "/" + packageName + "/edit");
+				} else if (kStaticFiles[i].uri == "/edit") {
+					var source = File.readFile("packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js") || "";
+					source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
+					data = data.replace("$(SOURCE)", source);
+				}
+				response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Content-Length": data.length});
+				response.end(data);
+				break;
 			}
-			response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Content-Length": data.length});
-			response.end(data);
-			break;
 		}
 	}
 
 	if (!found) {
 		var process;
-		if (request.uri == basePath + "/view") {
-			var data = File.readFile("packages/" + packageName + "/" + packageName + ".js");
+		if (uri === "/view") {
+			var data = File.readFile("packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js");
 			response.writeHead(200, {"Content-Type": "text/javascript; charset=utf-8", "Content-Length": data.length});
 			response.end(data);
-		} else if (request.uri == basePath + "/save") {
-			if (packageName == "core" ||
-				packageName.indexOf(".") != -1 ||
-				packageName.indexOf("/") != -1)
-			{
+		} else if (uri == "/save") {
+			var credentials = auth.query(request.headers);
+			var userName = credentials && credentials.session && credentials.session.name ? credentials.session.name : "guest";
+			if (badName(packageName)) {
 				response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
 				response.end("Invalid package name: " + packageName);
+			} else if (badName(userName)) {
+				response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
+				response.end("Invalid user name: " + userName);
 			} else {
-				File.makeDirectory("packages/" + packageName);
-				if (!File.writeFile("packages/" + packageName + "/" + packageName + ".js", request.body || "")) {
+				File.makeDirectory("packages/" + userName);
+				File.makeDirectory("packages/" + userName + "/" + packageName);
+				if (!File.writeFile("packages/" + userName + "/" + packageName + "/" + packageName + ".js", request.body || "")) {
 					response.writeHead(200, {"Content-Type": "text/plain; charset=utf-8"});
-					response.end();
-					updateProcesses(packageName);
+					response.end("/~" + userName + "/" + packageName);
+					updateProcesses(userName, packageName);
 				} else {
 					response.writeHead(500, {"Content-Type": "text/plain; charset=utf-8"});
 					response.end("Problem saving: " + packageName);
@@ -149,14 +158,14 @@ function handler(request, response, basePath) {
 			}
 			var sessionId = form.decodeForm(request.query).sessionId;
 			var isNewSession = false;
-			if (!getSessionProcess(packageName, sessionId, {create: false})) {
+			if (!getSessionProcess(packageOwner, packageName, sessionId, {create: false})) {
 				sessionId = makeSessionId();
 				isNewSession = true;
 			}
-			process = getSessionProcess(packageName, sessionId, options);
+			process = getSessionProcess(packageOwner, packageName, sessionId, options);
 			process.lastActive = Date.now();
 
-			if (request.uri == basePath + "/send") {
+			if (uri === "/send") {
 				if (isNewSession) {
 					response.writeHead(403, {"Content-Type": "text/plain; charset=utf-8"});
 					response.end("Too soon.");
@@ -183,7 +192,7 @@ function handler(request, response, basePath) {
 						process.terminal.print(error);
 					});
 				}
-			} else if (request.uri == basePath + "/receive") {
+			} else if (uri === "/receive") {
 				if (isNewSession) {
 					var data = JSON.stringify({
 						lines: [

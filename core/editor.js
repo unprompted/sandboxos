@@ -13,8 +13,15 @@ $(document).ready(function() {
 	gBackup = gEditor.getValue();
 });
 
+function packageOwner() {
+	var match = /^\/~([^\/]+)\/(^[\/]+)(.*)/.exec(window.location.pathname);
+	return match[1];
+}
+
 function packageName() {
-	var name = window.location.pathname;
+	var match = /^\/~([^\/]+)\/(^[\/]+)(.*)/.exec(window.location.pathname);
+	return match[2];
+	/*var name = window.location.pathname;
 	var start = 0;
 	var end = -1;
 	while (name.charAt(start) == '/') {
@@ -25,11 +32,15 @@ function packageName() {
 			end = i;
 		}
 	}
-	return name.substring(start, end);
+	return name.substring(start, end);*/
 }
 
-function back(name) {
-	window.location.pathname = "/" + (name || packageName());
+function back(uri) {
+	if (uri) {
+		window.location.pathname = uri;
+	} else {
+		window.location.pathname = "/~" + packageOwner() + "/" + packageName();
+	}
 }
 
 function save(newName) {
@@ -44,10 +55,10 @@ function save(newName) {
 		url: newName ? "/" + newName + "/save" : "save",
 		data: contents,
 		dataType: "text",
-	}).done(function() {
+	}).done(function(uri) {
 		gBackup = contents;
 		if (run) {
-			back(newName);
+			back(uri);
 		}
 	}).fail(function(xhr, status, error) {
 		alert("Unable to save: " + xhr.responseText);
