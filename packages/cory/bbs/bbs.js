@@ -13,13 +13,13 @@ if (terminal) {
 	core.register("onSessionBegin", function(user) {
 		if (user.packageName === core.user.packageName &&
 			user.index !== core.user.index) {
-			listUsers(user.name + " has joined the BBS.");
+			listUsers(user.name + " has joined the BBS.  ");
 		}
 	});
 	core.register("onSessionEnd", function(user) {
 		if (user.packageName === core.user.packageName &&
 			user.index !== core.user.index) {
-			listUsers(user.name + " has left the BBS.");
+			listUsers(user.name + " has left the BBS.  ");
 		}
 	});
 } else {
