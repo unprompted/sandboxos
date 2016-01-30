@@ -175,7 +175,7 @@ function getSessionProcess(packageOwner, packageName, session, options) {
 	return getProcess(packageOwner, packageName, 'session_' + session, actualOptions);
 }
 
-function getServiceProcess(packageName, service, options) {
+function getServiceProcess(packageOwner, packageName, service, options) {
 	return getProcess(packageOwner, packageName, 'service_' + packageName + '_' + service, options || {});
 }
 

@@ -71,10 +71,11 @@ function printList(name, key, items) {
 	imports.terminal.print("=".repeat(name.length));
 	for (var i = 0; i < items.length; i++) {
 		var isChecked = items[i].value;
+		var style = ["", "text-decoration: line-through"];
 		imports.terminal.print(
 			{command: "action:" + JSON.stringify({action: "set", key: key, item: items[i].name, value: !isChecked}), value: isChecked ? kChecked : kUnchecked},
 			" ",
-			items[i].name,
+			{style: style[isChecked ? 1 : 0], value: items[i].name},
 			" (",
 			{command: "action:" + JSON.stringify({action: "remove", key: key, item: items[i].name}), value: "x"},
 			")");
