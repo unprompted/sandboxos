@@ -1,6 +1,5 @@
 imports.core.register("onSessionBegin", index);
 imports.core.register("onSessionEnd", index);
-
 function index() {
 	Promise.all([imports.core.getPackages(), imports.core.getUsers()]).then(function(values) {
 		var packages = values[0];

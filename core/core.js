@@ -267,7 +267,6 @@ function getProcess(packageOwner, packageName, key, options) {
 		print("Executing task");
 		try {
 			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
-			print([packageOwner, packageName]);
 			process.task.execute(fileName).then(function() {
 				print("Task ready");
 				broadcastEvent('onSessionBegin', [getUser(process)]);

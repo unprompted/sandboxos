@@ -148,6 +148,17 @@ void Task::activate() {
 	v8::HandleScope handleScope(_isolate);
 
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+
+	if (!_importObject.IsEmpty()) {
+		v8::Local<v8::Object> imports(_importObject.Get(_isolate));
+		v8::Handle<v8::Array> keys = imports->GetOwnPropertyNames();
+		for (size_t i = 0; i < keys->Length(); ++i) {
+			v8::String::Utf8Value value(keys->Get(i).As<v8::String>());
+			std::cerr << *value << "\n";
+			global->SetAccessor(keys->Get(i).As<v8::String>(), getImportProperty);
+		}
+	}
+
 	global->Set(v8::String::NewFromUtf8(_isolate, "print"), v8::FunctionTemplate::New(_isolate, print));
 	global->Set(v8::String::NewFromUtf8(_isolate, "setTimeout"), v8::FunctionTemplate::New(_isolate, setTimeout));
 	global->Set(v8::String::NewFromUtf8(_isolate, "require"), v8::FunctionTemplate::New(_isolate, require));
@@ -406,6 +417,11 @@ void Task::parent(v8::Local<v8::String> property, const v8::PropertyCallbackInfo
 void Task::version(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
 	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
 	args.GetReturnValue().Set(v8::String::NewFromUtf8(task->_isolate, v8::V8::GetVersion()));
+}
+
+void Task::getImportProperty(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	v8::Local<v8::Object> imports = Task::get(args.GetIsolate())->_importObject.Get(args.GetIsolate());
+	args.GetReturnValue().Set(imports->Get(property));
 }
 
 void Task::getImports(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
