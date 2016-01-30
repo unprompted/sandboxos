@@ -4,7 +4,7 @@ var gOnInput = null;
 var kMaxHistory = 20;
 var kShowHistory = 20;
 
-if (terminal) {
+if (imports.terminal) {
 	core.register("onMessage", function(sender, message) {
 		if (message.message && message.when) {
 			printMessage(message, true);
@@ -278,6 +278,6 @@ function printHighScores(data) {
 	})));
 }
 
-if (terminal) {
+if (imports.terminal) {
 	welcome();
 }

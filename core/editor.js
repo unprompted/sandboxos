@@ -13,26 +13,16 @@ $(document).ready(function() {
 	gBackup = gEditor.getValue();
 });
 
+function explodePath() {
+	return /^\/~([^\/]+)\/([^\/]+)(.*)/.exec(window.location.pathname);
+}
+
 function packageOwner() {
-	var match = /^\/~([^\/]+)\/(^[\/]+)(.*)/.exec(window.location.pathname);
-	return match[1];
+	return explodePath()[1];
 }
 
 function packageName() {
-	var match = /^\/~([^\/]+)\/(^[\/]+)(.*)/.exec(window.location.pathname);
-	return match[2];
-	/*var name = window.location.pathname;
-	var start = 0;
-	var end = -1;
-	while (name.charAt(start) == '/') {
-		start++;
-	}
-	for (var i = start + 1; i < name.length; i++) {
-		if (name.charAt(i) == '/') {
-			end = i;
-		}
-	}
-	return name.substring(start, end);*/
+	return explodePath()[2];
 }
 
 function back(uri) {

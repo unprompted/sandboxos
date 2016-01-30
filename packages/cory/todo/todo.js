@@ -3,6 +3,8 @@
 var kUnchecked = "☐";
 var kChecked = "☑";
 
+terminal.setPrompt("Add Item>");
+
 core.register("onInput", function(command) {
 	if (command.substring(0, "action:".length) == "action:") {
 		command = JSON.parse(command.substring("action:".length));

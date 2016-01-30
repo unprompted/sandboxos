@@ -62,7 +62,7 @@ a:active, .command:active {
 	flex-flow: row;
 }
 
-.prompt {
+#prompt {
 	padding-right: 0.5em;
 	color: #eee8d5;
 }

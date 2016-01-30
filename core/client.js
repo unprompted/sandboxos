@@ -45,6 +45,14 @@ function receive() {
 				updateLogin();
 			} else if (line && line[0] && line[0].action == "notify") {
 				new Notification(line[0].title, line[0].options);
+			} else if (line && line[0] && line[0].action == "title") {
+				window.document.title = line[0].value;
+			} else if (line && line[0] && line[0].action == "prompt") {
+				var prompt = document.getElementById("prompt");
+				while (prompt.firstChild) {
+					prompt.removeChild(prompt.firstChild);
+				}
+				prompt.appendChild(document.createTextNode(line[0].value));
 			} else {
 				print(line);
 			}

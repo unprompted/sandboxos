@@ -257,8 +257,10 @@ function getProcess(packageOwner, packageName, key, options) {
 				'print': process.terminal.print.bind(process.terminal),
 				'clear': process.terminal.clear.bind(process.terminal),
 				'readLine': process.terminal.readLine.bind(process.terminal),
-				'setEcho': process.terminal.setEcho.bind(process.terminal),
 				'notify': process.terminal.notify.bind(process.terminal),
+				'setEcho': process.terminal.setEcho.bind(process.terminal),
+				'setTitle': process.terminal.setTitle.bind(process.terminal),
+				'setPrompt': process.terminal.setPrompt.bind(process.terminal),
 			};
 		}
 		process.task.setImports(imports);

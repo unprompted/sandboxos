@@ -47,6 +47,14 @@ Terminal.prototype.notify = function(title, options) {
 	this.print({action: "notify", title: title, options: options});
 }
 
+Terminal.prototype.setTitle = function(value) {
+	this.print({action: "title", value: value});
+}
+
+Terminal.prototype.setPrompt = function(value) {
+	this.print({action: "prompt", value: value});
+}
+
 Terminal.prototype.clear = function() {
 	this._lines.length = 0;
 	this._firstLine = this._index;
