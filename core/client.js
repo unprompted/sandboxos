@@ -97,6 +97,7 @@ function printStructured(data) {
 		if (data.href) {
 			node = document.createElement("a");
 			node.setAttribute("href", data.href);
+			node.setAttribute("target", "_blank");
 		} else if (data.iframe) {
 			node = document.createElement("iframe");
 			node.setAttribute("srcdoc", data.iframe);

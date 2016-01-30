@@ -1,7 +1,28 @@
 "use strict";
 
 var kUnchecked = "☐";
-var kChecked = "☒";
+var kChecked = "☑";
+
+imports.core.register("onInput", function(command) {
+	if (command.substring(0, "action:".length) == "action:") {
+		command = JSON.parse(command.substring("action:".length));
+		if (command.action == "set") {
+			setItem(command.key, command.item, command.value).then(notifyChanged).then(redisplay);
+		} else if (command.action == "remove") {
+			removeItem(command.key, command.item).then(notifyChanged).then(redisplay);
+		}
+	} else {
+		addItem("todo", command).then(notifyChanged).then(redisplay);
+	}
+});
+
+imports.core.register("onMessage", function(message) {
+	return redisplay();
+});
+
+function notifyChanged() {
+	return imports.core.broadcast({changed: true});
+}
 
 function readList(key) {
 	return imports.database.get(key).catch(function(error) {
@@ -17,19 +38,6 @@ function readList(key) {
 function writeList(key, todo) {
 	return imports.database.set(key, JSON.stringify(todo));
 }
-
-imports.core.register("onInput", function(command) {
-	if (command.substring(0, "action:".length) == "action:") {
-		command = JSON.parse(command.substring("action:".length));
-		if (command.action == "set") {
-			setItem(command.key, command.item, command.value).then(redisplay);
-		} else if (command.action == "remove") {
-			removeItem(command.key, command.item).then(redisplay);
-		}
-	} else {
-		addItem("todo", command).then(redisplay);
-	}
-});
 
 function addItem(key, name) {
 	return readList(key).then(function(todo) {
