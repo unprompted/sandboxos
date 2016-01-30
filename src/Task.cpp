@@ -153,8 +153,6 @@ void Task::activate() {
 		v8::Local<v8::Object> imports(_importObject.Get(_isolate));
 		v8::Handle<v8::Array> keys = imports->GetOwnPropertyNames();
 		for (size_t i = 0; i < keys->Length(); ++i) {
-			v8::String::Utf8Value value(keys->Get(i).As<v8::String>());
-			std::cerr << *value << "\n";
 			global->SetAccessor(keys->Get(i).As<v8::String>(), getImportProperty);
 		}
 	}

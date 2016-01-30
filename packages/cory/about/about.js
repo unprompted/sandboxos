@@ -128,17 +128,17 @@ function printNextMessage() {
 	if (gIndex < kMessages.length) {
 		var block = kMessages[gIndex];
 		for (var i = 0; i < block.length; i++) {
-			imports.terminal.print(block[i]);
+			terminal.print(block[i]);
 		}
-		imports.terminal.print("");
+		terminal.print("");
 	}
-	imports.terminal.print("(press enter to continue, \"exit\" to exit)");
+	terminal.print("(press enter to continue, \"exit\" to exit)");
 	if (gIndex < kMessages.length) {
 		gIndex++;
 	}
 }
 
-imports.core.register("onInput", function(input) {
+core.register("onInput", function(input) {
 	if (input == "exit") {
 		exit();
 	} else {
