@@ -19,6 +19,8 @@ let kDocumentation = {
 	"terminal.clear": ["", "Remove all terminal output."],
 	"terminal.readLine": ["", "Produces the next line of text from user input."],
 	"terminal.setEcho": ["echo", "Controls whether the terminal will automatically echo user input (default=true)."],
+	"terminal.setTitle": ["title", "Sets the browser window/tab title."],
+	"terminal.setPrompt": ["prompt", "Sets the terminal prompt (default \">\")."],
 	"terminal.notify": ["body, {title, icon}", ["Produces an ", {href: "https://developer.mozilla.org/en-US/docs/Web/API/notification", value: "HTML5 Notification"}, ".  Arguments are the same as the Notification constructor."]],
 };
 
@@ -28,7 +30,6 @@ terminal.print("");
 terminal.print("API Documentation");
 terminal.print("=================");
 dumpDocumentation("imports", imports);
-terminal.print("");
 terminal.print(`Notes
 =====
 All API functions are invoked asynchronously.  They
@@ -41,6 +42,10 @@ like this:
 	database.get(key).then(function(value) {
 		doSomethingWithTheResult(value);
 	});`);
+terminal.print("");
+terminal.print("Colors (CSS class names)");
+terminal.print("========================");
+dumpColors();
 
 function dumpDocumentation(prefix, object, depth) {
 	if (typeof object == "function") {
@@ -53,4 +58,25 @@ function dumpDocumentation(prefix, object, depth) {
 			dumpDocumentation(prefix + "." + i, object[i], (depth || 0) + 1);
 		}
 	}
+}
+
+function dumpColors() {
+	var kColors = [
+		"base03",
+		"base02",
+		"base01",
+		"base00",
+		"base0",
+		"base1",
+		"base2",
+		"base3",
+		"yellow",
+		"red",
+		"magenta",
+		"violet",
+		"blue",
+		"cyan",
+		"green",
+	];
+	terminal.print({style: "background-color: #000", value: kColors.map(function(color) { return [" ", {class: color, value: color}, " "]; })});
 }

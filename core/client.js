@@ -87,19 +87,21 @@ function autoNewLine() {
 
 function print(data) {
 	autoNewLine();
-	printStructured(data);
+	printStructured(document.getElementById("terminal"), data);
 	autoScroll();
 }
 
-function printStructured(data) {
+function printStructured(container, data) {
 	if (typeof data == "string") {
-		document.getElementById("terminal").appendChild(document.createTextNode(data));
+		container.appendChild(document.createTextNode(data));
 	} else if (data && data[0] !== undefined) {
 		for (var i in data) {
-			printStructured(data[i]);
+			printStructured(container, data[i]);
 		}
 	} else if (data && data.action == "clear") {
-		document.getElementById("terminal").innerHTML = "";
+		while (container.firstChild) {
+			container.removeChild(container.firstChild);
+		}
 	} else if (data) {
 		var node;
 		if (data.href) {
@@ -124,15 +126,15 @@ function printStructured(data) {
 		if (data.class) {
 			node.setAttribute("class", data.class);
 		}
-		node.appendChild(document.createTextNode(data.value || data.href || data.command || ""));
+		printStructured(node, data.value || data.href || data.command || "");
 		if (data.command) {
 			node.dataset.command = data.command;
 			node.onclick = commandClick;
 			node.setAttribute("class", "command");
 		}
-		terminal.appendChild(node);
+		container.appendChild(node);
 	} else {
-		printStructured(JSON.stringify(data));
+		printStructured(container, JSON.stringify(data));
 	}
 }
 

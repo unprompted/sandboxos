@@ -29,8 +29,7 @@ body {
 
 #terminal {
 	outline: none;
-	word-wrap: break-word;
-	white-space: pre;
+	white-space: pre-wrap;
 }
 
 #terminal > img {
