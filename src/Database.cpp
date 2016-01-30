@@ -66,7 +66,7 @@ bool Database::open(v8::Isolate* isolate, const char* path) {
 	if (!checkError("mdb_env_open", result)) {
 		result = mdb_txn_begin(_environment, 0, 0, &_transaction);
 		if (!checkError("mdb_txn_begin", result)) {
-			result = mdb_dbi_open(_transaction, path, MDB_CREATE, &_database);
+			result = mdb_dbi_open(_transaction, NULL, MDB_CREATE, &_database);
 			if (!checkError("mdb_dbi_open", result)) {
 				result = mdb_txn_commit(_transaction);
 				checkError("mdb_txn_commit", result);
