@@ -27,12 +27,11 @@ let kDocumentation = {
 terminal.print("V8 Version ", version);
 terminal.print("");
 
-terminal.print("API Documentation");
-terminal.print("=================");
+heading("API Documentation");
 dumpDocumentation("imports", imports);
-terminal.print(`Notes
-=====
-All API functions are invoked asynchronously.  They
+
+heading("Notes");
+terminal.print(`All API functions are invoked asynchronously.  They
 immediately return a `,
 {href: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise", value: "Promise"},
 ` object.  If you want to do
@@ -43,15 +42,24 @@ like this:
 		doSomethingWithTheResult(value);
 	});`);
 terminal.print("");
-terminal.print("Colors (CSS class names)");
-terminal.print("========================");
+heading("Colors (CSS class names)");
 dumpColors();
+
+function heading(text) {
+	terminal.print({class: "green", value: "+" + "-".repeat(text.length + 2) + "+"});
+	terminal.print({class: "green", value: "| " + text + " |"});
+	terminal.print({class: "green", value: "+" + "-".repeat(text.length + 2) + "+"});
+}
 
 function dumpDocumentation(prefix, object, depth) {
 	if (typeof object == "function") {
 		let documentation = kDocumentation[prefix.substring("imports.".length)] || ["", ""];
-		terminal.print(prefix.substring("imports.".length) + "(" + documentation[0] + ")");
-		terminal.print("\t", documentation[1]);
+		terminal.print(
+			{class: "yellow", value: prefix.substring("imports.".length)},
+			"(",
+			{class: "base0", value: documentation[0]},
+			")");
+		terminal.print({style: "display: block; margin-left: 2em", value: documentation[1]});
 		terminal.print("");
 	} else if (object && typeof object != "string") {
 		for (let i in object) {
