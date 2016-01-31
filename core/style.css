@@ -27,6 +27,10 @@ body {
 	overflow: auto;
 }
 
+#logo {
+	vertical-align: middle;
+}
+
 #terminal {
 	outline: none;
 	white-space: pre-wrap;
