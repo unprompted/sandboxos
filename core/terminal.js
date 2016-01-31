@@ -71,7 +71,7 @@ Terminal.prototype.getOutput = function(haveIndex) {
 	terminal._lastRead = new Date();
 	return new Promise(function(resolve) {
 		if (haveIndex < terminal._index - 1) {
-			resolve({index: terminal._index - 1, lines: terminal._lines.slice(haveIndex + 1 - terminal._firstLine)});
+			resolve({index: terminal._index - 1, lines: terminal._lines.slice(Math.max(0, haveIndex + 1 - terminal._firstLine))});
 		} else {
 			terminal._waiting.push(resolve);
 		}
