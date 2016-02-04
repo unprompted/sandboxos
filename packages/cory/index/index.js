@@ -1,12 +1,15 @@
+"use strict";
+
 core.register("onSessionBegin", index);
 core.register("onSessionEnd", index);
+
 function index() {
 	Promise.all([core.getPackages(), core.getUsers()]).then(function(values) {
-		var packages = values[0];
-		var users = values[1];
-		var usersByApp = {};
-		for (var i in users) {
-			var user = users[i];
+		let packages = values[0];
+		let users = values[1];
+		let usersByApp = {};
+		for (let i in users) {
+			let user = users[i];
 			if (!usersByApp["/~" + user.packageOwner + "/" + user.packageName]) {
 				usersByApp["/~" + user.packageOwner + "/" + user.packageName] = [];
 			}
@@ -15,12 +18,32 @@ function index() {
 
 		terminal.clear();
 		terminal.print("Available applications [active users]:");
-		packages.sort().forEach(function(package) {
-			var users = usersByApp["/~" + package.owner + "/" + package.name];
+		packages.sort().forEach(function(app) {
+			let users = usersByApp["/~" + app.owner + "/" + app.name];
+			let message = [];
+			if (users) {
+				message.push(" [");
+				let counts = {};
+				for (let i = 0; i < users.length; i++) {
+					counts[users[i]] = (counts[users[i]] || 0) + 1;
+				}
+				let names = Object.keys(counts).sort();
+				for (let i = 0; i < names.length; i++) {
+					var name = names[i];
+					if (message.length > 1) {
+						message.push(", ");
+					}
+					message.push({class: "orange", value: name});
+					if (counts[name] > 1) {
+						message.push({class: "base01", value: "(x" + counts[name] + ")"});
+					}
+				}
+				message.push("]");
+			}
 			terminal.print(
 				"* ",
-				{href: "/~" + package.owner + "/" + package.name},
-				users ? " [" + users.sort().join(", ") + "]" : "");
+				{href: "/~" + app.owner + "/" + app.name},
+				message);
 		});
 	});
 }
