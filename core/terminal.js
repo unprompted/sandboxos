@@ -56,6 +56,10 @@ Terminal.prototype.setPrompt = function(value) {
 	this.print({action: "prompt", value: value});
 }
 
+Terminal.prototype.notifyUpdate = function() {
+	this.print({action: "update"});
+}
+
 Terminal.prototype.clear = function() {
 	this._lines.length = 0;
 	this._firstLine = this._index;

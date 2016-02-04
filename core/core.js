@@ -289,7 +289,11 @@ function updateProcesses(packageOwner, packageName) {
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
 		if (process.packageName == packageName) {
-			process.task.kill();
+			if (process.terminal) {
+				process.terminal.notifyUpdate();
+			} else {
+				process.task.kill();
+			}
 		}
 	}
 }

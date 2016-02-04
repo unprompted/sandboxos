@@ -16,10 +16,6 @@ body {
 	width: 100%;
 }
 
-.navigation > a {
-	color: #fff;
-}
-
 .main {
 	flex: 1;
 	width: 100%;
@@ -103,6 +99,10 @@ a:active, .command:active {
 }
 
 #status {
+	display: none;
+}
+
+#update {
 	display: none;
 }
 

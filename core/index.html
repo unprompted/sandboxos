@@ -1,13 +1,23 @@
 <html>
 	<head>
-		<title>Web Terminal</title>
+		<title>Tilde Friends</title>
 		<link type="text/css" rel="stylesheet" href="/terminal/style.css"></link>
 		<link type="image/png" rel="shortcut icon" href="/terminal/favicon.png"></link>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 	</head>
 	<body>
 		<div id="body">
-			<div class="navigation"><img id="logo" src="/terminal/favicon.png" width="16" height="16"> <span id="title">Tilde Friends</span> <a href="/">home</a> <a href="$(EDIT_SOURCE)">edit</a> <a href="$(VIEW_SOURCE)">view source</a> <a href="/about">about</a> <span id="status"></span> <span id="login"></span></div>
+			<div class="navigation">
+				<img id="logo" src="/terminal/favicon.png" width="16" height="16">
+				<span id="title">Tilde Friends</span>
+				<a href="/">home</a>
+				<a href="$(EDIT_SOURCE)">edit</a>
+				<a href="$(VIEW_SOURCE)">view source</a>
+				<a href="/about">about</a>
+				<span id="status"></span>
+				<span id="update">update available! <a href="">refresh</a> to update</span>
+				<span id="login"></span>
+			</div>
 			<div id="terminal" class="main"></div>
 			<div class="input">
 				<span id="target"></span>

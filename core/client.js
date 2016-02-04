@@ -53,6 +53,8 @@ function receive() {
 					prompt.removeChild(prompt.firstChild);
 				}
 				prompt.appendChild(document.createTextNode(line[0].value));
+			} else if (line && line[0] && line[0].action == "update") {
+				document.getElementById("update").setAttribute("Style", "display: inline");
 			} else {
 				print(line);
 			}
