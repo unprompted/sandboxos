@@ -4,6 +4,8 @@ var gOnInput = null;
 var kMaxHistory = 20;
 var kShowHistory = 20;
 
+var lastTimestamp = null;
+
 if (imports.terminal) {
 	core.register("onMessage", function(sender, message) {
 		if (message.message && message.when) {
@@ -145,15 +147,31 @@ function formatMessage(message) {
 	return result;
 }
 
+function niceTime(lastTime, thisTime) {
+	if (!lastTime) {
+		return thisTime;
+	}
+	let result = [];
+	let lastParts = lastTime.split(" ");
+	let thisParts = thisTime.split(" ");
+	for (let i = 0; i < thisParts.length; i++) {
+		if (thisParts[i] !== lastParts[i]) {
+			result.push(thisParts[i]);
+		}
+	}
+	return result.join(" ");
+}
+
 function printMessage(message, notify) {
 	terminal.print(
-		{class: "base0", value: message.when},
+		{class: "base0", value: niceTime(lastTimestamp, message.when)},
 		" ",
 		{class: "base00", value: "<"},
 		{class: "base3", value: (message.sender ? message.sender.name : "unknown")},
 		{class: "base00", value: ">"},
 		" ",
 		formatMessage(message.message));
+	lastTimestamp = message.when;
 	if (notify) {
 		return core.getUser().then(function(user) {
 			if (message.message.indexOf("!") != -1) {
