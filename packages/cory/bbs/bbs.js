@@ -86,7 +86,7 @@ core.register("onInput", function(input) {
 	}
 });
 
-function welcome() {
+function logo() {
 	terminal.clear();
 	terminal.print("");
 	terminal.print("");
@@ -99,14 +99,16 @@ function welcome() {
 	terminal.print('                /____/                              ');
 	terminal.print('                    yesterday\'s technology...today!');
 	terminal.print("");
-	terminal.print("Press ", {command: "enter"}, " to continue.");
-	gOnInput = function(input) {
-		main();
-	};
+}
+
+function welcome() {
+	logo();
+	chat();
 }
 
 function main() {
 	terminal.clear();
+	logo();
 	terminal.print("");
 	terminal.print("Main menu commands:");
 	terminal.print("  ", {command: "chat"}, "       chat message board");
@@ -184,7 +186,6 @@ function printMessage(message, notify) {
 }
 
 function chat() {
-	terminal.clear();
 	terminal.setEcho(false);
 	terminal.print("");
 	terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, ".");
