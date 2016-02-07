@@ -179,8 +179,7 @@ function updateLogin() {
 		a.appendChild(document.createTextNode("logout " + gCredentials.session.name));
 		a.setAttribute("href", "/login/logout?return=" + encodeURIComponent(window.location.href));
 	} else {
-		a.appendChild(document.createTextNode("login"));
-		a.setAttribute("href", "/login?return=" + encodeURIComponent(window.location.href));
+		window.location.href = "/login?return=" + encodeURIComponent(window.location.href);
 	}
 	login.appendChild(a);
 }

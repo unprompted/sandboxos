@@ -73,22 +73,27 @@ function authHandler(request, response) {
 			session = newSession();
 			sessionIsNew = true;
 			var formData = form.decodeForm(request.body);
-			if (formData.register == "1") {
-				if (!gAccounts[formData.name] &&
-					formData.password == formData.confirm) {
-					gAccounts[formData.name] = {password: hashPassword(formData.password)};
-					writeSession(session, {name: formData.name});
-					File.writeFile(kAccountsFile, JSON.stringify(gAccounts));
+			if (formData.submit == "Login") {
+				if (formData.register == "1") {
+					if (!gAccounts[formData.name] &&
+						formData.password == formData.confirm) {
+						gAccounts[formData.name] = {password: hashPassword(formData.password)};
+						writeSession(session, {name: formData.name});
+						File.writeFile(kAccountsFile, JSON.stringify(gAccounts));
+					} else {
+						loginError = "Error registering account.";
+					}
 				} else {
-					loginError = "Error registering account.";
+					if (gAccounts[formData.name] &&
+						verifyPassword(formData.password, gAccounts[formData.name].password)) {
+						writeSession(session, {name: formData.name});
+					} else {
+						loginError = "Invalid username or password.";
+					}
 				}
 			} else {
-				if (gAccounts[formData.name] &&
-					verifyPassword(formData.password, gAccounts[formData.name].password)) {
-					writeSession(session, {name: formData.name});
-				} else {
-					loginError = "Invalid username or password.";
-				}
+				// Proceed as Guest
+				writeSession(session, {name: "guest"});
 			}
 		}
 
@@ -115,12 +120,20 @@ function authHandler(request, response) {
 				if (loginError) {
 					contents += "<p>" + loginError + "</p>\n";
 				}
-				contents += '<p><b>Halt.  Who goes there?</b></p>\n'
+				contents += '<div id="auth_greeting"><b>Halt.  Who goes there?</b></div>\n'
+				contents += '<div id="auth">\n';
+				contents += '<div id="auth_login">\n'
 				contents += '<div><label for="name">Name:</label> <input type="text" id="name" name="name" value=""></input></div>\n';
 				contents += '<div><label for="password">Password:</label> <input type="password" id="password" name="password" value=""></input></div>\n';
 				contents += '<div id="confirmPassword" style="display: none"><label for="confirm">Confirm:</label> <input type="password" id="confirm" name="confirm" value=""></input></div>\n';
 				contents += '<div><input type="checkbox" id="register" name="register" value="1" onchange="showHideConfirm()"></input> <label for="register">Register a new account</label></div>\n';
-				contents += '<div><input type="submit" value="Login"></input></div>\n';
+				contents += '<div><input id="loginButton" type="submit" name="submit" value="Login"></input></div>\n';
+				contents += '</div>';
+				contents += '<div id="auth_or"> - or - </div>';
+				contents += '<div id="auth_guest">\n';
+				contents += '<input id="guestButton" type="submit" name="submit" value="Proceeed as Guest"></input>\n';
+				contents += '</div>\n';
+				contents += '</div>\n';
 				contents += '</form>';
 			}
 			var text = html.replace("$(SESSION)", contents);
@@ -142,7 +155,7 @@ function getPermissions(session) {
 	var entry = readSession(session);
 	if (entry) {
 		permissions = getPermissionsForUser(entry.name);
-		permissions.authenticated = true;
+		permissions.authenticated = entry.name !== "guest";
 	}
 	return permissions || {};
 }

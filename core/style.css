@@ -110,6 +110,33 @@ a:active, .command:active {
 	float: right;
 }
 
+#auth_greeting {
+	text-align: center;
+}
+
+#auth {
+	display: flex;
+	flex-flow: row;
+	align-content: center;
+	align-items: center;
+	text-align: center;
+	justify-content: center;
+}
+
+#auth_login {
+	flex: 0 1 auto;
+	text-align: right;
+}
+
+#auth_or {
+	flex: 0 1 auto;
+	padding: 1em;
+}
+
+#auth_guest {
+	flex: 0 1 auto;
+}
+
 /* Solarized Color Scheme Colors */
 .base03 { color: #002b36; }
 .base02 { color: #073642; }
