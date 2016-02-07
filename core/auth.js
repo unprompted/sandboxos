@@ -158,6 +158,16 @@ function getPermissions(session) {
 	return permissions;
 }
 
+function getPermissionsForUser(userName) {
+	var permissions = {};
+	if (gPermissions[userName]) {
+		for (var i in gPermissions[userName]) {
+			permissions[gPermissions[userName][i]] = true;
+		}
+	}
+	return permissions;
+}
+
 function query(headers) {
 	var session = getCookies(headers).session;
 	var entry;

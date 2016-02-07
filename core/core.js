@@ -216,88 +216,92 @@ function getProcess(packageOwner, packageName, key, options) {
 		&& !(options && "create" in options && !options.create)
 		&& !badName(packageOwner) 
 		&& !badName(packageName)) {
-		print("Creating task for " + packageName + " " + key);
-		var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
-		var manifest = getManifest(fileName);
-		print("MANIFEST: " + JSON.stringify(manifest));
-		process = {};
-		process.index = gProcessIndex++;
-		process.userName = options.userName || ('user' + process.index);
-		process.credentials = options.credentials || {};
-		process.task = new Task();
-		process.eventHandlers = {};
-		process.packageOwner = packageOwner;
-		process.packageName = packageName;
-		process.terminal = new Terminal();
-		process.database = null;
-		process.lastActive = Date.now();
-		process.lastPing = null;
-		process.timeout = options.timeout;
-		var resolveReady;
-		var rejectReady;
-		process.ready = new Promise(function(resolve, reject) {
-			resolveReady = resolve;
-			rejectReady = reject;
-		});
-		gProcesses[key] = process;
-		process.task.onExit = function(exitCode, terminationSignal) {
-			broadcastEvent('onSessionEnd', [getUser(process)]);
-			if (terminationSignal) {
-				process.terminal.print("Process terminated with signal " + terminationSignal + ".");
-			} else {
-				process.terminal.print("Process ended with exit code " + exitCode + ".");
-			}
-			delete gProcesses[key];
-		};
-		if (process.timeout > 0) {
-			setTimeout(ping.bind(process), process.timeout);
-		}
-		var imports = {
-			'core': {
-				'broadcast': broadcast.bind(process),
-				'getService': getService.bind(process),
-				'getPackages': getPackages.bind(process),
-				'getUsers': getUsers.bind(process),
-				'register': function(eventName, handler) {
-					if (!process.eventHandlers[eventName]) {
-						process.eventHandlers[eventName] = [];
-					}
-					process.eventHandlers[eventName].push(handler);
-				},
-				'getUser': getUser.bind(process, process),
-				'user': getUser(process),
-			},
-			'database': {
-				'get': databaseGet.bind(process),
-				'set': databaseSet.bind(process),
-				'remove': databaseRemove.bind(process),
-				'getAll': databaseGetAll.bind(process),
-			},
-		};
-		if (options.terminal) {
-			imports.terminal = {
-				'print': process.terminal.print.bind(process.terminal),
-				'clear': process.terminal.clear.bind(process.terminal),
-				'readLine': process.terminal.readLine.bind(process.terminal),
-				'notify': process.terminal.notify.bind(process.terminal),
-				'setEcho': process.terminal.setEcho.bind(process.terminal),
-				'setTitle': process.terminal.setTitle.bind(process.terminal),
-				'setPrompt': process.terminal.setPrompt.bind(process.terminal),
-			};
-		}
-		if (manifest
-			&& manifest.permissions
-			&& manifest.permissions.indexOf("administration") != -1) {
-			imports.administration = {
-				'setGlobalSettings': setGlobalSettings.bind(process),
-				'getGlobalSettings': getGlobalSettings.bind(process),
-			};
-		}
-		process.task.setImports(imports);
-		print("Activating task");
-		process.task.activate();
-		print("Executing task");
 		try {
+			print("Creating task for " + packageName + " " + key);
+			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
+			var manifest = getManifest(fileName);
+			print("MANIFEST: " + JSON.stringify(manifest));
+			process = {};
+			process.index = gProcessIndex++;
+			process.userName = options.userName || ('user' + process.index);
+			process.credentials = options.credentials || {};
+			process.task = new Task();
+			process.eventHandlers = {};
+			process.packageOwner = packageOwner;
+			process.packageName = packageName;
+			process.terminal = new Terminal();
+			process.database = null;
+			process.lastActive = Date.now();
+			process.lastPing = null;
+			process.timeout = options.timeout;
+			var resolveReady;
+			var rejectReady;
+			process.ready = new Promise(function(resolve, reject) {
+				resolveReady = resolve;
+				rejectReady = reject;
+			});
+			gProcesses[key] = process;
+			process.task.onExit = function(exitCode, terminationSignal) {
+				broadcastEvent('onSessionEnd', [getUser(process)]);
+				if (terminationSignal) {
+					process.terminal.print("Process terminated with signal " + terminationSignal + ".");
+				} else {
+					process.terminal.print("Process ended with exit code " + exitCode + ".");
+				}
+				delete gProcesses[key];
+			};
+			if (process.timeout > 0) {
+				setTimeout(ping.bind(process), process.timeout);
+			}
+			var imports = {
+				'core': {
+					'broadcast': broadcast.bind(process),
+					'getService': getService.bind(process),
+					'getPackages': getPackages.bind(process),
+					'getUsers': getUsers.bind(process),
+					'register': function(eventName, handler) {
+						if (!process.eventHandlers[eventName]) {
+							process.eventHandlers[eventName] = [];
+						}
+						process.eventHandlers[eventName].push(handler);
+					},
+					'getUser': getUser.bind(process, process),
+					'user': getUser(process),
+				},
+				'database': {
+					'get': databaseGet.bind(process),
+					'set': databaseSet.bind(process),
+					'remove': databaseRemove.bind(process),
+					'getAll': databaseGetAll.bind(process),
+				},
+			};
+			if (options.terminal) {
+				imports.terminal = {
+					'print': process.terminal.print.bind(process.terminal),
+					'clear': process.terminal.clear.bind(process.terminal),
+					'readLine': process.terminal.readLine.bind(process.terminal),
+					'notify': process.terminal.notify.bind(process.terminal),
+					'setEcho': process.terminal.setEcho.bind(process.terminal),
+					'setTitle': process.terminal.setTitle.bind(process.terminal),
+					'setPrompt': process.terminal.setPrompt.bind(process.terminal),
+				};
+			}
+			if (manifest
+				&& manifest.permissions
+				&& manifest.permissions.indexOf("administration") != -1) {
+				if (getPermissionsForUser(packageOwner).administrator) {
+					imports.administration = {
+						'setGlobalSettings': setGlobalSettings.bind(process),
+						'getGlobalSettings': getGlobalSettings.bind(process),
+					};
+				} else {
+					throw new Error(packageOwner + " does not have right to permission 'administration'.");
+				}
+			}
+			process.task.setImports(imports);
+			print("Activating task");
+			process.task.activate();
+			print("Executing task");
 			process.task.execute(fileName).then(function() {
 				print("Task ready");
 				broadcastEvent('onSessionBegin', [getUser(process)]);
