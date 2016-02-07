@@ -169,6 +169,7 @@ function handler(request, response, packageOwner, packageName, uri) {
 			if (credentials && credentials.session) {
 				options.userName = credentials.session.name;
 			}
+			options.credentials = credentials;
 			var sessionId = form.decodeForm(request.query).sessionId;
 			var isNewSession = false;
 			if (!getSessionProcess(packageOwner, packageName, sessionId, {create: false})) {

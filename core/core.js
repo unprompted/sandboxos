@@ -6,6 +6,12 @@ var auth = require("auth");
 var gProcessIndex = 0;
 var gProcesses = {};
 
+var gGlobalSettings = {
+	index: "/~cory/index",
+};
+
+var kGlobalSettingsFile = "data/global/settings.json";
+
 var kPingInterval = 60 * 1000;
 
 function getCookies(headers) {
@@ -115,6 +121,7 @@ function getUser(process) {
 		index: process.index,
 		packageOwner: process.packageOwner,
 		packageName: process.packageName,
+		credentials: process.credentials,
 	};
 }
 
@@ -192,6 +199,17 @@ function badName(name) {
 	return bad;
 }
 
+function getManifest(fileName) {
+	var manifest = [];
+	var lines = File.readFile(fileName).split("\n").map(x => x.trimRight());
+	for (var i = 0; i < lines.length; i++) {
+		if (lines[i].substring(0, 4) == "//! ") {
+			manifest.push(lines[i].substring(4));
+		}
+	}
+	return manifest.length ? JSON.parse(manifest.join("\n")) : null;
+}
+
 function getProcess(packageOwner, packageName, key, options) {
 	var process = gProcesses[key];
 	if (!process
@@ -199,9 +217,13 @@ function getProcess(packageOwner, packageName, key, options) {
 		&& !badName(packageOwner) 
 		&& !badName(packageName)) {
 		print("Creating task for " + packageName + " " + key);
+		var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
+		var manifest = getManifest(fileName);
+		print("MANIFEST: " + JSON.stringify(manifest));
 		process = {};
 		process.index = gProcessIndex++;
 		process.userName = options.userName || ('user' + process.index);
+		process.credentials = options.credentials || {};
 		process.task = new Task();
 		process.eventHandlers = {};
 		process.packageOwner = packageOwner;
@@ -263,12 +285,19 @@ function getProcess(packageOwner, packageName, key, options) {
 				'setPrompt': process.terminal.setPrompt.bind(process.terminal),
 			};
 		}
+		if (manifest
+			&& manifest.permissions
+			&& manifest.permissions.indexOf("administration") != -1) {
+			imports.administration = {
+				'setGlobalSettings': setGlobalSettings.bind(process),
+				'getGlobalSettings': getGlobalSettings.bind(process),
+			};
+		}
 		process.task.setImports(imports);
 		print("Activating task");
 		process.task.activate();
 		print("Executing task");
 		try {
-			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
 			process.task.execute(fileName).then(function() {
 				print("Task ready");
 				broadcastEvent('onSessionBegin', [getUser(process)]);
@@ -298,6 +327,35 @@ function updateProcesses(packageOwner, packageName) {
 	}
 }
 
+function makeDirectoryForFile(fileName) {
+	var parts = fileName.split("/");
+	var path = "";
+	for (var i = 0; i < parts.length - 1; i++) {
+		path += parts[i];
+		File.makeDirectory(path);
+		path += "/";
+	}
+}
+
+function getGlobalSettings() {
+	return gGlobalSettings;
+}
+
+function setGlobalSettings(settings) {
+	makeDirectoryForFile(kGlobalSettingsFile);
+	if (!File.writeFile(kGlobalSettingsFile, JSON.stringify(settings))) {
+		gGlobalSettings = settings;
+	} else {
+		throw new Error("Unable to save settings.");
+	}
+}
+
+try {
+	gGlobalSettings = JSON.parse(File.readFile(kGlobalSettingsFile));
+} catch (error) {
+	print("Error loading settings from " + kGlobalSettingsFile + ": " + error);
+}
+
 var kIgnore = ["/favicon.ico"];
 
 var auth = require("auth");
@@ -306,7 +364,7 @@ httpd.all("/login", auth.handler);
 httpd.all("", function(request, response) {
 	var match;
 	if (request.uri === "/" || request.uri === "") {
-		response.writeHead(303, {"Location": "/~cory/index", "Content-Length": "0"});
+		response.writeHead(303, {"Location": gGlobalSettings.index, "Content-Length": "0"});
 		return response.end();
 	} else if (match = /^\/terminal(\/.*)/.exec(request.uri)) {
 		return terminal.handler(request, response, null, null, match[1]);
