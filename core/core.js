@@ -220,7 +220,6 @@ function getProcess(packageOwner, packageName, key, options) {
 			print("Creating task for " + packageName + " " + key);
 			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
 			var manifest = getManifest(fileName);
-			print("MANIFEST: " + JSON.stringify(manifest));
 			process = {};
 			process.index = gProcessIndex++;
 			process.userName = options.userName || ('user' + process.index);
@@ -289,7 +288,8 @@ function getProcess(packageOwner, packageName, key, options) {
 			if (manifest
 				&& manifest.permissions
 				&& manifest.permissions.indexOf("administration") != -1) {
-				if (getPermissionsForUser(packageOwner).administrator) {
+				print(getPermissionsForUser(packageOwner));
+				if (getPermissionsForUser(packageOwner).administration) {
 					imports.administration = {
 						'setGlobalSettings': setGlobalSettings.bind(process),
 						'getGlobalSettings': getGlobalSettings.bind(process),

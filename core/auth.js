@@ -1,9 +1,7 @@
 "use strict";
 var kAccountsFile = "data/auth/accounts.json";
-var kPermissionsFile = "data/auth/permissions.json";
 
 var gAccounts = {};
-var gPermissions = {};
 var gTokens = {};
 
 var bCryptLib = require('bCrypt');
@@ -18,11 +16,6 @@ var gDatabase = new Database("data/auth/db");
 
 try {
 	gAccounts = JSON.parse(File.readFile(kAccountsFile));
-} catch (error) {
-}
-
-try {
-	gPermissions = JSON.parse(File.readFile(kPermissionsFile));
 } catch (error) {
 }
 
@@ -145,24 +138,20 @@ function authHandler(request, response) {
 }
 
 function getPermissions(session) {
-	var permissions = {};
-	var entry;
-	if (entry = readSession(session)) {
+	var permissions;
+	var entry = readSession(session);
+	if (entry) {
+		permissions = getPermissionsForUser(entry.name);
 		permissions.authenticated = true;
-		if (gPermissions[entry.name]) {
-			for (var i in gPermissions[entry.name]) {
-				permissions[gPermissions[entry.name][i]] = true;
-			}
-		}
 	}
-	return permissions;
+	return permissions || {};
 }
 
 function getPermissionsForUser(userName) {
 	var permissions = {};
-	if (gPermissions[userName]) {
-		for (var i in gPermissions[userName]) {
-			permissions[gPermissions[userName][i]] = true;
+	if (gGlobalSettings && gGlobalSettings.permissions && gGlobalSettings.permissions[userName]) {
+		for (var i in gGlobalSettings.permissions[userName]) {
+			permissions[gGlobalSettings.permissions[userName][i]] = true;
 		}
 	}
 	return permissions;
