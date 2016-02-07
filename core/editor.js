@@ -42,7 +42,7 @@ function save(newName) {
 
 	return $.ajax({
 		type: "POST",
-		url: newName ? "/" + newName + "/save" : "save",
+		url: newName ? "../" + newName + "/save" : "save",
 		data: contents,
 		dataType: "text",
 	}).done(function(uri) {
