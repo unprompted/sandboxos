@@ -21,6 +21,7 @@ function Terminal() {
 	this._lastWrite = null;
 	this._echo = true;
 	this._readLine = null;
+	this._selected = null;
 	return this;
 }
 
@@ -34,13 +35,20 @@ Terminal.prototype.dispatch = function(data) {
 }
 
 Terminal.prototype.print = function() {
-	this._lines.push(arguments);
+	var data = arguments;
+	if (this._selected) {
+		data = {
+			terminal: this._selected,
+			value: data
+		};
+	}
+	this._lines.push(data);
 	this._index++;
 	if (this._lines.length >= Terminal.kBacklog * 2) {
 		this._firstLine = this._index - Terminal.kBacklog;
 		this._lines = this._lines.slice(this._lines.length - Terminal.kBacklog);
 	}
-	this.dispatch({index: this._index - 1, lines: [arguments]});
+	this.dispatch({index: this._index - 1, lines: [data]});
 	this._lastWrite = new Date();
 }
 
@@ -60,9 +68,17 @@ Terminal.prototype.notifyUpdate = function() {
 	this.print({action: "update"});
 }
 
+Terminal.prototype.configure = function(name, options) {
+	this.print({action: "configure", name: name, options: options});
+}
+
+Terminal.prototype.select = function(name) {
+	this._selected = name;
+}
+
 Terminal.prototype.clear = function() {
-	this._lines.length = 0;
-	this._firstLine = this._index;
+	//this._lines.length = 0;
+	//this._firstLine = this._index;
 	this.print({action: "clear"});
 }
 

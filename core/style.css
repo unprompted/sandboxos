@@ -16,7 +16,7 @@ body {
 	width: 100%;
 }
 
-.main {
+#terminal_ {
 	flex: 1;
 	width: 100%;
 	resize: none;
@@ -27,12 +27,12 @@ body {
 	vertical-align: middle;
 }
 
-#terminal {
+.terminal {
 	outline: none;
 	white-space: pre-wrap;
 }
 
-#terminal > img {
+.terminal > img {
 	vertical-align: middle;
 }
 

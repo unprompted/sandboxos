@@ -49,23 +49,29 @@ if (imports.terminal) {
 	});
 }
 
-function listUsers(messageStart) {
+function listUsers() {
 	return core.getUsers(core.user.packageName).then(function(users) {
-		var message = [messageStart + "Current users: "];
+		terminal.select("users");
+		terminal.clear();
+		terminal.print("Users:");
 		var counts = {};
 		for (var i = 0; i < users.length; i++) {
 			counts[users[i].name] = (counts[users[i].name] || 0) + 1;
 		}
-		for (var i in counts) {
+		var names = Object.keys(counts).sort();
+		for (var i = 0; i < names.length; i++) {
+			var name = names[i];
+			var message = [];
 			if (message.length > 1) {
 				message.push(", ");
 			}
-			message.push({class: "orange", value: i});
-			if (counts[i] > 1) {
-				message.push({class: "base01", value: "(x" + counts[i] + ")"});
+			message.push({class: "orange", value: name});
+			if (counts[name] > 1) {
+				message.push({class: "base01", value: "(x" + counts[name] + ")"});
 			}
+			terminal.print(message);
 		}
-		return terminal.print(message);
+		terminal.select();
 	});
 }
 
@@ -189,6 +195,7 @@ function chat() {
 	terminal.setEcho(false);
 	terminal.print("");
 	terminal.print("You are now in a chat.  Anything you type will be broadcast to everyone else connected.  To leave, say ", {command: "exit"}, ".");
+	listUsers();
 	database.get("board").catch(function() {
 		return null;
 	}).then(function(board) {
@@ -298,5 +305,7 @@ function printHighScores(data) {
 }
 
 if (imports.terminal) {
+	terminal.configure("", {style: "width: 75%"});
+	terminal.configure("users", {style: "position: absolute; top: 1em; right: 0em; width: 25%; height: auto"});
 	welcome();
 }

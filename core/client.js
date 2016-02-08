@@ -37,6 +37,14 @@ function receive() {
 	}).then(function(data) {
 		for (var i in data.lines) {
 			var line = data.lines[i];
+
+			var target = "terminal_";
+			if (line && line.terminal) {
+				if (document.getElementById("terminal_" + line.terminal)) {
+					target = "terminal_" + line.terminal;
+				}
+				line = line.value;
+			}
 			if (line && line.action == "ping") {
 				// PONG
 			} else if (line && line.action == "session") {
@@ -55,8 +63,24 @@ function receive() {
 				prompt.appendChild(document.createTextNode(line[0].value));
 			} else if (line && line[0] && line[0].action == "update") {
 				document.getElementById("update").setAttribute("Style", "display: inline");
+			} else if (line && line[0] && line[0].action == "configure") {
+				var options = line[0].options;
+				if (options) {
+					var node = document.getElementById("terminal_" + line[0].name);
+					if (!node) {
+						node = document.createElement("div");
+						document.getElementById("terminals").appendChild(node);
+					}
+					node.setAttribute("id", "terminal_" + line[0].name);
+					node.setAttribute("style", options.style);
+				} else {
+					var node = document.getElementById("terminal_" + line[0].name);
+					if (node) {
+						node.remove();
+					}
+				}
 			} else {
-				print(line);
+				print(document.getElementById(target), line);
 			}
 		}
 		if ("index" in data) {
@@ -83,14 +107,14 @@ function receive() {
 	});
 }
 
-function autoNewLine() {
-	document.getElementById("terminal").appendChild(document.createElement("br"));
+function autoNewLine(terminal) {
+	terminal.appendChild(document.createElement("br"));
 }
 
-function print(data) {
-	autoNewLine();
-	printStructured(document.getElementById("terminal"), data);
-	autoScroll();
+function print(terminal, data) {
+	autoNewLine(terminal);
+	printStructured(terminal, data);
+	autoScroll(terminal);
 }
 
 function printStructured(container, data) {
@@ -145,9 +169,8 @@ function commandClick() {
 	$("#input").focus();
 }
 
-function autoScroll() {
-	var textarea = $(document.getElementById("terminal"));
-	textarea.scrollTop(textarea[0].scrollHeight - textarea.height());
+function autoScroll(terminal) {
+	terminal.scrollTop = terminal.scrollHeight - terminal.clientHeight;
 }
 
 function send(command) {
@@ -164,7 +187,12 @@ function send(command) {
 			data: JSON.stringify(value),
 			dataType: "text",
 	}).fail(function(xhr, status, error) {
-		print("SEND FAILED: " + status + ": " + error)
+		var node = document.getElementById("status");
+		while (node.firstChild) {
+			node.removeChild(node.firstChild);
+		}
+		node.appendChild(document.createTextNode("Send failed: " + JSON.stringify([status, error])));
+		node.setAttribute("style", "display: inline; color: #dc322f");
 	});
 }
 
