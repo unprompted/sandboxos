@@ -18,7 +18,9 @@ function index() {
 
 		terminal.clear();
 		terminal.print("Available applications [active users]:");
-		packages.sort().forEach(function(app) {
+		packages.sort(function(x, y) {
+			return Math.sign(x.owner.localeCompare(y.owner)) * 10 + Math.sign(x.name.localeCompare(y.name)) * 1;
+		}).forEach(function(app) {
 			let users = usersByApp["/~" + app.owner + "/" + app.name];
 			let message = [];
 			if (users) {
