@@ -290,7 +290,6 @@ function getProcess(packageOwner, packageName, key, options) {
 			if (manifest
 				&& manifest.permissions
 				&& manifest.permissions.indexOf("administration") != -1) {
-				print(getPermissionsForUser(packageOwner));
 				if (getPermissionsForUser(packageOwner).administration) {
 					imports.administration = {
 						'setGlobalSettings': setGlobalSettings.bind(process),

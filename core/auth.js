@@ -62,6 +62,24 @@ function hashPassword(password) {
 	return bCrypt.hashpw(password, salt);
 }
 
+function noAdministrator() {
+	return !gGlobalSettings || !gGlobalSettings.permissions || !Object.keys(gGlobalSettings.permissions).some(function(name) {
+		return gGlobalSettings.permissions[name].indexOf("administration") != -1;
+	});
+}
+
+function makeAdministrator(name) {
+	if (!gGlobalSettings.permissions) {
+		gGlobalSettings.permissions = {};
+	}
+	if (!gGlobalSettings.permissions[name]) {
+		gGlobalSettings.permissions[name] = [];
+	}
+	if (gGlobalSettings.permissions[name].indexOf("administration") == -1) {
+		gGlobalSettings.permissions[name].push("administration");
+	}
+}
+
 function authHandler(request, response) {
 	var session = getCookies(request.headers).session;
 	if (request.uri == "/login") {
@@ -80,6 +98,7 @@ function authHandler(request, response) {
 						gAccounts[formData.name] = {password: hashPassword(formData.password)};
 						writeSession(session, {name: formData.name});
 						File.writeFile(kAccountsFile, JSON.stringify(gAccounts));
+						makeAdministrator(formData.name);
 					} else {
 						loginError = "Error registering account.";
 					}
@@ -87,6 +106,7 @@ function authHandler(request, response) {
 					if (gAccounts[formData.name] &&
 						verifyPassword(formData.password, gAccounts[formData.name].password)) {
 						writeSession(session, {name: formData.name});
+						makeAdministrator(formData.name);
 					} else {
 						loginError = "Invalid username or password.";
 					}
@@ -123,6 +143,9 @@ function authHandler(request, response) {
 				contents += '<div id="auth_greeting"><b>Halt.  Who goes there?</b></div>\n'
 				contents += '<div id="auth">\n';
 				contents += '<div id="auth_login">\n'
+				if (noAdministrator()) {
+					contents += '<div class="notice">There is currently no administrator.  You will be made administrator.</div>\n';
+				}
 				contents += '<div><label for="name">Name:</label> <input type="text" id="name" name="name" value=""></input></div>\n';
 				contents += '<div><label for="password">Password:</label> <input type="password" id="password" name="password" value=""></input></div>\n';
 				contents += '<div id="confirmPassword" style="display: none"><label for="confirm">Confirm:</label> <input type="password" id="confirm" name="confirm" value=""></input></div>\n';

@@ -137,6 +137,13 @@ a:active, .command:active {
 	flex: 0 1 auto;
 }
 
+.notice {
+	color: #cb4b16;
+	margin: 1em;
+	padding: 1em;
+	border: 1px solid #cb4b16;
+}
+
 /* Solarized Color Scheme Colors */
 .base03 { color: #002b36; }
 .base02 { color: #073642; }

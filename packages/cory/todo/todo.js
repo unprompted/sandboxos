@@ -34,7 +34,10 @@ core.register("onInput", function(command) {
 		} else if (command.action == "reallyRemoveList") {
 			confirmRemove = false;
 			activeList = null;
-			database.remove(command.key).then(notifyChanged).then(redisplay);
+			database.remove(command.key).then(notifyChanged).then(redisplay).catch(function(error) {
+				terminal.print(JSON.stringify(error));
+				terminal.print(command.key);
+			});
 		}
 	} else {
 		if (activeList) {
