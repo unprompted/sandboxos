@@ -9,7 +9,7 @@ let confirmRemove;
 terminal.setPrompt("Add Item>");
 
 core.register("onInput", function(command) {
-	if (command.substring(0, "action:".length) == "action:") {
+	if (typeof command == "string" && command.substring(0, "action:".length) == "action:") {
 		command = JSON.parse(command.substring("action:".length));
 		if (confirmRemove && command.action != "reallyRemoveList" && command.action != "reallyRemove") {
 			confirmRemove = false;
@@ -24,6 +24,7 @@ core.register("onInput", function(command) {
 			removeItem(command.key, command.item).then(notifyChanged).then(redisplay);
 		} else if (command.action == "editList") {
 			activeList = command.key;
+			terminal.setHash(activeList);
 			redisplay();
 		} else if (command.action == "lists") {
 			activeList = null;
@@ -39,13 +40,19 @@ core.register("onInput", function(command) {
 				terminal.print(command.key);
 			});
 		}
-	} else {
+	} else if (typeof command == "string") {
 		if (activeList) {
 			addItem(activeList, command).then(notifyChanged).then(redisplay);
 		} else {
 			activeList = makePrivateKey(command);
 			writeList(activeList, {name: command, items: []}).then(notifyChanged).then(redisplay);
 		}
+	} else if (command.hash) {
+		activeList = command.hash;
+		if (activeList.charAt(0) == "#") {
+			activeList = activeList.substring(1);
+		}
+		redisplay();
 	}
 });
 

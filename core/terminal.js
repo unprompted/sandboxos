@@ -64,6 +64,10 @@ Terminal.prototype.setPrompt = function(value) {
 	this.print({action: "prompt", value: value});
 }
 
+Terminal.prototype.setHash = function(value) {
+	this.print({action: "hash", value: value});
+}
+
 Terminal.prototype.notifyUpdate = function() {
 	this.print({action: "update"});
 }
@@ -241,6 +245,11 @@ function handler(request, response, packageOwner, packageName, uri) {
 						"Cache-Control": "no-cache, no-store, must-revalidate",
 						"Pragma": "no-cache",
 						"Expires": "0",
+					});
+					process.ready.then(function() {
+						process.terminal.print({action: "ready", ready: true});
+					}).catch(function(error) {
+						process.terminal.print({action: "ready", error: error});
 					});
 					response.end(data);
 				} else {

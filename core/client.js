@@ -1,3 +1,5 @@
+"use strict";
+
 var gHaveIndex = -1;
 var gSessionId;
 var gCredentials;
@@ -24,13 +26,18 @@ function enter(event) {
 	}
 }
 
+function url() {
+	var hash = window.location.href.indexOf('#');
+	return hash != -1 ? window.location.href.substring(0, hash) : window.location.href;
+}
+
 function storeTarget(target) {
 	$("#target").text(target || "");
 }
 
 function receive() {
 	$.ajax({
-		url: window.location.href + "/receive?sessionId=" + gSessionId,
+		url: url() + "/receive?sessionId=" + gSessionId,
 			method: "POST",
 			data: gHaveIndex.toString(),
 			dataType: "json",
@@ -51,6 +58,10 @@ function receive() {
 				gSessionId = line.session.sessionId;
 				gCredentials = line.session.credentials;
 				updateLogin();
+			} else if (line && line[0] && line[0].action == "ready") {
+				if (window.location.hash) {
+					send({hash: window.location.hash});
+				}
 			} else if (line && line[0] && line[0].action == "notify") {
 				new Notification(line[0].title, line[0].options);
 			} else if (line && line[0] && line[0].action == "title") {
@@ -61,6 +72,8 @@ function receive() {
 					prompt.removeChild(prompt.firstChild);
 				}
 				prompt.appendChild(document.createTextNode(line[0].value));
+			} else if (line && line[0] && line[0].action == "hash") {
+				window.location.hash = line[0].value;
 			} else if (line && line[0] && line[0].action == "update") {
 				document.getElementById("update").setAttribute("Style", "display: inline");
 			} else if (line && line[0] && line[0].action == "configure") {
@@ -182,7 +195,7 @@ function send(command) {
 		$("#input").val("");
 	}
 	$.ajax({
-		url: window.location.href + "/send?sessionId=" + gSessionId,
+		url: url() + "/send?sessionId=" + gSessionId,
 			method: "POST",
 			data: JSON.stringify(value),
 			dataType: "text",
@@ -205,9 +218,9 @@ function updateLogin() {
 	var a = document.createElement("a");
 	if (gCredentials && gCredentials.session) {
 		a.appendChild(document.createTextNode("logout " + gCredentials.session.name));
-		a.setAttribute("href", "/login/logout?return=" + encodeURIComponent(window.location.href));
+		a.setAttribute("href", "/login/logout?return=" + encodeURIComponent(url()));
 	} else {
-		window.location.href = "/login?return=" + encodeURIComponent(window.location.href);
+		window.location.href = "/login?return=" + encodeURIComponent(url());
 	}
 	login.appendChild(a);
 }
@@ -304,12 +317,17 @@ function enableDragDrop() {
 	body.addEventListener("drop", fileDrop);
 }
 
+function hashChange() {
+	send({hash: window.location.hash});
+}
+
 $(document).ready(function() {
 	if (Notification) {
 		Notification.requestPermission();
 	}
 	$("#input").keydown(enter);
 	$("#input").focus();
+	window.addEventListener("hashchange", hashChange);
 	enableDragDrop();
 });
 
