@@ -2,6 +2,7 @@
 
 var terminal = require("terminal");
 var auth = require("auth");
+var network = require("network");
 
 var gProcessIndex = 0;
 var gProcesses = {};
@@ -233,6 +234,7 @@ function getProcess(packageOwner, packageName, key, options) {
 			process.lastActive = Date.now();
 			process.lastPing = null;
 			process.timeout = options.timeout;
+			process.connections = [];
 			var resolveReady;
 			var rejectReady;
 			process.ready = new Promise(function(resolve, reject) {
@@ -247,6 +249,10 @@ function getProcess(packageOwner, packageName, key, options) {
 				} else {
 					process.terminal.print("Process ended with exit code " + exitCode + ".");
 				}
+				for (let i = 0; i < process.connections.length; i++) {
+					process.connections[i].close();
+				}
+				process.connections.length = 0;
 				delete gProcesses[key];
 			};
 			if (process.timeout > 0) {
@@ -298,6 +304,17 @@ function getProcess(packageOwner, packageName, key, options) {
 					};
 				} else {
 					throw new Error(packageOwner + " does not have right to permission 'administration'.");
+				}
+			}
+			if (manifest
+				&& manifest.permissions
+				&& manifest.permissions.indexOf("network") != -1) {
+				if (getPermissionsForUser(packageOwner).network) {
+					imports.network = {
+						'newConnection': newConnection.bind(process),
+					};
+				} else {
+					throw new Error(packageOwner + " does not have right to permission 'network'.");
 				}
 			}
 			process.task.setImports(imports);
