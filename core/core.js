@@ -184,7 +184,7 @@ function getSessionProcess(packageOwner, packageName, session, options) {
 }
 
 function getServiceProcess(packageOwner, packageName, service, options) {
-	return getProcess(packageOwner, packageName, 'service_' + packageName + '_' + service, options || {});
+	return getProcess(packageOwner, packageName, 'service_' + packageOwner + '_' + packageName + '_' + service, options || {});
 }
 
 function badName(name) {
@@ -244,10 +244,12 @@ function getProcess(packageOwner, packageName, key, options) {
 			gProcesses[key] = process;
 			process.task.onExit = function(exitCode, terminationSignal) {
 				broadcastEvent('onSessionEnd', [getUser(process)]);
-				if (terminationSignal) {
-					process.terminal.print("Process terminated with signal " + terminationSignal + ".");
-				} else {
-					process.terminal.print("Process ended with exit code " + exitCode + ".");
+				if (process.terminal) {
+					if (terminationSignal) {
+						process.terminal.print("Process terminated with signal " + terminationSignal + ".");
+					} else {
+						process.terminal.print("Process ended with exit code " + exitCode + ".");
+					}
 				}
 				for (let i = 0; i < process.connections.length; i++) {
 					process.connections[i].close();

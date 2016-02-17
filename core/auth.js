@@ -78,6 +78,7 @@ function makeAdministrator(name) {
 	if (gGlobalSettings.permissions[name].indexOf("administration") == -1) {
 		gGlobalSettings.permissions[name].push("administration");
 	}
+	setGlobalSettings(gGlobalSettings);
 }
 
 function authHandler(request, response) {
@@ -98,7 +99,9 @@ function authHandler(request, response) {
 						gAccounts[formData.name] = {password: hashPassword(formData.password)};
 						writeSession(session, {name: formData.name});
 						File.writeFile(kAccountsFile, JSON.stringify(gAccounts));
-						makeAdministrator(formData.name);
+						if (noAdministrator()) {
+							makeAdministrator(formData.name);
+						}
 					} else {
 						loginError = "Error registering account.";
 					}
@@ -106,7 +109,9 @@ function authHandler(request, response) {
 					if (gAccounts[formData.name] &&
 						verifyPassword(formData.password, gAccounts[formData.name].password)) {
 						writeSession(session, {name: formData.name});
-						makeAdministrator(formData.name);
+						if (noAdministrator()) {
+							makeAdministrator(formData.name);
+						}
 					} else {
 						loginError = "Invalid username or password.";
 					}

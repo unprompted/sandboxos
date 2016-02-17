@@ -63,7 +63,7 @@ Connection.prototype.close = function() {
 };
 
 Connection.prototype.startTls = function() {
-	return this.socket.startTls();
+	return this.socket.startTls(this.tlsContext);
 };
 
 Connection.prototype.getPeerCertificate = function() {
