@@ -303,6 +303,7 @@ function getProcess(packageOwner, packageName, key, options) {
 					imports.administration = {
 						'setGlobalSettings': setGlobalSettings.bind(process),
 						'getGlobalSettings': getGlobalSettings.bind(process),
+						'getStatistics': function() { return statistics; },
 					};
 				} else {
 					throw new Error(packageOwner + " does not have right to permission 'administration'.");

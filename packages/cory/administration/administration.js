@@ -29,6 +29,9 @@ if (core.user.credentials.permissions &&
 			["permission remove ", {class: "cyan", value: "user action1 action2 ..."}],
 			["Revoke permission for ", {class: "cyan", value: "action1"}, ", ", {class: "cyan", value: "action2"}, ", ", {class: "cyan", value: "..."}, " from ", {class: "cyan", value: "user"}, "."],
 		],
+		[
+			"statistics", "List statistics."
+		],
 	];
 	for (var i = 0; i < kCommands.length; i++) {
 		terminal.print({class: "yellow", value: kCommands[i][0]});
@@ -64,6 +67,12 @@ function onInput(input) {
 		let match;
 		if (input == "set") {
 			administration.getGlobalSettings().then(printSettings);
+		} else if (input == "statistics") {
+			administration.getStatistics().then(function(s) {
+				for (var i in s) {
+					terminal.print(" ".repeat(16 - s[i].toString().length), s[i].toString(), " ", i);
+				}
+			});
 		} else if (match = /^\s*set\s+(\w+)\s+(.*)/.exec(input)) {
 			var key = match[1];
 			var value = match[2];

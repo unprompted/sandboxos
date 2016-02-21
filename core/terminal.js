@@ -146,7 +146,9 @@ function handler(request, response, packageOwner, packageName, uri) {
 					data = data.replace("$(EDIT_SOURCE)", "/~" + packageOwner + "/" + packageName + "/edit");
 				} else if (kStaticFiles[i].uri == "/edit") {
 					var source = File.readFile("packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js") || "";
-					source = source.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;');
+					source = source.replace(/([&<>"])/g, function(x, item) {
+						return {'&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;'}[item];
+					});
 					data = data.replace("$(SOURCE)", source);
 				}
 				response.writeHead(200, {"Content-Type": kStaticFiles[i].type, "Content-Length": data.length});

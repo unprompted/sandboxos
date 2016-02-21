@@ -21,6 +21,8 @@ public:
 
 	TlsContext* getContext() { return _context; }
 
+	static int getCount();
+
 private:
 	TlsContextWrapper(Task* task);
 	~TlsContextWrapper();
@@ -31,6 +33,7 @@ private:
 	Task* _task = 0;
 	v8::Persistent<v8::Object> _object;
 	int _refCount = 1;
+	static int _count;
 
 	void ref();
 	void release();

@@ -166,6 +166,7 @@ void Task::activate() {
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "exports"), getExports, setExports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "imports"), getImports);
 	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "version"), version);
+	global->SetAccessor(v8::String::NewFromUtf8(_isolate, "statistics"), statistics);
 	if (_trusted) {
 		global->Set(v8::String::NewFromUtf8(_isolate, "Database"), v8::FunctionTemplate::New(_isolate, Database::create));
 		global->Set(v8::String::NewFromUtf8(_isolate, "Socket"), v8::FunctionTemplate::New(_isolate, Socket::create));
@@ -526,6 +527,11 @@ v8::Handle<v8::Function> Task::addImport(taskid_t taskId, exportid_t exportId) {
 	return function;
 }
 
+void Task::statistics(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& args) {
+	Task* task = reinterpret_cast<Task*>(args.GetIsolate()->GetData(0));
+	args.GetReturnValue().Set(task->getStatistics());
+}
+
 v8::Handle<v8::Object> Task::getStatistics() {
 	v8::Handle<v8::Object> result = v8::Object::New(_isolate);
 	result->Set(v8::String::NewFromUtf8(_isolate, "sockets"), v8::Integer::New(_isolate, Socket::getCount()));
@@ -533,6 +539,7 @@ v8::Handle<v8::Object> Task::getStatistics() {
 	result->Set(v8::String::NewFromUtf8(_isolate, "promises"), v8::Integer::New(_isolate, _promises.size()));
 	result->Set(v8::String::NewFromUtf8(_isolate, "exports"), v8::Integer::New(_isolate, _exports.size()));
 	result->Set(v8::String::NewFromUtf8(_isolate, "imports"), v8::Integer::New(_isolate, _imports.size()));
+	result->Set(v8::String::NewFromUtf8(_isolate, "tlsContexts"), v8::Integer::New(_isolate, TlsContextWrapper::getCount()));
 
 	uv_rusage_t usage;
 	if (uv_getrusage(&usage) == 0) {
@@ -540,7 +547,6 @@ v8::Handle<v8::Object> Task::getStatistics() {
 		result->Set(v8::String::NewFromUtf8(_isolate, "stime"), v8::Number::New(_isolate, usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1000000.0));
 		result->Set(v8::String::NewFromUtf8(_isolate, "maxrss"), v8::Number::New(_isolate, usage.ru_maxrss));
 	}
-
 	return result;
 }
 

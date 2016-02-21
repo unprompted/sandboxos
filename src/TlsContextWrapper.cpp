@@ -5,6 +5,8 @@
 
 #include <assert.h>
 
+int TlsContextWrapper::_count = 0;
+
 void TlsContextWrapper::create(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	v8::HandleScope handleScope(args.GetIsolate());
 	if (TlsContextWrapper* wrapper = new TlsContextWrapper(Task::get(args.GetIsolate()))) {
@@ -15,6 +17,7 @@ void TlsContextWrapper::create(const v8::FunctionCallbackInfo<v8::Value>& args) 
 }
 
 TlsContextWrapper::TlsContextWrapper(Task* task) {
+	++_count;
 	v8::HandleScope scope(task->getIsolate());
 	v8::Handle<v8::External> identifier = v8::External::New(task->getIsolate(), reinterpret_cast<void*>(&TlsContextWrapper::create));
 	v8::Handle<v8::External> data = v8::External::New(task->getIsolate(), this);
@@ -36,6 +39,7 @@ TlsContextWrapper::TlsContextWrapper(Task* task) {
 
 TlsContextWrapper::~TlsContextWrapper() {
 	close();
+	--_count;
 }
 
 void TlsContextWrapper::close() {
@@ -103,4 +107,9 @@ void TlsContextWrapper::addTrustedCertificate(const v8::FunctionCallbackInfo<v8:
 		v8::String::Utf8Value value(args[0]->ToString(args.GetIsolate()));
 		wrapper->_context->addTrustedCertificate(*value);
 	}
+}
+
+int TlsContextWrapper::getCount()
+{
+	return _count;
 }
