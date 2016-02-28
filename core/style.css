@@ -82,6 +82,12 @@ a:active, .command:active {
 
 .CodeMirror {
 	height: 100%;
+	padding: 0;
+}
+
+.CodeMirror-scroll {
+	height: 100%;
+	padding: 0;
 }
 
 .cm-tab {
