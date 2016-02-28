@@ -211,15 +211,21 @@ function handler(request, response, packageOwner, packageName, uri) {
 					response.end("Too soon.");
 				} else {
 					var command = JSON.parse(request.body);
-					if (process.terminal._echo && typeof command == "string") {
-						process.terminal.print("> " + command);
+					var eventName = 'unknown';
+					if (typeof command == "string") {
+						if (process.terminal._echo) {
+							process.terminal.print("> " + command);
+						}
+						if (process.terminal._readLine) {
+							let promise = process.terminal._readLine;
+							process.terminal._readLine = null;
+							promise[0](command);
+						}
+						eventName = 'onInput';
+					} else if (command.event) {
+						eventName = command.event;
 					}
-					if (process.terminal._readLine) {
-						let promise = process.terminal._readLine;
-						process.terminal._readLine = null;
-						promise[0](command);
-					}
-					return invoke(process.eventHandlers['onInput'], [command]).then(function() {
+					return invoke(process.eventHandlers[eventName], [command]).then(function() {
 						response.writeHead(200, {
 							"Content-Type": "text/plain; charset=utf-8",
 							"Content-Length": "0",

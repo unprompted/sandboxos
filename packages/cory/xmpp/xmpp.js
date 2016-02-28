@@ -681,9 +681,11 @@ updateTitle();
 terminal.setEcho(false);
 terminal.setPrompt("Username:");
 terminal.readLine().then(function(userName) {
+	terminal.setPassword(true);
 	terminal.setPrompt("Password:");
 	terminal.readLine().then(function(password) {
 		terminal.setPrompt(">");
+		terminal.setPassword(false);
 		network.newConnection().then(function(socket) {
 			connect(socket, userName, password);
 		}).catch(function(error) {
@@ -758,6 +760,16 @@ function printMessage(stanza) {
 }
 
 var gRecent = [];
+
+core.register("focus", function() {
+	gFocus = true;
+	gUnread = 0;
+	updateTitle();
+});
+
+core.register("blur", function() {
+	gFocus = false;
+});
 
 function connect(socket, userName, password) {
 	var kTrustedCertificate = "-----BEGIN CERTIFICATE-----\n" +
@@ -838,15 +850,7 @@ function connect(socket, userName, password) {
 					} else if (stanza.attributes.id == "session0") {
 						socket.write("<presence to='chadhappyfuntime@conference.jabber.troubleimpact.com/" + userName + "'><priority>1</priority><x xmlns='http://jabber.org/protocol/muc'/></presence>");
 						core.register("onInput", function(input) {
-							if (typeof input == "string") {
-								socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
-							} else if (input.event == "focus") {
-								gFocus = true;
-								gUnread = 0;
-								updateTitle();
-							} else if (input.event == "blur") {
-								gFocus = false;
-							}
+							socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
 						});
 					}
 				} else if (stanza.name == "message" && stanza.attributes.type == "groupchat") {

@@ -60,7 +60,7 @@ function receive() {
 				updateLogin();
 			} else if (line && line[0] && line[0].action == "ready") {
 				if (window.location.hash) {
-					send({hash: window.location.hash});
+					send({event: "hashChange", hash: window.location.hash});
 				}
 			} else if (line && line[0] && line[0].action == "notify") {
 				new Notification(line[0].title, line[0].options);
@@ -321,7 +321,7 @@ function enableDragDrop() {
 }
 
 function hashChange() {
-	send({hash: window.location.hash});
+	send({event: 'hashChange', hash: window.location.hash});
 }
 
 function focus() {
