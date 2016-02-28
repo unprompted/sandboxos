@@ -128,7 +128,7 @@ function onInput(input) {
 					});
 				});
 			}
-		} else {
+		} else if (typeof input == "string") {
 			terminal.print("I didn't understand that.");
 		}
 	} catch (error) {

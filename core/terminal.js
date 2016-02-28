@@ -64,6 +64,10 @@ Terminal.prototype.setPrompt = function(value) {
 	this.print({action: "prompt", value: value});
 }
 
+Terminal.prototype.setPassword = function(value) {
+	this.print({action: "password", value: value});
+}
+
 Terminal.prototype.setHash = function(value) {
 	this.print({action: "hash", value: value});
 }

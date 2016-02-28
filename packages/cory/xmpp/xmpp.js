@@ -420,8 +420,8 @@ _utf8_decode : function (utftext) {
 // end base64.js
 
 function xmlEncode(text) {
-	return text.replace(/([\&"<>])/g, function(x, item) {
-		return {'&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;'}[item];
+	return text.replace(/([\&"'<>])/g, function(x, item) {
+		return {'&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;', "'": '&apos;'}[item];
 	});
 }
 function xmlDecode(xml) {
@@ -665,14 +665,25 @@ XmlStanzaParser.prototype.parseNode = function(node) {
 
 // end xmpp.js
 
-terminal.print("WIP Jabber Client");
+var gFocus = false;
+var gUnread = 0;
+
+function updateTitle() {
+	if (gUnread) {
+		terminal.setTitle("(" + gUnread.toString() + ") ~Friends XMPP");
+	} else {
+		terminal.setTitle("~Friends XMPP");
+	}
+}
+
+terminal.print("~Friends XMPP");
+updateTitle();
 terminal.setEcho(false);
 terminal.setPrompt("Username:");
 terminal.readLine().then(function(userName) {
 	terminal.setPrompt("Password:");
 	terminal.readLine().then(function(password) {
 		terminal.setPrompt(">");
-		terminal.print(network.newConnection);
 		network.newConnection().then(function(socket) {
 			connect(socket, userName, password);
 		}).catch(function(error) {
@@ -719,12 +730,14 @@ var lastTimestamp = null;
 function printMessage(stanza) {
 	var body;
 	var delayed = false;
+	var now = new Date().toString();
 	for (var i in stanza.children) {
 		if (stanza.children[i].name == "body") {
 			body = stanza.children[i].text;
 		}
 		if (stanza.children[i].name == "delay") {
 			delayed = true;
+			now = new Date(stanza.children[i].attributes.stamp).toString();
 		}
 	}
 
@@ -733,7 +746,6 @@ function printMessage(stanza) {
 		from = from.split("/")[1];
 	}
 
-	var now = new Date().toString();
 	terminal.print(
 		{class: "base0", value: niceTime(lastTimestamp, now)},
 		" ",
@@ -744,6 +756,8 @@ function printMessage(stanza) {
 		formatMessage(body));
 	lastTimestamp = now;
 }
+
+var gRecent = [];
 
 function connect(socket, userName, password) {
 	var kTrustedCertificate = "-----BEGIN CERTIFICATE-----\n" +
@@ -773,13 +787,26 @@ function connect(socket, userName, password) {
 
 		var started = false;
 		var authenticated = false;
-
+		socket.onError(function(error) {
+			terminal.print("SOCKET ERROR");
+			terminal.print(JSON.stringify(error));
+			terminal.print(error);
+		});
 		socket.read(function(data) {
-			if (!data) {
+			if (data === undefined) {
+				terminal.print(JSON.stringify(data));
 				terminal.print("Disconnected.");
+				terminal.print("Recent stanzas:");
+				for (let i = 0; i < gRecent.length; i++) {
+					terminal.print(JSON.stringify(gRecent[i]));
+				}
 				return;
 			}
 			parse.parse(data).forEach(function(stanza) {
+				gRecent.push(stanza);
+				while (gRecent.length > 10) {
+					gRecent.shift();
+				}
 				if (stanza.name == "stream:features") {
 					if (!started) {
 						terminal.print("starttls");
@@ -794,9 +821,6 @@ function connect(socket, userName, password) {
 						started = true;
 						socket.addTrustedCertificate(kTrustedCertificate);
 						socket.startTls().then(function() {
-							terminal.print("PEER CERTIFICATE");
-							terminal.print(socket.peerCertificate);
-							terminal.print("PEER CERTIFICATE");
 							parse.reset();
 							socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
 						}).catch(function(e) {
@@ -812,14 +836,25 @@ function connect(socket, userName, password) {
 					if (stanza.attributes.id == "bind0") {
 						socket.write("<iq type='set' id='session0'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>");
 					} else if (stanza.attributes.id == "session0") {
-						terminal.print("TIME TO JOIN?");
 						socket.write("<presence to='chadhappyfuntime@conference.jabber.troubleimpact.com/" + userName + "'><priority>1</priority><x xmlns='http://jabber.org/protocol/muc'/></presence>");
 						core.register("onInput", function(input) {
-							socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
+							if (typeof input == "string") {
+								socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
+							} else if (input.event == "focus") {
+								gFocus = true;
+								gUnread = 0;
+								updateTitle();
+							} else if (input.event == "blur") {
+								gFocus = false;
+							}
 						});
 					}
 				} else if (stanza.name == "message" && stanza.attributes.type == "groupchat") {
 					printMessage(stanza);
+					if (!gFocus) {
+						++gUnread;
+						updateTitle();
+					}
 				} else if (stanza.name == "challenge") {
 					var challenge = Base64.decode(stanza.text);
 					var parts = challenge.split(',');

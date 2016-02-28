@@ -72,6 +72,9 @@ function receive() {
 					prompt.removeChild(prompt.firstChild);
 				}
 				prompt.appendChild(document.createTextNode(line[0].value));
+			} else if (line && line[0] && line[0].action == "password") {
+				var prompt = document.getElementById("input");
+				prompt.setAttribute("type", line[0].value ? "password" : "text");
 			} else if (line && line[0] && line[0].action == "hash") {
 				window.location.hash = line[0].value;
 			} else if (line && line[0] && line[0].action == "update") {
@@ -321,6 +324,14 @@ function hashChange() {
 	send({hash: window.location.hash});
 }
 
+function focus() {
+	send({event: "focus"});
+}
+
+function blur() {
+	send({event: "blur"});
+}
+
 $(document).ready(function() {
 	if (Notification) {
 		Notification.requestPermission();
@@ -328,6 +339,8 @@ $(document).ready(function() {
 	$("#input").keydown(enter);
 	$("#input").focus();
 	window.addEventListener("hashchange", hashChange);
+	window.addEventListener("focus", focus);
+	window.addEventListener("blur", blur);
 	enableDragDrop();
 });
 

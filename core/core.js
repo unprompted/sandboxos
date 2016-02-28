@@ -291,6 +291,7 @@ function getProcess(packageOwner, packageName, key, options) {
 					'setEcho': process.terminal.setEcho.bind(process.terminal),
 					'setTitle': process.terminal.setTitle.bind(process.terminal),
 					'setPrompt': process.terminal.setPrompt.bind(process.terminal),
+					'setPassword': process.terminal.setPassword.bind(process.terminal),
 					'setHash': process.terminal.setHash.bind(process.terminal),
 					'configure': process.terminal.configure.bind(process.terminal),
 					'select': process.terminal.select.bind(process.terminal),

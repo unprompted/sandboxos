@@ -87,7 +87,7 @@ function saveBoard(data) {
 }
 
 core.register("onInput", function(input) {
-	if (gOnInput) {
+	if (gOnInput && typeof input == "string") {
 		gOnInput(input);
 	}
 });
