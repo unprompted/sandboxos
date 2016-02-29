@@ -84,6 +84,10 @@ Terminal.prototype.select = function(name) {
 	this._selected = name;
 }
 
+Terminal.prototype.postMessageToIframe = function(name, message) {
+	this.print({action: "postMessageToIframe", name: name, message: message});
+}
+
 Terminal.prototype.clear = function() {
 	//this._lines.length = 0;
 	//this._firstLine = this._index;

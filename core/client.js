@@ -95,6 +95,11 @@ function receive() {
 						node.remove();
 					}
 				}
+			} else if (line && line[0] && line[0].action == "postMessageToIframe") {
+				var iframe = document.getElementById("iframe_" + line[0].name);
+				if (iframe) {
+					iframe.contentWindow.postMessage(line[0].message, "*");
+				}
 			} else {
 				print(document.getElementById(target), line);
 			}
@@ -156,6 +161,9 @@ function printStructured(container, data) {
 			node.setAttribute("sandbox", "allow-forms allow-scripts");
 			node.setAttribute("width", data.width || 320);
 			node.setAttribute("height", data.height || 240);
+			if (data.name) {
+				node.setAttribute("id", "iframe_" + data.name);
+			}
 		} else if (data.image) {
 			node = document.createElement("img");
 			node.setAttribute("src", data.image);
@@ -332,6 +340,10 @@ function blur() {
 	send({event: "blur"});
 }
 
+function onMessage(event) {
+	send({event: "onWindowMessage", message: event.data});
+}
+
 $(document).ready(function() {
 	if (Notification) {
 		Notification.requestPermission();
@@ -341,6 +353,7 @@ $(document).ready(function() {
 	window.addEventListener("hashchange", hashChange);
 	window.addEventListener("focus", focus);
 	window.addEventListener("blur", blur);
+	window.addEventListener("message", onMessage, false);
 	enableDragDrop();
 });
 

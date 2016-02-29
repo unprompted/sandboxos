@@ -5,6 +5,7 @@
 // 10 between.
 
 var letters = {
+	A: 'fd(20); rt(90); fd(10); rt(90); fd(10); rt(90); fd(10); pu(); bk(10); lt(90); pd(); fd(10); pu(); lt(90); fd(10); lt(90); pd();',
 	D: 'fd(20); rt(90); fd(10); rt(70); fd(11); rt(40); fd(11); rt(70); fd(10); pu(); bk(20); rt(90); pd();',
 	E: 'pu(); fd(20); rt(90); fd(10); lt(180); pd(); fd(10); lt(90); fd(10); lt(90); fd(8); pu(); rt(180); fd(8); lt(90); pd(); fd(10); lt(90); fd(10); pu(); fd(10); lt(90); pd()',
 	H: 'fd(20); pu(); bk(10); pd(); rt(90); fd(10); lt(90); pu(); fd(10); rt(180); pd(); fd(20); pu(); lt(90); fd(10); lt(90); pd();',
@@ -17,8 +18,8 @@ var letters = {
 
 function render(text) {
 	terminal.clear();
-	terminal.print(text);
-	var contents = '<script src="http://codeheartjs.com/turtle/turtle.min.js">-*- javascript -*-</script><script>';
+	terminal.print(text, " using ", {href: "http://codeheartjs.com/turtle/"}, ".");
+	var contents = '<script src="http://codeheartjs.com/turtle/turtle.min.js">-*- javascript -*-</script><script>\n';
 	contents += 'setScale(2); setWidth(5);\n';
 	for (var i = 0; i < text.length; i++) {
 		var c = text.charAt(i).toUpperCase();
@@ -28,8 +29,9 @@ function render(text) {
 			contents += letters[' '] + '\n';
 		}
 	}
-	contents += "ht();";
-	contents += "</script>";
+	contents += "ht();\n";
+	contents += "window.addEventListener('message', function(event) { console.debug(event.data); }, false);\n";
+	contents += "</script>\n";
 	terminal.print({iframe: contents, width: 640, height: 480});
 	terminal.print("Type text and the letters ", {style: "color: #ff0", value: Object.keys(letters).join("")}, " in it will be drawn.");
 }

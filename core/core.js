@@ -295,6 +295,7 @@ function getProcess(packageOwner, packageName, key, options) {
 					'setHash': process.terminal.setHash.bind(process.terminal),
 					'configure': process.terminal.configure.bind(process.terminal),
 					'select': process.terminal.select.bind(process.terminal),
+					'postMessageToIframe': process.terminal.postMessageToIframe.bind(process.terminal),
 				};
 			}
 			if (manifest
