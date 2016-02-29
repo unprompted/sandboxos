@@ -50,7 +50,7 @@ if (imports.terminal) {
 }
 
 function listUsers() {
-	return core.getUsers(core.user.packageName).then(function(users) {
+	return core.getUsers(core.user.packageOwner, core.user.packageName).then(function(users) {
 		terminal.select("users");
 		terminal.clear();
 		terminal.print("Users:");

@@ -66,7 +66,9 @@ function broadcast(message) {
 	var from = getUser(sender);
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
-		if (process != sender && process.packageName == sender.packageName) {
+		if (process != sender
+			&& process.packageOwner == sender.packageOwner
+			&& process.packageName == sender.packageName) {
 			promises.push(invoke(process.eventHandlers['onMessage'], [from, message]));
 		}
 	}
@@ -126,11 +128,12 @@ function getUser(process) {
 	};
 }
 
-function getUsers(packageName) {
+function getUsers(packageOwner, packageName) {
 	var result = [];
 	for (var key in gProcesses) {
 		var process = gProcesses[key];
-		if (!packageName || process.packageName == packageName) {
+		if ((!packageOwner || process.packageOwner == packageOwner)
+			&& (!packageName || process.packageName == packageName)) {
 			result.push(getUser(process));
 		}
 	}
@@ -345,7 +348,8 @@ function getProcess(packageOwner, packageName, key, options) {
 function updateProcesses(packageOwner, packageName) {
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
-		if (process.packageName == packageName) {
+		if (process.packageOwner == packageOwner
+			&& process.packageName == packageName) {
 			if (process.terminal) {
 				process.terminal.notifyUpdate();
 			} else {
