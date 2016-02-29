@@ -35,6 +35,37 @@ function storeTarget(target) {
 	$("#target").text(target || "");
 }
 
+function split(container, children) {
+	if (container) {
+		while (container.firstChild) {
+			container.removeChild(container.firstChild);
+		}
+	}
+	if (children) {
+		for (var i = 0; i < children.length; i++) {
+			if (children[i].name) {
+				var node = document.createElement("div");
+				node.setAttribute("id", "terminal_" + children[i].name);
+				var grow = children[i].grow || "1";
+				var shrink = children[i].shrink || "1";
+				var basis = children[i].basis || "auto";
+				node.setAttribute("style", "flex: " + grow + " " + shrink + " " + basis);
+				node.setAttribute("class", "terminal");
+				container.appendChild(node);
+			} else if (children[i].type) {
+				node = document.createElement("div");
+				if (children[i].type == "horizontal") {
+					node.setAttribute("class", "hbox");
+				} else if (children[i].type == "vertical") {
+					node.setAttribute("class", "vbox");
+				}
+				container.appendChild(node);
+				split(node, children[i].children);
+			}
+		}
+	}
+}
+
 function receive() {
 	$.ajax({
 		url: url() + "/receive?sessionId=" + gSessionId,
@@ -45,7 +76,7 @@ function receive() {
 		for (var i in data.lines) {
 			var line = data.lines[i];
 
-			var target = "terminal_";
+			var target = document.getElementsByClassName("terminal")[0].id;
 			if (line && line.terminal) {
 				if (document.getElementById("terminal_" + line.terminal)) {
 					target = "terminal_" + line.terminal;
@@ -79,22 +110,8 @@ function receive() {
 				window.location.hash = line[0].value;
 			} else if (line && line[0] && line[0].action == "update") {
 				document.getElementById("update").setAttribute("Style", "display: inline");
-			} else if (line && line[0] && line[0].action == "configure") {
-				var options = line[0].options;
-				if (options) {
-					var node = document.getElementById("terminal_" + line[0].name);
-					if (!node) {
-						node = document.createElement("div");
-						document.getElementById("terminals").appendChild(node);
-					}
-					node.setAttribute("id", "terminal_" + line[0].name);
-					node.setAttribute("style", options.style);
-				} else {
-					var node = document.getElementById("terminal_" + line[0].name);
-					if (node) {
-						node.remove();
-					}
-				}
+			} else if (line && line[0] && line[0].action == "split") {
+				split(document.getElementById("terminals"), line[0].options);
 			} else if (line && line[0] && line[0].action == "postMessageToIframe") {
 				var iframe = document.getElementById("iframe_" + line[0].name);
 				if (iframe) {

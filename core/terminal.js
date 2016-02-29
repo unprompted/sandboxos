@@ -76,8 +76,8 @@ Terminal.prototype.notifyUpdate = function() {
 	this.print({action: "update"});
 }
 
-Terminal.prototype.configure = function(name, options) {
-	this.print({action: "configure", name: name, options: options});
+Terminal.prototype.split = function(options) {
+	this.print({action: "split", options: options});
 }
 
 Terminal.prototype.select = function(name) {

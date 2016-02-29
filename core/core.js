@@ -296,7 +296,7 @@ function getProcess(packageOwner, packageName, key, options) {
 					'setPrompt': process.terminal.setPrompt.bind(process.terminal),
 					'setPassword': process.terminal.setPassword.bind(process.terminal),
 					'setHash': process.terminal.setHash.bind(process.terminal),
-					'configure': process.terminal.configure.bind(process.terminal),
+					'split': process.terminal.split.bind(process.terminal),
 					'select': process.terminal.select.bind(process.terminal),
 					'postMessageToIframe': process.terminal.postMessageToIframe.bind(process.terminal),
 				};

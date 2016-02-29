@@ -71,7 +71,7 @@ function listUsers() {
 			}
 			terminal.print(message);
 		}
-		terminal.select();
+		terminal.select("terminal");
 	});
 }
 
@@ -305,7 +305,11 @@ function printHighScores(data) {
 }
 
 if (imports.terminal) {
-	terminal.configure("", {style: "width: 75%"});
-	terminal.configure("users", {style: "position: absolute; top: 1em; right: 0em; width: 25%; height: auto"});
+	terminal.split([
+		{type: "horizontal", children: [
+			{name: "terminal", grow: 1},
+			{name: "users", grow: 0},
+		]},
+	]);
 	welcome();
 }

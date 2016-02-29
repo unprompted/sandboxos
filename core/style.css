@@ -16,11 +16,9 @@ body {
 	width: 100%;
 }
 
-#terminal_ {
+#terminals {
 	flex: 1;
-	width: 100%;
-	resize: none;
-	overflow: auto;
+	flex-flow: column;
 }
 
 #logo {
@@ -30,6 +28,20 @@ body {
 .terminal {
 	outline: none;
 	white-space: pre-wrap;
+	resize: none;
+	overflow: auto;
+	height: auto;
+	width: auto;
+}
+
+.hbox {
+	display: flex;
+	flex-direction: row;
+}
+
+.vbox {
+	display: flex;
+	flex-direction: column;
 }
 
 .terminal > img {
