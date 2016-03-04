@@ -4,6 +4,10 @@
 
 if (imports.terminal) {
 	terminal.setEcho(false);
+	terminal.split([
+		{name: "graphics", basis: "520px", shrink: "0", grow: "0"},
+		{name: "text"},
+	]);
 
 	// Request a callback every time the user hits enter at the terminal prompt.
 	core.register("onInput", function(input) {
@@ -23,7 +27,7 @@ if (imports.terminal) {
 		terminal.print(data.message);
 	});
 
-	terminal.clear();
+	terminal.select("graphics");
 	terminal.print("MMO Turtle Graphics using ", {href: "http://codeheartjs.com/turtle/"}, ".");
 
 	// Add an iframe to the terminal.  This is how we sandbox code running on the client.
@@ -39,6 +43,7 @@ if (imports.terminal) {
 		var command = parts.shift();
 		if (["fd", "bk", "rt", "lt", "pu", "pd"].indexOf(command) != -1) {
 			window[command].apply(window, parts.map(parseInt));
+			event.source.postMessage(event.data, event.origin);
 			_ch_startTimer(30);
 		} else {
 			console.debug(event.source);
@@ -51,6 +56,8 @@ if (imports.terminal) {
 	</script>
 	`
 	terminal.print({iframe: contents, width: 640, height: 480, name: "turtle"});
+
+	terminal.select("text");
 	terminal.print("Supported commands: ", ["fd", "bk", "rt", "lt", "pu", "pd"].join(", "));
 } else {
 	// This is all that the service sesion does.
