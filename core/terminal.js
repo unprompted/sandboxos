@@ -7,6 +7,7 @@ var kStaticFiles = [
 	{uri: '/favicon.png', path: 'favicon.png', type: 'image/png'},
 	{uri: '/client.js', path: 'client.js', type: 'text/javascript; charset=utf-8'},
 	{uri: '/editor.js', path: 'editor.js', type: 'text/javascript; charset=utf-8'},
+	{uri: '/agplv3-88x31.png', path: 'agplv3-88x31.png', type: 'image/png'},
 ];
 
 var auth = require('auth');
