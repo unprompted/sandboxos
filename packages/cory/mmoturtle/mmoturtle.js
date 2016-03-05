@@ -48,7 +48,24 @@ if (imports.terminal) {
 	function onMessage(event) {
 		var parts = event.data.split(" ");
 		var command = parts.shift();
-		if (["fd", "bk", "rt", "lt", "pu", "pd"].indexOf(command) != -1) {
+		if (command == "reset") {
+			setPosition(0, 0);
+			setHeading(0);
+			clear(WHITE);
+			_ch_startTimer(30);
+		} else if (command == "home") {
+			var wasDown = _turtle.penDown;
+			pu();
+			setPosition(0, 0);
+			setHeading(0);
+			if (wasDown) {
+				pd();
+			}
+			_ch_startTimer(30);
+		} else if (command == "clear") {
+			clear(WHITE);
+			_ch_startTimer(30);
+		} else if (["fd", "bk", "rt", "lt", "pu", "pd"].indexOf(command) != -1) {
 			window[command].apply(window, parts.map(parseInt));
 			event.source.postMessage(event.data, event.origin);
 			_ch_startTimer(30);
@@ -64,7 +81,7 @@ if (imports.terminal) {
 	terminal.print({iframe: contents, width: 640, height: 480, name: "turtle"});
 
 	terminal.select("text");
-	terminal.print("Supported commands: ", ["fd", "bk", "rt", "lt", "pu", "pd"].join(", "));
+	terminal.print("Supported commands: ", ["fd <distance>", "bk <distance>", "rt <angle>", "lt <angle>", "pu", "pd", "home", "reset", "clear"].join(", "));
 
 	// Get the party started by asking for the history of commands (the turtle party).
 	setTimeout(function() {
