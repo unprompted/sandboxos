@@ -771,6 +771,15 @@ core.register("blur", function() {
 	gFocus = false;
 });
 
+var gPingCount = 0;
+
+function schedulePing(socket) {
+	setTimeout(function() {
+		socket.write("<iq type='get' id='ping" + (++gPingCount) + "'><ping xmlns='urn:xmpp:ping'/></iq>");
+		schedulePing(socket);
+	}, 60000);
+}
+
 function connect(socket, userName, password) {
 	var kTrustedCertificate = "-----BEGIN CERTIFICATE-----\n" +
 		"MIICqjCCAhOgAwIBAgIJAPEhMguftPdoMA0GCSqGSIb3DQEBCwUAMG4xCzAJBgNV\n" +
@@ -790,9 +799,7 @@ function connect(socket, userName, password) {
 		"q46TZws0oz5lAvklIgo=\n" +
 		"-----END CERTIFICATE-----";
 	var resource = "tildefriend" + core.user.index;
-	terminal.print("connecting");
 	socket.connect("jabber.troubleimpact.com", 5222).then(function() {
-		terminal.print("connected");
 		var parse = new XmlStanzaParser(1);
 		socket.write("<?xml version='1.0'?>");
 		socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
@@ -805,102 +812,110 @@ function connect(socket, userName, password) {
 			terminal.print(error);
 		});
 		socket.read(function(data) {
-			if (data === undefined) {
-				terminal.print(JSON.stringify(data));
-				terminal.print("Disconnected.");
-				terminal.print("Recent stanzas:");
-				for (let i = 0; i < gRecent.length; i++) {
-					terminal.print(JSON.stringify(gRecent[i]));
-				}
-				return;
-			}
-			parse.parse(data).forEach(function(stanza) {
-				gRecent.push(stanza);
+			try {
+				gRecent.push(data);
 				while (gRecent.length > 10) {
 					gRecent.shift();
 				}
-				if (stanza.name == "stream:features") {
-					if (!started) {
-						terminal.print("starttls");
-						socket.write("<starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>");
-					} else if (!authenticated) {
-						socket.write("<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='DIGEST-MD5'/>");
-					} else {
-						socket.write("<iq type='set' id='bind0'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><resource>" + resource + "</resource></bind></iq>");
+				if (data === undefined) {
+					terminal.print(JSON.stringify(data));
+					terminal.print("Disconnected.");
+					terminal.print("Recent data:");
+					for (let i = 0; i < gRecent.length; i++) {
+						terminal.print(JSON.stringify(gRecent[i]));
 					}
-				} else if (stanza.name == "proceed") {
-					if (!started) {
-						started = true;
-						socket.addTrustedCertificate(kTrustedCertificate);
-						socket.startTls().then(function() {
-							parse.reset();
-							socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
-						}).catch(function(e) {
-							terminal.print("TLS FAILED: " + e);
-						});
-					}
-				} else if (stanza.name == "success") {
-					authenticated = true;
-					socket.write("<?xml version='1.0'?>");
-					socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
-					parse.reset();
-				} else if (stanza.name == "iq") {
-					if (stanza.attributes.id == "bind0") {
-						socket.write("<iq type='set' id='session0'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>");
-					} else if (stanza.attributes.id == "session0") {
-						socket.write("<presence to='chadhappyfuntime@conference.jabber.troubleimpact.com/" + userName + "'><priority>1</priority><x xmlns='http://jabber.org/protocol/muc'/></presence>");
-						core.register("onInput", function(input) {
-							socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
-						});
-					}
-				} else if (stanza.name == "message" && stanza.attributes.type == "groupchat") {
-					printMessage(stanza);
-					if (!gFocus) {
-						++gUnread;
-						updateTitle();
-					}
-				} else if (stanza.name == "challenge") {
-					var challenge = Base64.decode(stanza.text);
-					var parts = challenge.split(',');
-					challenge = {};
-					for (var i = 0; i < parts.length; i++) {
-						var equals = parts[i].indexOf("=");
-						if (equals != -1) {
-							var key = parts[i].substring(0, equals);
-							var value = parts[i].substring(equals + 1);
-							if (value.length > 2 && value.charAt(0) == '"' && value.charAt(value.length - 1) == '"') {
-								value = value.substring(1, value.length - 1);
-							}
-							challenge[key] = value;
-						} else {
-							print(parts[i]);
-						}
-					}
-					print(challenge);
-					if (challenge.rspauth) {
-						socket.write("<response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>");
-					} else {
-						var realm = "jabber.troubleimpact.com";
-						var cnonce = Base64.encode(new Date().toString());
-						var x = userName + ":" + realm + ":" + password;
-						var y = raw_md5(x);
-						var a1 = y + ":" + challenge.nonce + ":" + cnonce;
-						var digestUri = "xmpp/" + realm;
-						var a2 = "AUTHENTICATE:" + digestUri;
-						var ha1 = md5(a1);
-						var ha2 = md5(a2);
-						var nc = "00000001";
-						var kd = ha1 + ":" + challenge.nonce + ":" + nc + ":" + cnonce + ":" + challenge.qop + ":" + ha2;
-						var response = md5(kd);
-						var value = Base64.encode('username="' + userName + '",realm="' + realm + '",nonce="' + challenge.nonce + '",cnonce="' + cnonce + '",nc=' + nc + ',qop=' + challenge.qop + ',digest-uri="' + digestUri + '",response=' + response + ',charset=utf-8');
-						socket.write("<response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + value + "</response>");
-					}
-				} else if (stanza.name == "presence") {
-					// Ignore <presence/>
-				} else {
-					terminal.print(data);
+					return;
 				}
-			});
+				parse.parse(data).forEach(function(stanza) {
+					if (stanza.name == "stream:features") {
+						if (!started) {
+							socket.write("<starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>");
+						} else if (!authenticated) {
+							socket.write("<auth xmlns='urn:ietf:params:xml:ns:xmpp-sasl' mechanism='DIGEST-MD5'/>");
+						} else {
+							socket.write("<iq type='set' id='bind0'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><resource>" + resource + "</resource></bind></iq>");
+						}
+					} else if (stanza.name == "proceed") {
+						if (!started) {
+							started = true;
+							socket.addTrustedCertificate(kTrustedCertificate);
+							socket.startTls().then(function() {
+								parse.reset();
+								socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
+							}).catch(function(e) {
+								terminal.print("TLS FAILED: " + e);
+							});
+						}
+					} else if (stanza.name == "success") {
+						authenticated = true;
+						socket.write("<?xml version='1.0'?>");
+						socket.write("<stream:stream to='jabber.troubleimpact.com' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>");
+						parse.reset();
+					} else if (stanza.name == "iq") {
+						if (stanza.attributes.id == "bind0") {
+							socket.write("<iq type='set' id='session0'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>");
+						} else if (stanza.attributes.id == "session0") {
+							socket.write("<presence to='chadhappyfuntime@conference.jabber.troubleimpact.com/" + userName + "'><priority>1</priority><x xmlns='http://jabber.org/protocol/muc'/></presence>");
+							core.register("onInput", function(input) {
+								socket.write("<message type='groupchat' to='chadhappyfuntime@conference.jabber.troubleimpact.com'><body>" + xmlEncode(input) + "</body></message>");
+							});
+							schedulePing(socket);
+						} else if (stanza.attributes.id == "ping" + gPingCount) {
+							// Ping response.
+						} else {
+							terminal.print(JSON.stringify(stanza));
+						}
+					} else if (stanza.name == "message") {
+						printMessage(stanza);
+						if (!gFocus) {
+							++gUnread;
+							updateTitle();
+						}
+					} else if (stanza.name == "challenge") {
+						var challenge = Base64.decode(stanza.text);
+						var parts = challenge.split(',');
+						challenge = {};
+						for (var i = 0; i < parts.length; i++) {
+							var equals = parts[i].indexOf("=");
+							if (equals != -1) {
+								var key = parts[i].substring(0, equals);
+								var value = parts[i].substring(equals + 1);
+								if (value.length > 2 && value.charAt(0) == '"' && value.charAt(value.length - 1) == '"') {
+									value = value.substring(1, value.length - 1);
+								}
+								challenge[key] = value;
+							}
+						}
+						if (challenge.rspauth) {
+							socket.write("<response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>");
+						} else {
+							var realm = "jabber.troubleimpact.com";
+							var cnonce = Base64.encode(new Date().toString());
+							var x = userName + ":" + realm + ":" + password;
+							var y = raw_md5(x);
+							var a1 = y + ":" + challenge.nonce + ":" + cnonce;
+							var digestUri = "xmpp/" + realm;
+							var a2 = "AUTHENTICATE:" + digestUri;
+							var ha1 = md5(a1);
+							var ha2 = md5(a2);
+							var nc = "00000001";
+							var kd = ha1 + ":" + challenge.nonce + ":" + nc + ":" + cnonce + ":" + challenge.qop + ":" + ha2;
+							var response = md5(kd);
+							var value = Base64.encode('username="' + userName + '",realm="' + realm + '",nonce="' + challenge.nonce + '",cnonce="' + cnonce + '",nc=' + nc + ',qop=' + challenge.qop + ',digest-uri="' + digestUri + '",response=' + response + ',charset=utf-8');
+							socket.write("<response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + value + "</response>");
+						}
+					} else if (stanza.name == "presence") {
+						// Ignore <presence/>
+						print(stanza);
+					} else {
+						terminal.print(data);
+					}
+				});
+			} catch (error) {
+				terminal.print("ERROR: " + error);
+				terminal.print("ERROR: " + JSON.stringify(error));
+				terminal.print("ERROR: " + error.message);
+			}
 		});
 	}).catch(function(e) {
 		terminal.print("connect failed: " + e);
