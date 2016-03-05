@@ -10,9 +10,9 @@ var kMessages = [
 		"",
 		"Tilde Friends: De-centralized webapps that anyone can download, modify, run, and share.",
 		"",
-		"You are looking at a web site running on a JavaScript and C++ web server that uses Google V8 to safely let visitors author webapps.",
+		"You are looking at a web site running on a JavaScript and C++ web server that uses Google V8 to let visitors author webapps.",
 		"",
-		["Source: ", {href: "https://www.unprompted.com/projects/browser/sandboxos/trunk/"}],
+		["Full source is here <", {href: "https://www.unprompted.com/projects/browser/sandboxos/trunk/"}, ">, but it is probably more fun and useful to poke around the ", {href: "/~cory/index", value: "existing webapps"}, "."],
 	],
 ];
 var gIndex = 0;

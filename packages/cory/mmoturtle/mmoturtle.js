@@ -18,9 +18,16 @@ if (imports.terminal) {
 	});
 
 	// Request a callback for every message that is broadcast.
-	core.register("onMessage", function(sender, input) {
-		// Pass the message on to the iframe in the client.
-		terminal.postMessageToIframe("turtle", input);
+	core.register("onMessage", function(sender, message) {
+		if (message.history) {
+			for (var i = 0; i < message.history.length; i++) {
+				// Pass the message on to the iframe in the client.
+				terminal.postMessageToIframe("turtle", message.history[i]);
+			}
+		} else {
+			// Pass the message on to the iframe in the client.
+			terminal.postMessageToIframe("turtle", message);
+		}
 	});
 
 	core.register("onWindowMessage", function(data) {
@@ -34,8 +41,8 @@ if (imports.terminal) {
 	var contents = `
 	<script src="http://codeheartjs.com/turtle/turtle.min.js">-*- javascript -*-</script>
 	<script>
-	//setScale(2);
-	//setWidth(5);
+	setScale(2);
+	setWidth(3);
 
 	// Receive messages in the iframe and use them to draw.
 	function onMessage(event) {
@@ -46,7 +53,6 @@ if (imports.terminal) {
 			event.source.postMessage(event.data, event.origin);
 			_ch_startTimer(30);
 		} else {
-			console.debug(event.source);
 			event.source.postMessage("Unrecognized command: " + command, event.origin);
 		}
 	}
@@ -59,9 +65,24 @@ if (imports.terminal) {
 
 	terminal.select("text");
 	terminal.print("Supported commands: ", ["fd", "bk", "rt", "lt", "pu", "pd"].join(", "));
+
+	// Get the party started by asking for the history of commands (the turtle party).
+	setTimeout(function() {
+		core.getService("turtle").then(function(service) {
+			return service.postMessage("sync");
+		});
+	}, 1000);
 } else {
-	// This is all that the service sesion does.
+	var gHistory = [];
 	core.register("onMessage", function(sender, message) {
-		return core.broadcast(message);
+		if (message == "reset") {
+			gHistory.length = 0;
+			return core.broadcast(message);
+		} else if (message == "sync") {
+			sender.postMessage({history: gHistory});
+		} else {
+			gHistory.push(message);
+			return core.broadcast(message);
+		}
 	});
 }

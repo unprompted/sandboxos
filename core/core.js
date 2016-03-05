@@ -63,13 +63,13 @@ function broadcastEvent(eventName, argv) {
 function broadcast(message) {
 	var sender = this;
 	var promises = [];
-	var from = getUser(sender);
 	for (var i in gProcesses) {
 		var process = gProcesses[i];
 		if (process != sender
 			&& process.packageOwner == sender.packageOwner
 			&& process.packageName == sender.packageName) {
-			promises.push(invoke(process.eventHandlers['onMessage'], [from, message]));
+			var from = getUser(process, sender);
+			promises.push(postMessageInternal(from, process, message));
 		}
 	}
 	return Promise.all(promises);
@@ -118,13 +118,14 @@ function getPackages() {
 	return packages;
 }
 
-function getUser(process) {
+function getUser(caller, process) {
 	return {
 		name: process.userName,
 		index: process.index,
 		packageOwner: process.packageOwner,
 		packageName: process.packageName,
 		credentials: process.credentials,
+		postMessage: postMessageInternal.bind(caller, caller, process),
 	};
 }
 
@@ -134,7 +135,7 @@ function getUsers(packageOwner, packageName) {
 		var process = gProcesses[key];
 		if ((!packageOwner || process.packageOwner == packageOwner)
 			&& (!packageName || process.packageName == packageName)) {
-			result.push(getUser(process));
+			result.push(myGetUser(this, process));
 		}
 	}
 	return result;
@@ -161,9 +162,8 @@ function ping() {
 	}
 }
 
-function postMessage(from, message) {
-	var process = this;
-	return invoke(process.eventHandlers['onMessage'], [getUser(from), message]);
+function postMessageInternal(from, to, message) {
+	return invoke(to.eventHandlers['onMessage'], [getUser(from, from), message]);
 }
 
 function getService(service) {
@@ -171,7 +171,7 @@ function getService(service) {
 	var serviceProcess = getServiceProcess(process.packageOwner, process.packageName, service);
 	return serviceProcess.ready.then(function() {
 		return {
-			postMessage: postMessage.bind(serviceProcess, process),
+			postMessage: postMessageInternal.bind(process, process, serviceProcess),
 		}
 	});
 }
@@ -225,6 +225,7 @@ function getProcess(packageOwner, packageName, key, options) {
 			var fileName = "packages/" + packageOwner + "/" + packageName + "/" + packageName + ".js";
 			var manifest = getManifest(fileName);
 			process = {};
+			process.key = key;
 			process.index = gProcessIndex++;
 			process.userName = options.userName || ('user' + process.index);
 			process.credentials = options.credentials || {};
@@ -232,7 +233,9 @@ function getProcess(packageOwner, packageName, key, options) {
 			process.eventHandlers = {};
 			process.packageOwner = packageOwner;
 			process.packageName = packageName;
-			process.terminal = new Terminal();
+			if (options.terminal) {
+				process.terminal = new Terminal();
+			}
 			process.database = null;
 			process.lastActive = Date.now();
 			process.lastPing = null;
@@ -246,7 +249,7 @@ function getProcess(packageOwner, packageName, key, options) {
 			});
 			gProcesses[key] = process;
 			process.task.onExit = function(exitCode, terminationSignal) {
-				broadcastEvent('onSessionEnd', [getUser(process)]);
+				broadcastEvent('onSessionEnd', [getUser(process, process)]);
 				if (process.terminal) {
 					if (terminationSignal) {
 						process.terminal.print("Process terminated with signal " + terminationSignal + ".");
@@ -275,8 +278,8 @@ function getProcess(packageOwner, packageName, key, options) {
 						}
 						process.eventHandlers[eventName].push(handler);
 					},
-					'getUser': getUser.bind(process, process),
-					'user': getUser(process),
+					'getUser': getUser.bind(null, process, process),
+					'user': getUser(process, process),
 				},
 				'database': {
 					'get': databaseGet.bind(process),
@@ -331,7 +334,7 @@ function getProcess(packageOwner, packageName, key, options) {
 			print("Executing task");
 			process.task.execute(fileName).then(function() {
 				print("Task ready");
-				broadcastEvent('onSessionBegin', [getUser(process)]);
+				broadcastEvent('onSessionBegin', [getUser(process, process)]);
 				resolveReady(process);
 			}).catch(function(error) {
 				printError(process.terminal, error);
