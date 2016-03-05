@@ -28,7 +28,9 @@ function enter(event) {
 
 function url() {
 	var hash = window.location.href.indexOf('#');
-	return hash != -1 ? window.location.href.substring(0, hash) : window.location.href;
+	var question = window.location.href.indexOf('?');
+	var end = hash != -1 ? hash : question;
+	return end != -1 ? window.location.href.substring(0, end) : window.location.href;
 }
 
 function storeTarget(target) {
@@ -247,6 +249,8 @@ function updateLogin() {
 	if (gCredentials && gCredentials.session) {
 		a.appendChild(document.createTextNode("logout " + gCredentials.session.name));
 		a.setAttribute("href", "/login/logout?return=" + encodeURIComponent(url()));
+	} else if (window.location.href.indexOf("?guest=1") != -1) {
+		window.location.href = "/login?submit=Proceed+as+Guest&return=" + encodeURIComponent(url());
 	} else {
 		window.location.href = "/login?return=" + encodeURIComponent(url());
 	}

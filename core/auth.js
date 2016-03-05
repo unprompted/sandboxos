@@ -87,11 +87,12 @@ function authHandler(request, response) {
 		var sessionIsNew = false;
 		var loginError;
 
-		if (request.method == "POST") {
-			// XXX: Assume a post is a new login attempt.
+		var formData = form.decodeForm(request.query);
+
+		if (request.method == "POST" || formData.submit) {
 			session = newSession();
 			sessionIsNew = true;
-			var formData = form.decodeForm(request.body);
+			formData = form.decodeForm(request.body, formData);
 			if (formData.submit == "Login") {
 				if (formData.register == "1") {
 					if (!gAccounts[formData.name] &&
@@ -122,12 +123,10 @@ function authHandler(request, response) {
 			}
 		}
 
-		var queryForm = form.decodeForm(request.query);
-
 		var cookie = "session=" + session + "; path=/; Max-Age=604800";
 		var entry = readSession(session);
-		if (entry && queryForm.return) {
-			response.writeHead(303, {"Location": queryForm.return, "Set-Cookie": cookie});
+		if (entry && formData.return) {
+			response.writeHead(303, {"Location": formData.return, "Set-Cookie": cookie});
 			response.end();
 		} else {
 			var html = File.readFile("core/auth.html");
