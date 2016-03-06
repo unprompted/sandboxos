@@ -1,5 +1,6 @@
 #include "Task.h"
 #include "TaskStub.h"
+#include "TaskTryCatch.h"
 
 #include <cstring>
 #include <libplatform/libplatform.h>
@@ -57,7 +58,14 @@ int main(int argc, char* argv[]) {
 		Task task;
 		task.setTrusted(true);
 		task.activate();
-		task.execute(coreTask);
+
+		{
+			v8::Isolate::Scope isolateScope(task.getIsolate());
+			v8::HandleScope handleScope(task.getIsolate());
+			v8::Context::Scope contextScope(task.getContext());
+			TaskTryCatch tryCatch(&task);
+			task.execute(coreTask);
+		}
 		task.run();
 	}
 

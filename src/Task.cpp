@@ -100,6 +100,7 @@ Task::Task() {
 	options.array_buffer_allocator = &_allocator;
 	_isolate = v8::Isolate::New(options);
 	_isolate->SetData(0, this);
+	_isolate->SetCaptureStackTraceForUncaughtExceptions(true, 16);
 }
 
 Task::~Task() {
@@ -114,6 +115,10 @@ Task::~Task() {
 
 	uv_loop_delete(_loop);
 	--_count;
+}
+
+v8::Handle<v8::Context> Task::getContext() {
+	return v8::Local<v8::Context>::New(_isolate, _context);
 }
 
 void Task::run() {
@@ -195,6 +200,9 @@ void Task::print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	for (int i = 0; i < args.Length(); i++) {
 		std::cout << ' ';
 		v8::Handle<v8::Value> arg = args[i];
+		if (arg->IsNativeError()) {
+			arg = Serialize::storeMessage(task, v8::Exception::CreateMessage(arg));
+		}
 		v8::String::Utf8Value value(stringify->Call(json, 1, &arg));
 		std::cout << (*value ? *value : "(null)");
 	}

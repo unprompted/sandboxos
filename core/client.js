@@ -195,7 +195,25 @@ function printStructured(container, data) {
 		if (data.class) {
 			node.setAttribute("class", data.class);
 		}
-		printStructured(node, data.value || data.href || data.command || "");
+		var value = data.value || data.href || data.command || "";
+		if (!value && data.message && data.stackTrace) {
+			printStructured(node, data.message);
+			node.appendChild(document.createElement("br"));
+			printStructured(node, data.fileName + ":" + data.lineNumber + ":");
+			node.appendChild(document.createElement("br"));
+			if (data.stackTrace.length) {
+				for (var i = 0; i < data.stackTrace.length; i++) {
+					printStructured(node, data.stackTrace[i]);
+					node.appendChild(document.createElement("br"));
+				}
+			} else {
+				printStructured(node, data.sourceLine);
+			}
+		} else if (value === undefined) {
+			printStructured(node, JSON.stringify(value));
+		} else {
+			printStructured(node, value);
+		}
 		if (data.command) {
 			node.dataset.command = data.command;
 			node.onclick = commandClick;

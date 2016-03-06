@@ -13,6 +13,7 @@ public:
 	static v8::Handle<v8::Value> load(Task* task, TaskStub* from, const std::vector<char>& buffer);
 
 	static v8::Handle<v8::Value> store(Task* task, v8::TryCatch& tryCatch);
+	static v8::Handle<v8::Object> storeMessage(Task* task, v8::Handle<v8::Message> message);
 
 private:
 	static bool storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<v8::Value> value, int depth);
@@ -39,6 +40,7 @@ private:
 		kArray,
 		kObject,
 		kFunction,
+		kError,
 	};
 };
 

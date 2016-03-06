@@ -64,6 +64,7 @@ public:
 	const std::string& getName() const { return _scriptName; }
 	v8::Isolate* getIsolate() { return _isolate; }
 	uv_loop_t* getLoop() { return _loop; }
+	v8::Handle<v8::Context> getContext();
 	void kill();
 
 	promiseid_t allocatePromise();

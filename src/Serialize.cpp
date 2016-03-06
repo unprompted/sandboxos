@@ -91,9 +91,19 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 		writeInt32(buffer, kFunction);
 		exportid_t exportId = task->exportFunction(v8::Handle<v8::Function>::Cast(value));
 		writeInt32(buffer, exportId);
+	} else if (value->IsNativeError()) {
+		storeInternal(task, buffer, storeMessage(task, v8::Exception::CreateMessage(value)), depth);
 	} else if (value->IsObject()) {
 		writeInt32(buffer, kObject);
 		v8::Handle<v8::Object> object = value->ToObject();
+
+		// XXX: For some reason IsNativeError isn't working reliably.  Catch an
+		// object that still looks like an error object and treat it as such.
+		if (object->GetOwnPropertyNames()->Length() == 0
+			&& !object->Get(v8::String::NewFromUtf8(task->getIsolate(), "stackTrace")).IsEmpty()) {
+			object = v8::Handle<v8::Object>::Cast(storeMessage(task, v8::Exception::CreateMessage(value)));
+		}
+
 		v8::Handle<v8::Array> keys = object->GetOwnPropertyNames();
 		writeInt32(buffer, keys->Length());
 		for (size_t i = 0; i < keys->Length(); ++i) {
@@ -112,13 +122,18 @@ bool Serialize::storeInternal(Task* task, std::vector<char>& buffer, v8::Handle<
 }
 
 v8::Handle<v8::Value> Serialize::store(Task* task, v8::TryCatch& tryCatch) {
+	return storeMessage(task, tryCatch.Message());
+}
+
+v8::Handle<v8::Object> Serialize::storeMessage(Task* task, v8::Handle<v8::Message> message) {
 	v8::Handle<v8::Object> error = v8::Object::New(task->getIsolate());
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "message"), tryCatch.Message()->Get());
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "fileName"), tryCatch.Message()->GetScriptResourceName());
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "lineNumber"), v8::Integer::New(task->getIsolate(), tryCatch.Message()->GetLineNumber()));
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "sourceLine"), tryCatch.Message()->GetSourceLine());
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "exception"), tryCatch.Exception());
-	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "stackTrace"), tryCatch.StackTrace());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "message"), message->Get());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "fileName"), message->GetScriptResourceName());
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "lineNumber"), v8::Integer::New(task->getIsolate(), message->GetLineNumber()));
+	error->Set(v8::String::NewFromUtf8(task->getIsolate(), "sourceLine"), message->GetSourceLine());
+	if (!message->GetStackTrace().IsEmpty()) {
+		error->Set(v8::String::NewFromUtf8(task->getIsolate(), "stackTrace"), message->GetStackTrace()->AsArray());
+	}
 	return error;
 }
 
