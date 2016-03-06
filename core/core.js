@@ -135,7 +135,7 @@ function getUsers(packageOwner, packageName) {
 		var process = gProcesses[key];
 		if ((!packageOwner || process.packageOwner == packageOwner)
 			&& (!packageName || process.packageName == packageName)) {
-			result.push(myGetUser(this, process));
+			result.push(getUser(this, process));
 		}
 	}
 	return result;
