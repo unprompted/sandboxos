@@ -90,16 +90,35 @@ if (imports.terminal) {
 		});
 	}, 1000);
 } else {
-	var gHistory = [];
-	core.register("onMessage", function(sender, message) {
-		if (message == "reset") {
-			gHistory.length = 0;
-			return core.broadcast(message);
-		} else if (message == "sync") {
-			sender.postMessage({history: gHistory});
+	var gHistory = null;
+
+	function ensureHistoryLoaded() {
+		if (!gHistory) {
+			return database.get("history").then(function(data) {
+				gHistory = JSON.parse(data);
+				return gHistory;
+			}).catch(function(error) {
+				gHistory = [];
+				return gHistory;
+			});
 		} else {
-			gHistory.push(message);
-			return core.broadcast(message);
+			return new Promise(function(resolve, reject) { resolve(gHistory); });
 		}
+	}
+
+	core.register("onMessage", function(sender, message) {
+		return ensureHistoryLoaded().then(function(history) {
+			if (message == "reset") {
+				history.length = 0;
+				database.set("history", JSON.stringify(history));
+				return core.broadcast(message);
+			} else if (message == "sync") {
+				sender.postMessage({history: history});
+			} else {
+				history.push(message);
+				database.set("history", JSON.stringify(history));
+				return core.broadcast(message);
+			}
+		});
 	});
 }
