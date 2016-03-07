@@ -75,12 +75,15 @@ def updateV8():
 	if clean:
 		if os.path.isdir(kV8Work):
 			shutil.rmtree(kV8Work)
+	extension = ''
+	if sys.platform == 'win32':
+		extension = '.bat'
 	if not os.path.isdir(kV8Work):
-		subprocess.check_call(['fetch', 'v8'])
+		subprocess.check_call(['fetch' + extension, 'v8'])
 	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
 	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
 	subprocess.check_call(['git', 'checkout', kV8Branch], cwd=kV8Work)
-	subprocess.check_call(['gclient', 'sync'], cwd=kV8Work)
+	subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work)
 	contents = open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'r').readlines()
 	contents = [line for line in contents if not 'SSLv3' in line]
 	open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'w').write(''.join(contents))
