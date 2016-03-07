@@ -87,6 +87,7 @@ def updateV8():
 	contents = open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'r').readlines()
 	contents = [line for line in contents if not 'SSLv3' in line]
 	open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'w').write(''.join(contents))
+	subprocess.check_call(['git', 'add', 'third_party/requests/packages/urllib3/contrib/pyopenssl.py'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
 	if sys.platform == 'linux2':
 		subprocess.check_call(['make', '-j4', 'native'], cwd=kV8Work)
 	elif sys.platform == 'darwin':
