@@ -5,6 +5,8 @@ import shutil
 import subprocess
 import sys
 
+os.chdir(os.path.join(os.path.dirname(__file__), '..'))
+
 kWork = os.path.join('deps', sys.platform)
 
 kUvRepository = 'https://github.com/libuv/libuv.git'
@@ -19,6 +21,8 @@ print
 
 if not os.path.isdir(kUvWork):
 	subprocess.check_call(['git', 'clone', '--branch', kUvBranch, kUvRepository, kUvWork])
+if not os.path.isdir(os.path.join(kUvWork, 'build', 'gyp')):
+	subprocess.check_call(['git', 'clone', 'https://chromium.googlesource.com/external/gyp.git', 'build/gyp'], cwd=kUvWork)
 if clean:
 	if os.path.isdir(os.path.join(kUvWork, 'out')):
 		shutil.rmtree(os.path.join(kUvWork, 'out'))
