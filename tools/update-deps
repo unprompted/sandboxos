@@ -21,17 +21,19 @@ print
 
 if not os.path.isdir(kUvWork):
 	subprocess.check_call(['git', 'clone', '--branch', kUvBranch, kUvRepository, kUvWork])
-if not os.path.isdir(os.path.join(kUvWork, 'build', 'gyp')):
-	subprocess.check_call(['git', 'clone', 'https://chromium.googlesource.com/external/gyp.git', 'build/gyp'], cwd=kUvWork)
+if sys.platform in ('darwin', 'win32'):
+	if not os.path.isdir(os.path.join(kUvWork, 'build', 'gyp')):
+		subprocess.check_call(['git', 'clone', 'https://chromium.googlesource.com/external/gyp.git', 'build/gyp'], cwd=kUvWork)
 if clean:
 	if os.path.isdir(os.path.join(kUvWork, 'out')):
 		shutil.rmtree(os.path.join(kUvWork, 'out'))
-subprocess.check_call(['./gyp_uv.py', '-f', 'make'], cwd=kUvWork)
 
 if sys.platform == 'linux2':
+	subprocess.check_call(['./gyp_uv.py', '-f', 'make'], cwd=kUvWork)
 	subprocess.check_call(['make', '-j8', '-C', 'out'], cwd=kUvWork)
 elif sys.platform == 'darwin':
+	subprocess.check_call(['./gyp_uv.py', '-f', 'xcode'], cwd=kUvWork)
 	subprocess.check_call(['xcodebuild', '-ARCHS="x86_64"', '-project', 'uv.xcodeproj', '-configuration', 'Release', '-target', 'All'], cwd=kUvWork)
 elif sys.platform == 'win32':
-	subprocess.check_call(['vcbuild.bat'], cwd=kUvWork)
+	subprocess.check_call(['cmd', '/C', 'call', 'vcbuild.bat'], cwd=kUvWork)
 	subprocess.check_call(['devenv.cmd', 'libuv.sln', '/Build', 'Release'], cwd=kUvWork)
