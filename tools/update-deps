@@ -85,14 +85,14 @@ def updateV8():
 	win32Env['GYP_MSVS_VERSION'] = '2013'
 	win32Env['DEPOT_TOOLS_WIN_TOOLCHAIN'] = '0'
 
-	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
-	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
-	subprocess.check_call(['git', 'checkout', kV8Branch], cwd=kV8Work)
-
 	# XXX We modify one .py file which assumes invalid things.
 	if os.path.isfile(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py')):
 		print 'resetting tools/swarming_client'
 		subprocess.check_call(['git', 'reset', '--hard'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
+
+	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
+	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
+	subprocess.check_call(['git', 'checkout', kV8Branch], cwd=kV8Work)
 
 	if sys.platform == 'win32':
 		subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work, env=win32Env)
