@@ -40,9 +40,7 @@ elif sys.platform == 'darwin':
 	subprocess.check_call(['./gyp_uv.py', '-f', 'xcode'], cwd=kUvWork)
 	subprocess.check_call(['xcodebuild', '-ARCHS="x86_64"', '-project', 'uv.xcodeproj', '-configuration', 'Release', '-target', 'All'], cwd=kUvWork)
 elif sys.platform == 'win32':
-	env = dict(os.environ)
-	if 'VCINSTALLDIR' in env:
-		del env['VCINSTALLDIR']
-	if 'WindowsSDKDir' in env:
-		del env['WindowsSDKDir']
+	env = os.environ.copy()
+	env['VCINSTALLDIR'] = ''
+	env['WindowsSDKDir'] = ''
 	subprocess.check_call(['cmd', '/C', 'call', 'vcbuild.bat', 'release', 'x64'], cwd=kUvWork, env=env)
