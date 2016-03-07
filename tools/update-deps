@@ -80,23 +80,32 @@ def updateV8():
 		extension = '.bat'
 	if not os.path.isdir(kV8Work):
 		subprocess.check_call(['fetch' + extension, 'v8'])
+
+	win32Env = os.environ.copy()
+	win32Env['GYP_MSVS_VERSION'] = '2013'
+	win32Env['DEPOT_TOOLS_WIN_TOOLCHAIN'] = '0'
+
 	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
 	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
 	subprocess.check_call(['git', 'checkout', kV8Branch], cwd=kV8Work)
-	subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work)
+	if sys.platform == 'win32':
+		subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work, env=win32Env)
+	else:
+		subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work)
+	
+	# XXX Modify one .py file which assumes invalid things.
+	subprocess.call(['git', 'add', 'third_party/requests/packages/urllib3/contrib/pyopenssl.py'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
 	contents = open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'r').readlines()
 	contents = [line for line in contents if not 'SSLv3' in line]
 	open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'w').write(''.join(contents))
-	subprocess.check_call(['git', 'add', 'third_party/requests/packages/urllib3/contrib/pyopenssl.py'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
+
 	if sys.platform == 'linux2':
 		subprocess.check_call(['make', '-j4', 'native'], cwd=kV8Work)
 	elif sys.platform == 'darwin':
 		subprocess.check_call(['build/gyp_v8', '-Dtarget_arch=x64'], cwd=kV8Work)
 		subprocess.check_call(['xcodebuild', '-project', 'build/all.xcodeproj', '-configuration', 'Release'], cwd=kV8Work)
 	elif sys.platform == 'win32':
-		env = os.environ.copy()
-		env['GYP_MSVS_VERSION'] = '2013'
-		subprocess.check_call(['python', 'build\\gyp_v8'], cwd=kV8Work, env=env)
+		subprocess.check_call(['python', 'build\\gyp_v8', '-Dtarget_arch=x64'], cwd=kV8Work, env=win32Env)
 		subprocess.check_call(['devenv.com', '/Build', 'Release', 'build\\All.sln'], cwd=kV8Work)
 
 if __name__ == '__main__':
