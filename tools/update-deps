@@ -88,16 +88,20 @@ def updateV8():
 	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
 	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
 	subprocess.check_call(['git', 'checkout', kV8Branch], cwd=kV8Work)
+
+	# XXX Modify one .py file which assumes invalid things.
+	if os.path.isfile(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py')):
+		subprocess.check_call(['git', 'reset', '--hard'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
+
 	if sys.platform == 'win32':
 		subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work, env=win32Env)
 	else:
 		subprocess.check_call(['gclient' + extension, 'sync'], cwd=kV8Work)
-	
-	# XXX Modify one .py file which assumes invalid things.
-	subprocess.call(['git', 'add', 'third_party/requests/packages/urllib3/contrib/pyopenssl.py'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
+
 	contents = open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'r').readlines()
 	contents = [line for line in contents if not 'SSLv3' in line]
 	open(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py'), 'w').write(''.join(contents))
+	subprocess.call(['git', 'add', 'third_party/requests/packages/urllib3/contrib/pyopenssl.py'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
 
 	if sys.platform == 'linux2':
 		subprocess.check_call(['make', '-j4', 'native'], cwd=kV8Work)

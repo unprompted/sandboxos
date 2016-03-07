@@ -41,7 +41,7 @@ elif sys.platform == 'darwin':
 	env.Append(CFLAGS=['-g', '-Wall'])
 	env.Append(LINKFLAGS=['-g', '-stdlib=libstdc++'])
 	env.Append(LIBPATH=[
-		os.path.join(v8, 'out/x64.release'),
+		os.path.join(v8, 'xcodebuild/Release'),
 		os.path.join(uv, 'build/Release'),
 	])
 else:
@@ -50,8 +50,8 @@ else:
 	env.Append(CFLAGS=['-g', '-Wall'])
 	env.Append(LINKFLAGS=['-g'])
 	env.Append(LIBPATH=[
-		os.path.join(v8, 'out/x64.release/obj.target/third_party/icu'),
-		os.path.join(v8, 'out/x64.release/obj.target/tools/gyp'),
+		os.path.join(v8, 'out/native/obj.target/third_party/icu'),
+		os.path.join(v8, 'out/native/obj.target/tools/gyp'),
 		os.path.join(uv, 'out/Debug/obj.target'),
 	])
 
