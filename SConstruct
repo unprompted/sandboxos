@@ -42,7 +42,7 @@ elif sys.platform == 'darwin':
 	env.Append(LINKFLAGS=['-g', '-stdlib=libstdc++'])
 	env.Append(LIBPATH=[
 		os.path.join(v8, 'out/x64.release'),
-		os.path.join(uv, 'out/Debug'),
+		os.path.join(uv, 'build/Release'),
 	])
 else:
 	env.Append(LIBS=['v8_base', 'v8_libbase', 'v8_libplatform', 'v8_nosnapshot', 'icui18n', 'icuuc', 'icudata', 'pthread', 'uv', 'rt', 'dl'])
