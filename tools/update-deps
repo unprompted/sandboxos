@@ -43,4 +43,6 @@ elif sys.platform == 'win32':
 	env = os.environ.copy()
 	env['VCINSTALLDIR'] = ''
 	env['WindowsSDKDir'] = ''
+	subprocess.check_call(['cmd', '/C', 'set'], cwd=kUvWork, env=env)
+	subprocess.check_call(['cmd', '/C', 'if defined VCINSTALLDIR echo DEFINED'], cwd=kUvWork, env=env)
 	subprocess.check_call(['cmd', '/C', 'call', 'vcbuild.bat', 'release', 'x64'], cwd=kUvWork, env=env)
