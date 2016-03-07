@@ -41,4 +41,4 @@ elif sys.platform == 'darwin':
 	subprocess.check_call(['xcodebuild', '-ARCHS="x86_64"', '-project', 'uv.xcodeproj', '-configuration', 'Release', '-target', 'All'], cwd=kUvWork)
 elif sys.platform == 'win32':
 	subprocess.check_call(['cmd', '/C', 'call', 'vcbuild.bat'], cwd=kUvWork)
-	subprocess.check_call(['devenv.com', 'libuv.sln', '/Build', 'Release'], cwd=kUvWork)
+	subprocess.check_call(['devenv.com', 'uv.sln', '/Build', 'Release'], cwd=kUvWork)
