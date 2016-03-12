@@ -75,6 +75,12 @@ def updateV8():
 	if clean:
 		if os.path.isdir(kV8Work):
 			shutil.rmtree(kV8Work)
+
+	# XXX We modify one .py file which assumes invalid things.
+	if os.path.isfile(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py')):
+		print 'resetting tools/swarming_client'
+		subprocess.check_call(['git', 'reset', '--hard'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
+
 	extension = ''
 	if sys.platform == 'win32':
 		extension = '.bat'
@@ -84,11 +90,6 @@ def updateV8():
 	win32Env = os.environ.copy()
 	win32Env['GYP_MSVS_VERSION'] = '2013'
 	win32Env['DEPOT_TOOLS_WIN_TOOLCHAIN'] = '0'
-
-	# XXX We modify one .py file which assumes invalid things.
-	if os.path.isfile(os.path.join(kV8Work, 'tools/swarming_client/third_party/requests/packages/urllib3/contrib/pyopenssl.py')):
-		print 'resetting tools/swarming_client'
-		subprocess.check_call(['git', 'reset', '--hard'], cwd=os.path.join(kV8Work, 'tools', 'swarming_client'))
 
 	open(os.path.join(kV8Work, '.update-deps-branch'), 'w').write(kV8Branch)
 	subprocess.check_call(['git', 'fetch'], cwd=kV8Work)
