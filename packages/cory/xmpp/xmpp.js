@@ -780,6 +780,25 @@ function schedulePing(socket) {
 	}, 60000);
 }
 
+terminal.split([
+	{type: "horizontal", children: [
+		{name: "terminal", grow: 1},
+		{name: "users", grow: 0},
+	]},
+]);
+terminal.select("terminal");
+
+var gPresence = {};
+
+function refreshUsers() {
+	terminal.select("users");
+	terminal.clear();
+	for (var i in gPresence) {
+		terminal.print(i);
+	}
+	terminal.select("terminal");
+}
+
 function connect(socket, userName, password) {
 	var kTrustedCertificate = "-----BEGIN CERTIFICATE-----\n" +
 		"MIICqjCCAhOgAwIBAgIJAPEhMguftPdoMA0GCSqGSIb3DQEBCwUAMG4xCzAJBgNV\n" +
@@ -810,6 +829,7 @@ function connect(socket, userName, password) {
 			terminal.print("SOCKET ERROR");
 			terminal.print(JSON.stringify(error));
 			terminal.print(error);
+			terminal.print(error.message);
 		});
 		socket.read(function(data) {
 			try {
@@ -905,8 +925,17 @@ function connect(socket, userName, password) {
 							socket.write("<response xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>" + value + "</response>");
 						}
 					} else if (stanza.name == "presence") {
-						// Ignore <presence/>
-						print(stanza);
+						var name = stanza.attributes.from.split('/', 2)[1];
+						if (stanza.attributes.type == "unavailable") {
+							terminal.print(name + " has left the room.");
+							delete gPresence[name];
+						} else {
+							if (!gPresence[name]) {
+								terminal.print(name + " has joined the room.");
+							}
+							gPresence[name] = stanza;
+						}
+						refreshUsers();
 					} else {
 						terminal.print(data);
 					}
@@ -918,6 +947,6 @@ function connect(socket, userName, password) {
 			}
 		});
 	}).catch(function(e) {
-		terminal.print("connect failed: " + e);
+		terminal.print("connect failed: ", e);
 	});
 }
